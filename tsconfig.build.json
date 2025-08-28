@@ -11,7 +11,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "types": [],
-    "lib": ["esnext"],
+    "lib": ["esnext", "dom"],
     "noEmit": false
   },
   "exclude": [

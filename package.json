@@ -36,6 +36,8 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@hpke/core": "^1.7.4",
+    "eslint-config-prettier": "^10.1.8",
     "ts-mls": "^1.1.0"
   },
   "devDependencies": {
