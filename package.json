@@ -1,0 +1,52 @@
+{
+  "name": "ts-mls-nostr",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Glue code for using ts-mls with nostr",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/parres-hq/ts-mls-nostr.git"
+  },
+  "keywords": [
+    "nostr",
+    "mls"
+  ],
+  "author": "Parres",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/parres-hq/ts-mls-nostr/issues"
+  },
+  "homepage": "https://github.com/parres-hq/ts-mls-nostr#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npm run clean && npm run compile --force",
+    "clean": "rimraf ./dist",
+    "compile": "tsc -b tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "format": "eslint --fix .",
+    "lint": "eslint .",
+    "test": "vitest",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "ts-mls": "^1.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "eslint": "^9.34.0",
+    "globals": "^16.3.0",
+    "husky": "^9.1.7",
+    "jiti": "^2.5.1",
+    "rimraf": "~6.0.0",
+    "typescript": "~5.8.0",
+    "typescript-eslint": "^8.41.0",
+    "vitest": "^3.2.4"
+  }
+}
