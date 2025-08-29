@@ -12,17 +12,15 @@
     "esModuleInterop": true,
     "types": [],
     "lib": ["esnext", "dom"],
-    "noEmit": false
+    "noEmit": false,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true
   },
   "exclude": [
     "node_modules",
     "dist"
   ],
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true
-  },
   "include": [
     "src/**/*"
   ]

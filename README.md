@@ -7,10 +7,12 @@ This library serves the same purpose as the [nostr-mls](https://github.com/rust-
 ## Usage
 
 ```typescript
-import { f } from 'ts-mls-nostr';
+import { NostrMLS } from "ts-mls-nostr"
 
-// Basic usage example
-f();
+const mls = new NostrMLS()
+const aliceCred = mls.createCredential("deadbeef")
+const aliceKP = await mls.createKeyPackage(aliceCred)
+const aliceGroup = await mls.createGroup(aliceKP)
 ```
 
 ## Contributing

@@ -32,7 +32,7 @@ export type CompleteKeyPackage = {
   privatePackage: PrivateKeyPackage
 }
 
-export const ciphersuite: Ciphersuite = getCiphersuiteFromName("MLS_256_XWING_AES256GCM_SHA512_Ed25519")
+export const ciphersuite: Ciphersuite = getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519")
 
 export const defaultExtensions = []
 
