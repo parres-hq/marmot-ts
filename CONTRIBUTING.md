@@ -6,7 +6,8 @@ Thank you for your interest in contributing to ts-mls-nostr! This document provi
 
 ### Prerequisites
 
-- Node.js (version compatible with TypeScript 5.8+)
+- Node.js LTS (>= 20.x)
+- TypeScript ~5.8.0 (installed via devDependencies)
 - npm or yarn
 - Git
 
