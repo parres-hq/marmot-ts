@@ -2,6 +2,8 @@
   "extends": "./tsconfig.build.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "noEmit": true
-  }
+    "noEmit": true,
+    "types": ["vitest", "vitest/globals", "node"]
+  },
+  "include": ["src", "__tests__"]
 }
