@@ -21,6 +21,7 @@ import {
   MlsPublicMessage,
   MlsPrivateMessage,
   PrivateKeyPackage,
+  processPrivateMessage,
   processMessage,
   Proposal,
   RatchetTree,
@@ -36,7 +37,7 @@ export const ciphersuite: Ciphersuite = getCiphersuiteFromName("MLS_128_DHKEMX25
 
 export const defaultExtensions = []
 
-export class NostrMLS {
+export class Marmot {
   private ciphersuiteImpl: Promise<CiphersuiteImpl>
 
   constructor(readonly provider: CryptoProvider = defaultCryptoProvider) {
@@ -60,11 +61,12 @@ export class NostrMLS {
     )
   }
 
-  async createGroup(keyPackage: CompleteKeyPackage) {
+  async createGroup(keyPackage: CompleteKeyPackage, groupId?: Uint8Array) {
     const ciphersuiteImpl = await this.ciphersuiteImpl
+    const actualGroupId = groupId || ciphersuiteImpl.rng.randomBytes(32)
 
     return createGroup(
-      ciphersuiteImpl.rng.randomBytes(32),
+      actualGroupId,
       keyPackage.publicPackage,
       keyPackage.privatePackage,
       defaultExtensions,
@@ -88,13 +90,24 @@ export class NostrMLS {
   }
 
   async processMessage(groupState: ClientState, message: MlsPrivateMessage | MlsPublicMessage) {
-    return processMessage(
-      message,
-      groupState,
-      makePskIndex(groupState, {}),
-      acceptAll,
-      await this.ciphersuiteImpl,
-    )
+    if ('privateMessage' in message) {
+      // Handle private message
+      return processPrivateMessage(
+        groupState,
+        message.privateMessage,
+        emptyPskIndex,
+        await this.ciphersuiteImpl
+      )
+    } else {
+      // Handle public message - use the general processMessage
+      return processMessage(
+        message,
+        groupState,
+        makePskIndex(groupState, {}),
+        acceptAll,
+        await this.ciphersuiteImpl,
+      )
+    }
   }
 
   async joinGroup(welcome: Welcome, keyPackage: CompleteKeyPackage, ratchetTree: RatchetTree) {

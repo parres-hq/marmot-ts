@@ -1,6 +1,6 @@
-# Contributing to ts-mls-nostr
+# Contributing to marmot-ts
 
-Thank you for your interest in contributing to ts-mls-nostr! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to marmot-ts! This document provides guidelines and information for contributors.
 
 ## Getting Started
 
@@ -16,8 +16,8 @@ Thank you for your interest in contributing to ts-mls-nostr! This document provi
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/ts-mls-nostr.git
-   cd ts-mls-nostr
+   git clone https://github.com/YOUR_USERNAME/marmot-ts.git
+   cd marmot-ts
    ```
 3. Install dependencies:
    ```bash
