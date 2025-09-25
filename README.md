@@ -4,15 +4,17 @@
 
 This library serves the same purpose as the [MDK](https://github.com/parres-hq/mdk) library that wrap the [OpenMLS](https://github.com/openmls/openmls) library. It provides the necessary functionality to implement the [Marmot protocol](https://github.com/parres-hq/marmot) on top of a complete MLS (Messaging Layer Security) specification implementation.
 
-## Usage
+## Examples
 
-```typescript
-import { Marmot } from "marmot-ts"
+See the [`examples/`](examples/) directory for comprehensive examples:
 
-const marmot = new Marmot()
-const aliceCred = marmot.createCredential("deadbeef")
-const aliceKP = await marmot.createKeyPackage(aliceCred)
-const aliceGroup = await marmot.createGroup(aliceKP)
+- **[`full-workflow.ts`](examples/full-workflow.ts)** - Complete MLS workflow with multiple participants, group management, and secure messaging
+- **[`simple-chat.ts`](examples/simple-chat.ts)** - Practical chat application demonstrating real-world usage
+
+```bash
+npm run example:full  # Run the full workflow example
+npm run example:chat  # Run the simple chat example
+npm test             # Run all tests including examples
 ```
 
 ## Contributing

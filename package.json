@@ -46,7 +46,9 @@
     "format": "eslint --fix .",
     "lint": "eslint .",
     "test": "vitest",
-    "prepare": "husky"
+    "prepare": "husky",
+    "example:full": "tsx examples/full-workflow.ts",
+    "example:chat": "tsx examples/simple-chat.ts"
   },
   "dependencies": {
     "@hpke/core": "^1.7.4",
