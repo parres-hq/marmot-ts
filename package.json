@@ -2,7 +2,7 @@
   "name": "marmot-ts",
   "version": "0.0.1",
   "type": "module",
-  "description": "Marmot protocol implmentation in TypeScript",
+  "description": "Marmot protocol implementation in TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
