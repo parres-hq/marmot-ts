@@ -6,9 +6,10 @@ export default function SideNav() {
   const [searchTerm, setSearchTerm] = createSignal<string>("");
   const hash = useHash();
 
-  const filtered = examples.filter((item) =>
-    item.id.toLowerCase().includes(searchTerm().toLowerCase()),
-  );
+  const filtered = () =>
+    examples.filter((item) =>
+      item.id.toLowerCase().includes(searchTerm().toLowerCase()),
+    );
 
   return (
     <div class="drawer-side">
@@ -26,7 +27,7 @@ export default function SideNav() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
         <ul class="menu menu-lg px-0 font-mono w-xs">
-          <For each={filtered}>
+          <For each={filtered()}>
             {(item) => (
               <li>
                 <a

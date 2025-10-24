@@ -40,12 +40,12 @@ function RelayPickerModal(props: {
               placeholder="wss://your-relay.com"
               class="input input-bordered join-item flex-1"
               value={customRelayUrl()}
-              onChange={(e) => setCustomRelayUrl(e.target.value)}
+              onInput={(e) => setCustomRelayUrl(e.currentTarget.value)}
             />
             <button
               class="btn btn-primary join-item"
               onClick={handleCustomRelaySubmit}
-              disabled={!customRelayUrl}
+              disabled={customRelayUrl() === ""}
             >
               Set
             </button>
@@ -59,39 +59,34 @@ function RelayPickerModal(props: {
   );
 }
 
-export default function RelayPicker({
-  value,
-  onChange,
-  common = COMMON_RELAYS,
-  className,
-}: {
+export default function RelayPicker(props: {
   value: string;
   onChange: (relay: string) => void;
   common?: string[];
-  className?: string;
 }) {
   const [isModalOpen, setIsModalOpen] = createSignal(false);
 
   const allRelayOptions = createMemo(() => {
-    if (!value || common.includes(value)) return common;
-    else return [value, ...(common || [])];
-  }, [value, common]);
+    const common = props.common || COMMON_RELAYS;
+    if (!props.value || common.includes(props.value)) return common;
+    else return [props.value, ...common];
+  });
 
   const handleSelectChange = (e: Event) => {
-    onChange((e.target as HTMLSelectElement).value);
+    props.onChange((e.target as HTMLSelectElement).value);
   };
 
   const handleModalSelect = (relay: string) => {
-    onChange(relay);
+    props.onChange(relay);
     setIsModalOpen(false);
   };
 
   return (
     <>
-      <div class={`join ${className}`}>
+      <div class="join">
         <select
           class="select select-bordered join-item"
-          value={value}
+          value={props.value}
           onChange={handleSelectChange}
         >
           <option value="" disabled>

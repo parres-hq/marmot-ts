@@ -11,7 +11,7 @@ export const eventStore = new EventStore();
 // Create relay connection pool
 export const pool = new RelayPool();
 
-// Create loaders for loading evnets and replaceable events
+// Create loaders for loading events and replaceable events
 const addressLoader = createAddressLoader(pool, {
   lookupRelays: ["wss://purplepag.es/", "wss://index.hzrd149.com/"],
 });

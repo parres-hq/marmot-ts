@@ -68,6 +68,8 @@ export function getKeyPackageCipherSuiteId(
 ): CiphersuiteId | undefined {
   const cipherSuite = getTagValue(event, KEY_PACKAGE_CIPHER_SUITE_TAG);
   if (!cipherSuite) return undefined;
+
+  // NOTE: we are intentially not passing a radix to parseInt here so that it can handle base 10 and 16 (with leading 0x)
   const id = parseInt(cipherSuite);
 
   // Verify that cipher suite is a valid ID
@@ -87,6 +89,7 @@ export function getKeyPackageExtensions(
 
   const ids = tag
     .slice(1)
+    // NOTE: we are intentially not passing a radix to parseInt here so that it can handle base 10 and 16 (with leading 0x)
     .map((t) => parseInt(t))
     .filter((id) => Number.isFinite(id));
 

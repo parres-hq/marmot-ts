@@ -19,15 +19,20 @@ function ExampleView(props: { example?: Example }) {
   // load selected example
   createEffect(() => {
     if (!props.example) return;
-
     setPath(props.example.path.replace(/^\.\//, ""));
-    props.example.load().then((module: any) => {
-      if (typeof module.default !== "function")
-        throw new Error("Example must be a function");
+    props.example
+      .load()
+      .then((module: any) => {
+        if (typeof module.default !== "function")
+          throw new Error("Example must be a function");
 
-      console.log("Loaded Example", module.default);
-      setComponent(() => module.default);
-    });
+        console.log("Loaded Example", module.default);
+        setComponent(() => module.default);
+      })
+      .catch((error) => {
+        console.error("Failed to load example:", error);
+        setComponent(null);
+      });
   });
 
   return (
