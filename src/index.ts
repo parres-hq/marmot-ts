@@ -29,7 +29,7 @@ import {
   Proposal,
   RatchetTree,
   Welcome,
-} from "ts-mls"
+} from "ts-mls";
 
 /**
  * A complete key package containing both public and private components.
@@ -39,14 +39,16 @@ import {
  */
 export type CompleteKeyPackage = {
   /** The public key package that can be shared with others */
-  publicPackage: KeyPackage
+  publicPackage: KeyPackage;
   /** The private key package that must be kept secret */
-  privatePackage: PrivateKeyPackage
-}
+  privatePackage: PrivateKeyPackage;
+};
 
-export const ciphersuite: Ciphersuite = getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519")
+export const ciphersuite: Ciphersuite = getCiphersuiteFromName(
+  "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+);
 
-export const defaultExtensions = []
+export const defaultExtensions = [];
 
 /**
  * Main class providing MLS (Messaging Layer Security) functionality for the Marmot protocol.
@@ -66,7 +68,7 @@ export const defaultExtensions = []
  * ```
  */
 export class Marmot {
-  private ciphersuiteImpl: Promise<CiphersuiteImpl>
+  private ciphersuiteImpl: Promise<CiphersuiteImpl>;
 
   /**
    * Creates a new Marmot instance.
@@ -74,7 +76,7 @@ export class Marmot {
    * @param provider - Optional crypto provider. Defaults to the default crypto provider from ts-mls.
    */
   constructor(readonly provider: CryptoProvider = defaultCryptoProvider) {
-    this.ciphersuiteImpl = getCiphersuiteImpl(ciphersuite, provider)
+    this.ciphersuiteImpl = getCiphersuiteImpl(ciphersuite, provider);
   }
 
   /**
@@ -92,7 +94,7 @@ export class Marmot {
     return {
       credentialType: "basic",
       identity: new TextEncoder().encode(hexPublicKey),
-    }
+    };
   }
 
   /**
@@ -116,8 +118,8 @@ export class Marmot {
       defaultCapabilities(),
       defaultLifetime,
       defaultExtensions,
-      await this.ciphersuiteImpl
-    )
+      await this.ciphersuiteImpl,
+    );
   }
 
   /**
@@ -135,17 +137,20 @@ export class Marmot {
    * const group = await marmot.createGroup(keyPackage, customId)
    * ```
    */
-  async createGroup(keyPackage: CompleteKeyPackage, groupId?: Uint8Array): Promise<ClientState> {
-    const ciphersuiteImpl = await this.ciphersuiteImpl
-    const actualGroupId = groupId || ciphersuiteImpl.rng.randomBytes(32)
+  async createGroup(
+    keyPackage: CompleteKeyPackage,
+    groupId?: Uint8Array,
+  ): Promise<ClientState> {
+    const ciphersuiteImpl = await this.ciphersuiteImpl;
+    const actualGroupId = groupId || ciphersuiteImpl.rng.randomBytes(32);
 
     return createGroup(
       actualGroupId,
       keyPackage.publicPackage,
       keyPackage.privatePackage,
       defaultExtensions,
-      ciphersuiteImpl
-    )
+      ciphersuiteImpl,
+    );
   }
 
   /**
@@ -168,11 +173,14 @@ export class Marmot {
    * const result = await marmot.createCommit(groupState, [addProposal])
    * ```
    */
-  async createCommit(groupState: ClientState, proposals: Proposal[]): Promise<CreateCommitResult> {
+  async createCommit(
+    groupState: ClientState,
+    proposals: Proposal[],
+  ): Promise<CreateCommitResult> {
     return createCommit(
-      {state: groupState, cipherSuite: await this.ciphersuiteImpl},
-      {extraProposals: proposals}
-    )
+      { state: groupState, cipherSuite: await this.ciphersuiteImpl },
+      { extraProposals: proposals },
+    );
   }
 
   /**
@@ -195,15 +203,18 @@ export class Marmot {
    * }
    * ```
    */
-  async createMessage(groupState: ClientState, message: string): Promise<{
+  async createMessage(
+    groupState: ClientState,
+    message: string,
+  ): Promise<{
     newState: ClientState;
     privateMessage: PrivateMessage;
   }> {
     return createApplicationMessage(
       groupState,
       new TextEncoder().encode(message),
-      await this.ciphersuiteImpl
-    )
+      await this.ciphersuiteImpl,
+    );
   }
 
   /**
@@ -226,15 +237,18 @@ export class Marmot {
    * }
    * ```
    */
-  async processMessage(groupState: ClientState, message: MlsPrivateMessage | MlsPublicMessage): Promise<ProcessMessageResult> {
-    if ('privateMessage' in message) {
+  async processMessage(
+    groupState: ClientState,
+    message: MlsPrivateMessage | MlsPublicMessage,
+  ): Promise<ProcessMessageResult> {
+    if ("privateMessage" in message) {
       // Handle private message
       return processPrivateMessage(
         groupState,
         message.privateMessage,
         emptyPskIndex,
-        await this.ciphersuiteImpl
-      )
+        await this.ciphersuiteImpl,
+      );
     } else {
       // Handle public message - use the general processMessage
       return processMessage(
@@ -243,7 +257,7 @@ export class Marmot {
         makePskIndex(groupState, {}),
         acceptAll,
         await this.ciphersuiteImpl,
-      )
+      );
     }
   }
 
@@ -268,7 +282,11 @@ export class Marmot {
    * )
    * ```
    */
-  async joinGroup(welcome: Welcome, keyPackage: CompleteKeyPackage, ratchetTree: RatchetTree): Promise<ClientState> {
+  async joinGroup(
+    welcome: Welcome,
+    keyPackage: CompleteKeyPackage,
+    ratchetTree: RatchetTree,
+  ): Promise<ClientState> {
     return joinGroup(
       welcome,
       keyPackage.publicPackage,
@@ -276,6 +294,6 @@ export class Marmot {
       emptyPskIndex,
       await this.ciphersuiteImpl,
       ratchetTree,
-    )
+    );
   }
 }
