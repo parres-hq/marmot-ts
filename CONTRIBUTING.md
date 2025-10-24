@@ -36,8 +36,7 @@ Thank you for your interest in contributing to marmot-ts! This document provides
 - `npm run clean` - Remove the dist directory
 - `npm run compile` - Compile TypeScript files
 - `npm run test` - Run tests with Vitest
-- `npm run lint` - Run ESLint
-- `npm run format` - Format code with ESLint --fix
+- `npm run format` - Format code with Prettier
 - `npm run prepare` - Set up Husky git hooks
 
 ### Making Changes
