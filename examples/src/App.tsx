@@ -73,18 +73,6 @@ function ExampleView(props: { example?: Example }) {
               <CodeIcon /> Source
             </a>
           </div>
-          <div class="hidden flex-none lg:block">
-            <ul class="menu menu-horizontal">
-              <li>
-                <a href="https://hzrd149.github.io/applesauce">Documentation</a>
-              </li>
-              <li>
-                <a href="https://hzrd149.github.io/applesauce/typedoc/">
-                  Reference
-                </a>
-              </li>
-            </ul>
-          </div>
         </div>
 
         {/* Page content */}
