@@ -47,6 +47,8 @@ jobs:
 
       - name: Build examples
         working-directory: examples
+        env:
+          VITE_REPO_BRANCH: ${{ github.ref_name }}
         run: pnpm install && pnpm build --base /marmot-ts
 
       - name: Setup Pages
