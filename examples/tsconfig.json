@@ -13,8 +13,7 @@
     "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "noEmit": true,
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
+    "jsx": "react-jsx",
 
     /* Linting */
     "strict": true,

@@ -1,23 +1,17 @@
-import {
-  createEffect,
-  createSignal,
-  ErrorBoundary,
-  Show,
-  type Component,
-} from "solid-js";
-import { Dynamic } from "solid-js/web";
-import SideNav from "./components/Nav";
+import { useEffect, useState, type ComponentType, Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import SideNav from "./components/SideNav.tsx";
 
 import { CodeIcon } from "./components/items.tsx";
 import examples, { type Example } from "./examples";
 import useHash from "./hooks/use-hash";
 
 function ExampleView(props: { example?: Example }) {
-  const [path, setPath] = createSignal("");
-  const [Component, setComponent] = createSignal<Component<any> | null>(null);
+  const [path, setPath] = useState("");
+  const [Component, setComponent] = useState<ComponentType<any> | null>(null);
 
   // load selected example
-  createEffect(() => {
+  useEffect(() => {
     if (!props.example) return;
     setPath(props.example.path.replace(/^\.\//, ""));
     props.example
@@ -33,47 +27,47 @@ function ExampleView(props: { example?: Example }) {
         console.error("Failed to load example:", error);
         setComponent(null);
       });
-  });
+  }, [props.example]);
 
   return (
-    <div class="drawer lg:drawer-open h-full min-h-screen">
-      <input id="drawer" type="checkbox" class="drawer-toggle" />
+    <div className="drawer lg:drawer-open h-full min-h-screen">
+      <input id="drawer" type="checkbox" className="drawer-toggle" />
 
       {/* Main content */}
-      <div class="drawer-content flex flex-col relative">
+      <div className="drawer-content flex flex-col relative">
         {/* Navbar */}
-        <div class="navbar bg-base-300 w-full">
-          <div class="flex-none lg:hidden">
+        <div className="navbar bg-base-300 w-full">
+          <div className="flex-none lg:hidden">
             <label
-              for="drawer"
+              htmlFor="drawer"
               aria-label="open sidebar"
-              class="btn btn-square btn-ghost"
+              className="btn btn-square btn-ghost"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
-                class="inline-block h-6 w-6 stroke-current"
+                className="inline-block h-6 w-6 stroke-current"
               >
                 <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
                   d="M4 6h16M4 12h16M4 18h16"
                 ></path>
               </svg>
             </label>
           </div>
-          <div class="mx-2 flex-1 px-2">
-            <span class="font-bold text-lg">
+          <div className="mx-2 flex-1 px-2">
+            <span className="font-bold text-lg">
               {props.example?.name ?? "Examples"}
             </span>
           </div>
-          <div class="flex-none">
+          <div className="flex-none">
             <a
               target="_blank"
-              class="btn btn-sm btn-ghost"
-              href={`https://github.com/parres-hq/marmot-ts/tree/master/examples/src/${path()}`}
+              className="btn btn-sm btn-ghost"
+              href={`https://github.com/parres-hq/marmot-ts/tree/master/examples/src/${path}`}
             >
               <CodeIcon /> Source
             </a>
@@ -81,24 +75,27 @@ function ExampleView(props: { example?: Example }) {
         </div>
 
         {/* Page content */}
-        <Show
-          when={Component()}
-          fallback={
-            <div class="flex justify-center items-center h-full">
-              <span class="loading loading-dots loading-xl"></span>
-            </div>
-          }
-        >
-          {(component) => (
-            <ErrorBoundary
-              fallback={(error) => (
-                <div class="text-red-500">{error.message}</div>
-              )}
+        {Component ? (
+          <ErrorBoundary
+            fallbackRender={({ error }) => (
+              <div className="text-red-500">{error.message}</div>
+            )}
+          >
+            <Suspense
+              fallback={
+                <div className="flex justify-center items-center h-full">
+                  <span className="loading loading-dots loading-xl"></span>
+                </div>
+              }
             >
-              <Dynamic component={component()} />
-            </ErrorBoundary>
-          )}
-        </Show>
+              <Component />
+            </Suspense>
+          </ErrorBoundary>
+        ) : (
+          <div className="flex justify-center items-center h-full">
+            <span className="loading loading-dots loading-xl"></span>
+          </div>
+        )}
       </div>
 
       {/* Sidebar */}
@@ -108,18 +105,18 @@ function ExampleView(props: { example?: Example }) {
 }
 
 function App() {
-  const [example, setExample] = createSignal<Example | null>(null);
+  const [example, setExample] = useState<Example | null>(null);
   const hash = useHash();
 
   // set example based on hash or fallback to a random example
-  createEffect(() => {
-    const name = hash().replace(/^#/, "");
+  useEffect(() => {
+    const name = hash.replace(/^#/, "");
     const example = examples.find((e) => e.id === name);
     if (example) setExample(example);
     else setExample(examples[Math.floor(Math.random() * examples.length)]);
-  });
+  }, [hash]);
 
-  return <ExampleView example={example() ?? undefined} />;
+  return <ExampleView example={example ?? undefined} />;
 }
 
 export default App;

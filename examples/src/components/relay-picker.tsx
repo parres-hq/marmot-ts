@@ -1,5 +1,5 @@
 import { relaySet } from "applesauce-core/helpers";
-import { createMemo, createSignal, For } from "solid-js";
+import { useMemo, useState } from "react";
 
 // Common relay URLs that users might want to use
 const COMMON_RELAYS = relaySet([
@@ -16,43 +16,43 @@ function RelayPickerModal(props: {
   onClose: () => void;
   onSelect: (relay: string) => void;
 }) {
-  const [customRelayUrl, setCustomRelayUrl] = createSignal("");
+  const [customRelayUrl, setCustomRelayUrl] = useState("");
 
   const handleCustomRelaySubmit = () => {
     if (customRelayUrl) {
-      props.onSelect(customRelayUrl());
+      props.onSelect(customRelayUrl);
       setCustomRelayUrl("");
     }
   };
 
   return (
-    <dialog class={`modal ${props.isOpen ? "modal-open" : ""}`}>
-      <div class="modal-box">
-        <h3 class="font-bold text-lg mb-4">Custom Relay</h3>
+    <dialog className={`modal ${props.isOpen ? "modal-open" : ""}`}>
+      <div className="modal-box">
+        <h3 className="font-bold text-lg mb-4">Custom Relay</h3>
 
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text">Custom Relay URL</span>
+        <div className="form-control">
+          <label className="label">
+            <span className="label-text">Custom Relay URL</span>
           </label>
-          <div class="join w-full mb-4">
+          <div className="join w-full mb-4">
             <input
               type="text"
               placeholder="wss://your-relay.com"
-              class="input input-bordered join-item flex-1"
-              value={customRelayUrl()}
+              className="input input-bordered join-item flex-1"
+              value={customRelayUrl}
               onInput={(e) => setCustomRelayUrl(e.currentTarget.value)}
             />
             <button
-              class="btn btn-primary join-item"
+              className="btn btn-primary join-item"
               onClick={handleCustomRelaySubmit}
-              disabled={customRelayUrl() === ""}
+              disabled={customRelayUrl === ""}
             >
               Set
             </button>
           </div>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" className="modal-backdrop">
         <button onClick={props.onClose}>close</button>
       </form>
     </dialog>
@@ -64,16 +64,16 @@ export default function RelayPicker(props: {
   onChange: (relay: string) => void;
   common?: string[];
 }) {
-  const [isModalOpen, setIsModalOpen] = createSignal(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const allRelayOptions = createMemo(() => {
+  const allRelayOptions = useMemo(() => {
     const common = props.common || COMMON_RELAYS;
     if (!props.value || common.includes(props.value)) return common;
     else return [props.value, ...common];
-  });
+  }, [props.value, props.common]);
 
-  const handleSelectChange = (e: Event) => {
-    props.onChange((e.target as HTMLSelectElement).value);
+  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    props.onChange(e.target.value);
   };
 
   const handleModalSelect = (relay: string) => {
@@ -83,26 +83,28 @@ export default function RelayPicker(props: {
 
   return (
     <>
-      <div class="join">
+      <div className="join">
         <select
-          class="select select-bordered join-item"
+          className="select select-bordered join-item"
           value={props.value}
           onChange={handleSelectChange}
         >
           <option value="" disabled>
             Select a relay
           </option>
-          <For each={allRelayOptions()}>
-            {(relay) => <option value={relay}>{relay}</option>}
-          </For>
+          {allRelayOptions.map((relay) => (
+            <option key={relay} value={relay}>
+              {relay}
+            </option>
+          ))}
         </select>
-        <button class="btn join-item" onClick={() => setIsModalOpen(true)}>
+        <button className="btn join-item" onClick={() => setIsModalOpen(true)}>
           Custom
         </button>
       </div>
 
       <RelayPickerModal
-        isOpen={isModalOpen()}
+        isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSelect={handleModalSelect}
       />

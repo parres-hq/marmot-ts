@@ -1,16 +1,14 @@
-import { createSignal, onCleanup, onMount } from "solid-js";
+import { useState, useEffect } from "react";
 
 export default function useHash() {
-  const [hash, setHash] = createSignal(window.location.hash);
+  const [hash, setHash] = useState(window.location.hash);
 
-  onMount(() => {
-    const handleHashChange = () => setHash(window.location.hash);
-    window.addEventListener("hashchange", handleHashChange);
+  useEffect(() => {
+    const listener = () => setHash(window.location.hash);
 
-    onCleanup(() => {
-      window.removeEventListener("hashchange", handleHashChange);
-    });
-  });
+    window.addEventListener("hashchange", listener);
+    return () => window.removeEventListener("hashchange", listener);
+  }, []);
 
   return hash;
 }
