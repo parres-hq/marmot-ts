@@ -13,10 +13,12 @@ function ExampleView(props: { example?: Example }) {
   // load selected example
   useEffect(() => {
     if (!props.example) return;
+    let cancelled = false;
     setPath(props.example.path.replace(/^\.\//, ""));
     props.example
       .load()
       .then((module: any) => {
+        if (cancelled) return;
         if (typeof module.default !== "function")
           throw new Error("Example must be a function");
 
@@ -24,9 +26,13 @@ function ExampleView(props: { example?: Example }) {
         setComponent(() => module.default);
       })
       .catch((error) => {
+        if (cancelled) return;
         console.error("Failed to load example:", error);
         setComponent(null);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [props.example]);
 
   return (
