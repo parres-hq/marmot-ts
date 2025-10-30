@@ -1,6 +1,7 @@
 import examples from "../examples";
 import { useState, useMemo } from "react";
 import useHash from "../hooks/use-hash";
+import AccountSwitcher from "./Accounts";
 
 export default function SideNav() {
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -21,15 +22,17 @@ export default function SideNav() {
         aria-label="open sidebar"
         className="drawer-overlay"
       ></label>
-      <div className="menu bg-base-200 text-base-content min-h-full">
-        <input
-          type="text"
-          placeholder="Search..."
-          className="input input-bordered w-full"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-        <ul className="menu menu-lg px-0 font-mono w-xs">
+      <div className="menu bg-base-200 text-base-content min-h-full flex flex-col">
+        <div className="flex-none">
+          <input
+            type="text"
+            placeholder="Search..."
+            className="input input-bordered w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <ul className="menu menu-lg px-0 font-mono w-xs flex-1 overflow-y-auto">
           {filtered.map((item) => (
             <li key={item.id}>
               <a
@@ -43,6 +46,7 @@ export default function SideNav() {
             </li>
           ))}
         </ul>
+        <AccountSwitcher />
       </div>
     </div>
   );

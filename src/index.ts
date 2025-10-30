@@ -31,8 +31,8 @@ import {
 import { createCredential } from "./helpers/credential.js";
 import { CompleteKeyPackage } from "./helpers/key-package.js";
 
-export * from "./helpers/credential.js";
-export * from "./helpers/key-package.js";
+// export all helpers
+export * from "./helpers/index.js";
 
 export const ciphersuite: Ciphersuite = getCiphersuiteFromName(
   "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",

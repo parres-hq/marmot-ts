@@ -5,6 +5,7 @@ import SideNav from "./components/SideNav.tsx";
 import { CodeIcon } from "./components/items.tsx";
 import examples, { type Example } from "./examples";
 import useHash from "./hooks/use-hash";
+import SignInModal from "./components/SignInModal.tsx";
 
 function ExampleView(props: { example?: Example }) {
   const [path, setPath] = useState("");
@@ -106,6 +107,8 @@ function ExampleView(props: { example?: Example }) {
 
       {/* Sidebar */}
       <SideNav />
+
+      <SignInModal />
     </div>
   );
 }
