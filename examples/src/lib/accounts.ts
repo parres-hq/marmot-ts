@@ -24,12 +24,16 @@ accounts.accounts$.subscribe(() => {
 
 // load active account from storage
 const active = localStorage.getItem("active");
-if (active) accounts.setActive(active);
+if (active) {
+  try {
+    accounts.setActive(active);
+  } catch (error) {}
+}
 
 // subscribe to active changes
 accounts.active$.subscribe((account) => {
   if (account) localStorage.setItem("active", account.id);
-  else localStorage.clearItem("active");
+  else localStorage.removeItem("active");
 });
 
 export default accounts;

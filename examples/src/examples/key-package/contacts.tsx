@@ -1,13 +1,17 @@
-import { EMPTY, combineLatest, map, switchMap } from "rxjs";
+import { mapEventsToTimeline } from "applesauce-core";
+import { NostrEvent, getSeenRelays, kinds } from "applesauce-core/helpers";
+import { EMPTY, combineLatest, map, switchMap, throttleTime } from "rxjs";
 import {
+  KEY_PACKAGE_KIND,
   KEY_PACKAGE_RELAY_LIST_KIND,
+  getKeyPackageClient,
   getKeyPackageRelayList,
 } from "../../../../src";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { withSignIn } from "../../components/withSignIn";
 import { useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
-import { eventStore } from "../../lib/nostr";
+import { eventStore, pool } from "../../lib/nostr";
 
 const contacts$ = accounts.active$.pipe(
   switchMap((account) =>
@@ -15,11 +19,78 @@ const contacts$ = accounts.active$.pipe(
   ),
 );
 
+function KeyPackageItem({
+  pkg,
+  relays,
+}: {
+  pkg: NostrEvent;
+  relays: string[];
+}) {
+  const client = getKeyPackageClient(pkg);
+  const date = new Date(pkg.created_at * 1000).toLocaleDateString();
+  const seenRelays = getSeenRelays(pkg);
+
+  return (
+    <div key={pkg.id} className="text-xs bg-base-300 rounded px-2 py-1.5">
+      <div className="flex justify-between items-center gap-2">
+        <span>
+          ({seenRelays?.size ?? 0}/{relays.length})
+        </span>
+        {client ? (
+          <span
+            className="font-mono truncate flex-1 text-success font-bold"
+            title={pkg.id}
+          >
+            {client.name}
+          </span>
+        ) : (
+          <span className="font-mono truncate flex-1" title={pkg.id}>
+            {pkg.id.slice(0, 16) + "..."}
+          </span>
+        )}
+        <span className="text-base-content/60 whitespace-nowrap">{date}</span>
+      </div>
+      {seenRelays && (
+        <div className="text-base-content/60 space-x-1">
+          {Array.from(seenRelays).map((relay) => (
+            <span
+              key={relay}
+              className="text-xs bg-base-300 rounded font-mono truncate"
+              title={relay}
+            >
+              {relay.replace(/wss?:\/\//, "").replace(/\/$/, "")}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ContactCard(props: { pubkey: string; relays: string[] }) {
+  const keyPackages = useObservableMemo(
+    () =>
+      pool
+        .request(props.relays, [
+          {
+            kinds: [KEY_PACKAGE_KIND],
+            authors: [props.pubkey],
+          },
+          {
+            // Also fetch the event deletions for the key packages
+            kinds: [kinds.EventDeletion],
+            authors: [props.pubkey],
+            "#k": [String(KEY_PACKAGE_KIND)],
+          },
+        ])
+        .pipe(mapEventsToTimeline(), throttleTime(100)),
+    [props.relays.join(","), props.pubkey],
+  );
+
   return (
     <div className="card bg-base-200 shadow-sm hover:shadow-md transition-shadow">
       <div className="card-body p-4">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3">
           <UserAvatar pubkey={props.pubkey} />
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold truncate">
@@ -27,6 +98,8 @@ function ContactCard(props: { pubkey: string; relays: string[] }) {
             </h3>
           </div>
         </div>
+
+        <div className="divider my-2">Relays ({props.relays.length})</div>
         <div className="space-y-1.5">
           {props.relays.map((relay, idx) => (
             <div
@@ -38,6 +111,22 @@ function ContactCard(props: { pubkey: string; relays: string[] }) {
             </div>
           ))}
         </div>
+
+        <div className="divider my-2">
+          Key Packages ({keyPackages?.length ?? 0})
+        </div>
+
+        {keyPackages && keyPackages.length > 0 ? (
+          <div className="space-y-2 overflow-y-auto max-h-[300px]">
+            {keyPackages.map((pkg) => (
+              <KeyPackageItem key={pkg.id} pkg={pkg} relays={props.relays} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-xs text-base-content/60 text-center py-2">
+            No key packages found
+          </div>
+        )}
       </div>
     </div>
   );

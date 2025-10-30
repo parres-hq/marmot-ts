@@ -4,6 +4,7 @@ import {
   createEventLoader,
 } from "applesauce-loaders/loaders";
 import { RelayPool } from "applesauce-relay";
+import { lookupRelays$ } from "./setting";
 
 // Create in-memory event store
 export const eventStore = new EventStore();
@@ -13,7 +14,7 @@ export const pool = new RelayPool();
 
 // Create loaders for loading events and replaceable events
 const addressLoader = createAddressLoader(pool, {
-  lookupRelays: ["wss://purplepag.es/", "wss://index.hzrd149.com/"],
+  lookupRelays: lookupRelays$,
 });
 const eventLoader = createEventLoader(pool);
 
