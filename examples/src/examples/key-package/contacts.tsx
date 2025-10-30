@@ -1,5 +1,10 @@
 import { mapEventsToTimeline } from "applesauce-core";
-import { NostrEvent, getSeenRelays, kinds } from "applesauce-core/helpers";
+import {
+  NostrEvent,
+  getSeenRelays,
+  kinds,
+  neventEncode,
+} from "applesauce-core/helpers";
 import { EMPTY, combineLatest, map, switchMap, throttleTime } from "rxjs";
 import {
   KEY_PACKAGE_KIND,
@@ -50,19 +55,29 @@ function KeyPackageItem({
         )}
         <span className="text-base-content/60 whitespace-nowrap">{date}</span>
       </div>
-      {seenRelays && (
+
+      <div className="flex items-center gap-2">
         <div className="text-base-content/60 space-x-1">
-          {Array.from(seenRelays).map((relay) => (
-            <span
-              key={relay}
-              className="text-xs bg-base-300 rounded font-mono truncate"
-              title={relay}
-            >
-              {relay.replace(/wss?:\/\//, "").replace(/\/$/, "")}
-            </span>
-          ))}
+          {seenRelays &&
+            Array.from(seenRelays).map((relay) => (
+              <span
+                key={relay}
+                className="text-xs bg-base-300 rounded font-mono truncate"
+                title={relay}
+              >
+                {relay.replace(/wss?:\/\//, "").replace(/\/$/, "")}
+              </span>
+            ))}
         </div>
-      )}
+        <a
+          href={`https://nostr.at/${neventEncode({ id: pkg.id, relays })}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-xs btn-ghost ms-auto"
+        >
+          View
+        </a>
+      </div>
     </div>
   );
 }
