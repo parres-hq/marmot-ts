@@ -1,4 +1,4 @@
-import { mapEventsToTimeline } from "applesauce-core";
+import { mapEventsToStore, mapEventsToTimeline } from "applesauce-core";
 import {
   NostrEvent,
   getSeenRelays,
@@ -98,7 +98,11 @@ function ContactCard(props: { pubkey: string; relays: string[] }) {
             "#k": [String(KEY_PACKAGE_KIND)],
           },
         ])
-        .pipe(mapEventsToTimeline(), throttleTime(100)),
+        .pipe(
+          mapEventsToStore(eventStore),
+          mapEventsToTimeline(),
+          throttleTime(100),
+        ),
     [props.relays.join(","), props.pubkey],
   );
 
