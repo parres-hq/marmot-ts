@@ -4,32 +4,32 @@ import { NostrConnectSigner } from "applesauce-signers";
 import { pool } from "./nostr";
 
 // create an account manager instance
-const manager = new AccountManager();
+const accounts = new AccountManager();
 
 // register common account types
-registerCommonAccountTypes(manager);
+registerCommonAccountTypes(accounts);
 
 // Setup nostr connect signer
 NostrConnectSigner.pool = pool;
 
 // first load all accounts from localStorage
 const json = JSON.parse(localStorage.getItem("accounts") || "[]");
-await manager.fromJSON(json, true);
+await accounts.fromJSON(json, true);
 
 // next, subscribe to any accounts added or removed
-manager.accounts$.subscribe(() => {
+accounts.accounts$.subscribe(() => {
   // save all the accounts into the "accounts" field
-  localStorage.setItem("accounts", JSON.stringify(manager.toJSON()));
+  localStorage.setItem("accounts", JSON.stringify(accounts.toJSON()));
 });
 
 // load active account from storage
 const active = localStorage.getItem("active");
-if (active) manager.setActive(active);
+if (active) accounts.setActive(active);
 
 // subscribe to active changes
-manager.active$.subscribe((account) => {
+accounts.active$.subscribe((account) => {
   if (account) localStorage.setItem("active", account.id);
   else localStorage.clearItem("active");
 });
 
-export default manager;
+export default accounts;

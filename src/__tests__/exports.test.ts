@@ -11,6 +11,8 @@ describe("exports", () => {
         "KEY_PACKAGE_KIND",
         "KEY_PACKAGE_MLS_VERSION_TAG",
         "KEY_PACKAGE_RELAYS_TAG",
+        "KEY_PACKAGE_RELAY_LIST_KIND",
+        "KEY_PACKAGE_RELAY_LIST_RELAY_TAG",
         "Marmot",
         "ciphersuite",
         "createCredential",
@@ -20,7 +22,11 @@ describe("exports", () => {
         "getKeyPackageClient",
         "getKeyPackageExtensions",
         "getKeyPackageMLSVersion",
+        "getKeyPackageRelayList",
         "getKeyPackageRelays",
+        "isValidKeyPackageRelayListEvent",
+        "isValidRelayUrl",
+        "normalizeRelayUrl",
       ]
     `);
   });

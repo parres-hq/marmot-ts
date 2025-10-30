@@ -3,6 +3,7 @@ import { ExtensionType, KeyPackage, PrivateKeyPackage } from "ts-mls";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { decodeKeyPackage } from "ts-mls/keyPackage.js";
 import { getTagValue, NostrEvent } from "../lib/nostr.js";
+import { isValidRelayUrl, normalizeRelayUrl } from "./relay-url.js";
 
 /** Event kind for key package events */
 export const KEY_PACKAGE_KIND = 443;
@@ -100,7 +101,7 @@ export function getKeyPackageExtensions(
 export function getKeyPackageRelays(event: NostrEvent): string[] | undefined {
   const tag = event.tags.find((t) => t[0] === KEY_PACKAGE_RELAYS_TAG);
   if (!tag) return undefined;
-  return tag.slice(1);
+  return tag.slice(1).filter(isValidRelayUrl).map(normalizeRelayUrl);
 }
 
 /** Gets the client for a kind 443 event */
