@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.16",
+    "applesauce-accounts": "^4.1.0",
     "applesauce-core": "^4.1.0",
     "applesauce-loaders": "^4.0.0",
     "applesauce-relay": "^4.1.0",

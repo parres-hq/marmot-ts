@@ -11,6 +11,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.1.16
         version: 4.1.16(vite@7.1.12(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2))
+      applesauce-accounts:
+        specifier: ^4.1.0
+        version: 4.1.0(typescript@5.9.3)
       applesauce-core:
         specifier: ^4.1.0
         version: 4.1.0(typescript@5.9.3)
@@ -592,6 +595,9 @@ packages:
     engines: {node: ^14.18.0 || >=16.0.0}
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
+
+  applesauce-accounts@4.1.0:
+    resolution: {integrity: sha512-4vRUpkJL8RpVBiboxDb5fUPkeqv+rTIlw3Tog79K1paLHJUcUokcdzzdZLEmS/C531n0AamO2Qvr1XiBFqR5xg==}
 
   applesauce-core@4.1.0:
     resolution: {integrity: sha512-vFOHfqWW4DJfvPkMYLYNiy2ozO2IF+ZNwetGqaLuPjgE1Iwu4trZmG3GJUH+lO1Oq1N4e/OQ/EcotJoEBEiW7Q==}
@@ -1352,6 +1358,18 @@ snapshots:
       vite: 7.1.12(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2)
     transitivePeerDependencies:
       - supports-color
+
+  applesauce-accounts@4.1.0(typescript@5.9.3):
+    dependencies:
+      '@noble/hashes': 1.8.0
+      applesauce-core: 4.1.0(typescript@5.9.3)
+      applesauce-signers: 4.1.0(typescript@5.9.3)
+      nanoid: 5.1.6
+      nostr-tools: 2.17.0(typescript@5.9.3)
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   applesauce-core@4.1.0(typescript@5.9.3):
     dependencies:
