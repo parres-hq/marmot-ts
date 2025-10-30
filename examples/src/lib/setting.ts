@@ -1,5 +1,13 @@
 import { BehaviorSubject } from "rxjs";
 
+export function parse<T>(value?: string | null): T | undefined {
+  if (value === undefined || value === null) return;
+  try {
+    return JSON.parse(value);
+  } catch {}
+  return;
+}
+
 const DEFAULT_LOOKUP_RELAYS = [
   "wss://purplepag.es/",
   "wss://index.hzrd149.com/",
@@ -7,9 +15,7 @@ const DEFAULT_LOOKUP_RELAYS = [
 ];
 
 export const lookupRelays$ = new BehaviorSubject<string[]>(
-  (localStorage["lookup-relays"] &&
-    JSON.parse(localStorage["lookup-relays"])) ||
-    DEFAULT_LOOKUP_RELAYS,
+  parse(localStorage["lookup-relays"]) || DEFAULT_LOOKUP_RELAYS,
 );
 
 lookupRelays$.subscribe((relays) => {

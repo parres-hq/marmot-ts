@@ -1,7 +1,8 @@
-import { AccountManager } from "applesauce-accounts";
+import { AccountManager, SerializedAccount } from "applesauce-accounts";
 import { registerCommonAccountTypes } from "applesauce-accounts/accounts";
 import { NostrConnectSigner } from "applesauce-signers";
 import { pool } from "./nostr";
+import { parse } from "./setting";
 
 // create an account manager instance
 const accounts = new AccountManager();
@@ -13,8 +14,8 @@ registerCommonAccountTypes(accounts);
 NostrConnectSigner.pool = pool;
 
 // first load all accounts from localStorage
-const json = JSON.parse(localStorage.getItem("accounts") || "[]");
-await accounts.fromJSON(json, true);
+const json = parse<SerializedAccount[]>(localStorage.getItem("accounts"));
+if (json) await accounts.fromJSON(json, true);
 
 // next, subscribe to any accounts added or removed
 accounts.accounts$.subscribe(() => {
