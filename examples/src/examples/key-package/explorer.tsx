@@ -19,7 +19,7 @@ import {
   getKeyPackageRelays,
   KEY_PACKAGE_KIND,
 } from "../../../../src";
-import { NostrEvent } from "../../../../src/lib/nostr";
+import { NostrEvent } from "../../../../src/utils/nostr";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { pool } from "../../lib/nostr";
 
