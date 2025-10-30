@@ -9,40 +9,30 @@ import {
   createGroup,
   Credential,
   CryptoProvider,
-  defaultCryptoProvider,
   defaultCapabilities,
+  defaultCryptoProvider,
   defaultLifetime,
   emptyPskIndex,
   generateKeyPackage,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
   joinGroup,
-  KeyPackage,
   makePskIndex,
-  MlsPublicMessage,
   MlsPrivateMessage,
-  PrivateKeyPackage,
+  MlsPublicMessage,
   PrivateMessage,
-  processPrivateMessage,
   processMessage,
   ProcessMessageResult,
+  processPrivateMessage,
   Proposal,
   RatchetTree,
   Welcome,
 } from "ts-mls";
+import { createCredential } from "./helpers/credential.js";
+import { CompleteKeyPackage } from "./helpers/key-package.js";
 
-/**
- * A complete key package containing both public and private components.
- *
- * The public package can be shared with others to add this participant to groups,
- * while the private package must be kept secret and is used for decryption and signing.
- */
-export type CompleteKeyPackage = {
-  /** The public key package that can be shared with others */
-  publicPackage: KeyPackage;
-  /** The private key package that must be kept secret */
-  privatePackage: PrivateKeyPackage;
-};
+export * from "./helpers/credential.js";
+export * from "./helpers/key-package.js";
 
 export const ciphersuite: Ciphersuite = getCiphersuiteFromName(
   "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
@@ -91,10 +81,7 @@ export class Marmot {
    * ```
    */
   createCredential(hexPublicKey: string): Credential {
-    return {
-      credentialType: "basic",
-      identity: new TextEncoder().encode(hexPublicKey),
-    };
+    return createCredential(hexPublicKey);
   }
 
   /**
