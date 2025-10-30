@@ -1,9 +1,9 @@
 import { hexToBytes } from "@noble/ciphers/utils.js";
-import { ExtensionType, KeyPackage, PrivateKeyPackage } from "ts-mls";
+import { ExtensionType, KeyPackage } from "ts-mls";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { decodeKeyPackage } from "ts-mls/keyPackage.js";
-import { getTagValue, NostrEvent } from "../lib/nostr.js";
-import { isValidRelayUrl, normalizeRelayUrl } from "./relay-url.js";
+import { getTagValue, NostrEvent } from "../utils/nostr.js";
+import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 
 /** Event kind for key package events */
 export const KEY_PACKAGE_KIND = 443;
@@ -30,19 +30,6 @@ export type MLS_VERSIONS = "1.0";
 export type KeyPackageClient = {
   name: string;
   // TODO: this is probably a NIP-89 client tag, so it should probably have the rest of the fields
-};
-
-/**
- * A complete key package containing both public and private components.
- *
- * The public package can be shared with others to add this participant to groups,
- * while the private package must be kept secret and is used for decryption and signing.
- */
-export type CompleteKeyPackage = {
-  /** The public key package that can be shared with others */
-  publicPackage: KeyPackage;
-  /** The private key package that must be kept secret */
-  privatePackage: PrivateKeyPackage;
 };
 
 /** Get the {@link KeyPackage} from a kind 443 event */
