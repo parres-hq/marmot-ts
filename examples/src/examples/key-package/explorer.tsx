@@ -11,6 +11,7 @@ import { LeafNode } from "ts-mls/leafNode.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
 
 import {
+  getCredentialPubkey,
   getKeyPackage,
   getKeyPackageCipherSuiteId,
   getKeyPackageClient,
@@ -26,6 +27,7 @@ import { pool } from "../../lib/nostr";
 import JsonBlock from "../../components/json-block";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import RelayPicker from "../../components/relay-picker";
+import { CredentialBasic } from "ts-mls/credential.js";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -304,14 +306,76 @@ function NostrEventTab(props: { event: NostrEvent }) {
   );
 }
 
+function CredentialInfo({
+  credential,
+  event,
+}: {
+  credential: CredentialBasic;
+  event: NostrEvent;
+}) {
+  const pubkey = getCredentialPubkey(credential);
+  const isValid = pubkey === event.pubkey;
+
+  return (
+    <div className="mb-3 flex gap-2 items-center bg-base-200 p-3 rounded">
+      <UserAvatar pubkey={pubkey} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <h3 className="font-semibold">
+            <UserName pubkey={pubkey} />
+          </h3>
+          {isValid ? (
+            <span className="badge badge-success ms-auto">Valid</span>
+          ) : (
+            <span className="badge badge-error ms-auto">Invalid</span>
+          )}
+        </div>
+        <code className="text-xs text-base-content/60 truncate block">
+          {pubkey}
+        </code>
+        {!isValid && (
+          <div className="text-xs text-error mt-1">
+            Credential pubkey does not match event publisher
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** A component that renders a MLS key package details */
-function MLSKeyPackageTab(props: { keyPackage: KeyPackage }) {
+function MLSKeyPackageTab({
+  keyPackage,
+  event,
+}: {
+  keyPackage: KeyPackage;
+  event: NostrEvent;
+}) {
   const [showKeyPackageData, setShowKeyPackageData] = useState(false);
 
   return (
     <div className="space-y-3">
+      {/* User Info from Credential */}
+      {keyPackage.leafNode.credential.credentialType === "basic" && (
+        <ErrorBoundary
+          fallbackRender={({ error, resetErrorBoundary }) => (
+            <div className="alert alert-error">
+              <div className="font-bold">Error: {error.message}</div>
+              <button className="btn btn-xs" onClick={resetErrorBoundary}>
+                Try Again
+              </button>
+            </div>
+          )}
+        >
+          <CredentialInfo
+            credential={keyPackage.leafNode.credential}
+            event={event}
+          />
+        </ErrorBoundary>
+      )}
+
       {/* Leaf Node Information */}
-      <LeafNodeInfo leafNode={props.keyPackage.leafNode} />
+      <LeafNodeInfo leafNode={keyPackage.leafNode} />
 
       {/* Full Key Package Data - Collapsible */}
       <div className="collapse collapse-arrow bg-base-200">
@@ -324,7 +388,7 @@ function MLSKeyPackageTab(props: { keyPackage: KeyPackage }) {
           Full Key Package Data
         </div>
         <div className="collapse-content">
-          <KeyPackageDataView keyPackage={props.keyPackage} />
+          <KeyPackageDataView keyPackage={keyPackage} />
         </div>
       </div>
     </div>
@@ -378,7 +442,7 @@ function KeyPackageCardContent(props: { event: NostrEvent }) {
             aria-label="MLS Key Package"
           />
           <div className="tab-content bg-base-100 border-base-300 p-2">
-            <MLSKeyPackageTab keyPackage={keyPackage} />
+            <MLSKeyPackageTab keyPackage={keyPackage} event={props.event} />
           </div>
         </div>
       </div>
