@@ -1,12 +1,12 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import { Credential } from "ts-mls";
+import { CredentialBasic } from "ts-mls/credential.js";
 
 function isHexKey(str: string): boolean {
   return /^[0-9a-fA-F]{64}$/.test(str);
 }
 
 /** Creates a MLS basic credential from a nostr public key. */
-export function createCredential(pubkey: string): Credential {
+export function createCredential(pubkey: string): CredentialBasic {
   if (isHexKey(pubkey) === false)
     throw new Error("Invalid nostr public key, must be 64 hex characters");
 
@@ -19,7 +19,7 @@ export function createCredential(pubkey: string): Credential {
 const legacyDecoder = new TextDecoder();
 
 /** Gets the nostr public key from a credential. */
-export function getCredentialPubkey(credential: Credential): string {
+export function getCredentialPubkey(credential: CredentialBasic): string {
   if (credential.credentialType !== "basic")
     throw new Error(
       "Credential is not a basic credential, cannot get nostr public key",

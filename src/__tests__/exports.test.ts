@@ -18,6 +18,7 @@ describe("exports", () => {
         "ciphersuite",
         "createCredential",
         "defaultExtensions",
+        "getCredentialPubkey",
         "getKeyPackage",
         "getKeyPackageCipherSuiteId",
         "getKeyPackageClient",

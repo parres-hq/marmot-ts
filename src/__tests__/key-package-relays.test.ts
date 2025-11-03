@@ -1,8 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   getKeyPackageRelayList,
   isValidKeyPackageRelayListEvent,
-  KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../core/key-package-relay-list.js";
 import { NostrEvent } from "../utils/nostr.js";
 

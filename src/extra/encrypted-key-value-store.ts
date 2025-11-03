@@ -9,6 +9,51 @@ const TEST_KEY = "__test__";
 const TEST_VALUE = "decryption test value";
 
 /**
+ * Apply PKCS#7 padding to bytes to make length a multiple of blockSize.
+ * Appends N bytes of value N where N is the number of padding bytes needed.
+ * @param bytes - The data to pad
+ * @param blockSize - Block size in bytes (default 16 for AES)
+ * @returns Padded bytes
+ */
+function pad(bytes: Uint8Array, blockSize: number = 16): Uint8Array {
+  const paddingLength = blockSize - (bytes.length % blockSize);
+  const padded = new Uint8Array(bytes.length + paddingLength);
+  padded.set(bytes);
+  // Fill padding bytes with the padding length value
+  for (let i = bytes.length; i < padded.length; i++) padded[i] = paddingLength;
+
+  return padded;
+}
+
+/**
+ * Remove PKCS#7 padding from bytes and validate it.
+ * @param bytes - The padded data
+ * @returns Unpadded bytes
+ * @throws Error if padding is invalid or zero
+ */
+function unpad(bytes: Uint8Array): Uint8Array {
+  if (bytes.length === 0) throw new Error("Invalid padding: empty data");
+
+  const paddingLength = bytes[bytes.length - 1];
+
+  // Validate padding length
+  if (paddingLength === 0 || paddingLength > 16)
+    throw new Error("Invalid padding: padding length out of range");
+
+  if (paddingLength > bytes.length)
+    throw new Error("Invalid padding: padding length exceeds data length");
+
+  // Validate all padding bytes have the correct value
+  for (let i = bytes.length - paddingLength; i < bytes.length; i++) {
+    if (bytes[i] !== paddingLength)
+      throw new Error("Invalid padding: inconsistent padding bytes");
+  }
+
+  // Return data without padding
+  return bytes.slice(0, bytes.length - paddingLength);
+}
+
+/**
  * Wrapper around a {@link KeyPackageStoreBackend} that encrypts and decrypts data using a password.
  * WARNING: THIS IS NOT SECURE AND SHOULD NOT BE USED IN PRODUCTION. IT IS ONLY FOR DEMONSTRATION PURPOSES.
  */
@@ -42,8 +87,11 @@ export class EncryptedKeyValueStore {
     if (!encryptionKey) throw new Error("Storage locked");
 
     try {
-      // Convert value to string if it's an object
+      // Convert value to UTF-8 bytes
       const valueBytes = utf8ToBytes(value);
+
+      // Apply PKCS#7 padding to make length a multiple of 16
+      const paddedBytes = pad(valueBytes);
 
       // Generate a random IV for CBC mode
       const iv = crypto.getRandomValues(new Uint8Array(16));
@@ -51,8 +99,8 @@ export class EncryptedKeyValueStore {
       // Create AES-CBC cipher
       const cipher = cbc(encryptionKey, iv);
 
-      // Encrypt the data
-      const encryptedData = cipher.encrypt(valueBytes);
+      // Encrypt the padded data
+      const encryptedData = cipher.encrypt(paddedBytes);
 
       // Store IV and encrypted data directly as binary
       const dataToStore = { iv, data: encryptedData };
@@ -88,8 +136,16 @@ export class EncryptedKeyValueStore {
       throw new Error("Decryption failed, incorrect PIN");
     }
 
-    // Convert bytes to UTF-8 string
-    const decryptedText = bytesToUtf8(decryptedBytes);
+    // Remove PKCS#7 padding
+    let unpaddedBytes: Uint8Array;
+    try {
+      unpaddedBytes = unpad(decryptedBytes);
+    } catch (e) {
+      throw new Error("Decryption failed, invalid padding");
+    }
+
+    // Convert unpadded bytes to UTF-8 string
+    const decryptedText = bytesToUtf8(unpaddedBytes);
 
     return decryptedText;
   }
