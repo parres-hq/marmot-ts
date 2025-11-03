@@ -173,11 +173,11 @@ export class EncryptedKeyValueStore {
       if (testValue === null) {
         // First setup
         await this.setItem(testKey, TEST_VALUE, key);
-        this.key = this.deriveKey(password);
+        this.key = key;
         return true;
       } else if (testValue === TEST_VALUE) {
         // Save the key for later
-        this.key = this.deriveKey(password);
+        this.key = key;
         return true;
       }
     } catch (error) {
