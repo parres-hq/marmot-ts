@@ -1,8 +1,7 @@
 const modules = import.meta.glob("./examples/**/*.(tsx|ts)");
-const sources = import.meta.glob("./examples/**/*.(tsx|ts)", { query: "?raw" }) as Record<
-  string,
-  () => Promise<{ default: string }>
->;
+const sources = import.meta.glob("./examples/**/*.(tsx|ts)", {
+  query: "?raw",
+}) as Record<string, () => Promise<{ default: string }>>;
 
 export type Example = {
   id: string;

@@ -1,0 +1,32 @@
+/** Event kind for key package relay list events */
+export const KEY_PACKAGE_RELAY_LIST_KIND = 10051;
+
+/** The name of the tag that contains relay URLs */
+export const KEY_PACKAGE_RELAY_LIST_RELAY_TAG = "relay";
+
+/** Event kind for key package events */
+export const KEY_PACKAGE_KIND = 443;
+
+/** The name of the tag that contains the MLS protocol version */
+export const KEY_PACKAGE_MLS_VERSION_TAG = "mls_protocol_version";
+
+/** The name of the tag that contains the MLS cipher suite */
+export const KEY_PACKAGE_CIPHER_SUITE_TAG = "mls_ciphersuite";
+
+/** The name of the tag that contains the MLS extensions */
+export const KEY_PACKAGE_EXTENSIONS_TAG = "mls_extensions";
+
+/** The name of the tag that contains the relays */
+export const KEY_PACKAGE_RELAYS_TAG = "relays";
+
+/** The name of the tag that contains the client */
+export const KEY_PACKAGE_CLIENT_TAG = "client";
+
+/** The possible MLS protocol versions */
+export type MLS_VERSIONS = "1.0";
+
+/** Parsed client tag from a kind 443 event */
+export type KeyPackageClient = {
+  name: string;
+  // TODO: this is probably a NIP-89 client tag, so it should probably have the rest of the fields
+};
