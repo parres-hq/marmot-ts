@@ -1,11 +1,11 @@
-import { bytesToHex } from "@noble/ciphers/utils";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { BehaviorSubject, mapEventsToTimeline } from "applesauce-core";
 import { onlyEvents } from "applesauce-relay";
 import { useMemo, useState, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { map, switchMap } from "rxjs/operators";
-
 import { defaultExtensionTypes, KeyPackage } from "ts-mls";
+import { CredentialBasic } from "ts-mls/credential.js";
 import { getCiphersuiteFromId } from "ts-mls/crypto/ciphersuite.js";
 import { LeafNode } from "ts-mls/leafNode.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
@@ -27,7 +27,6 @@ import { pool } from "../../lib/nostr";
 import JsonBlock from "../../components/json-block";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import RelayPicker from "../../components/relay-picker";
-import { CredentialBasic } from "ts-mls/credential.js";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
