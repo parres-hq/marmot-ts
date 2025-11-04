@@ -1,11 +1,9 @@
 import { NostrEvent } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
-
-/** Event kind for key package relay list events */
-export const KEY_PACKAGE_RELAY_LIST_KIND = 10051;
-
-/** The name of the tag that contains relay URLs */
-export const KEY_PACKAGE_RELAY_LIST_RELAY_TAG = "relay";
+import {
+  KEY_PACKAGE_RELAY_LIST_KIND,
+  KEY_PACKAGE_RELAY_LIST_RELAY_TAG,
+} from "./protocol.js";
 
 /**
  * Gets the relay URLs from a kind 10051 event.
