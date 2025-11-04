@@ -15,7 +15,7 @@ import {
   getKeyPackageRelayList,
 } from "../../../../src";
 import { UserAvatar, UserName } from "../../components/nostr-user";
-import { withSignIn } from "../../components/withSignIn";
+import { withSignIn } from "../../components/with-signIn";
 import { useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";

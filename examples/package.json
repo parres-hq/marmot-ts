@@ -9,18 +9,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@noble/hashes": "^2.0.1",
     "@tailwindcss/vite": "^4.1.16",
     "applesauce-accounts": "^4.1.0",
     "applesauce-core": "^4.1.0",
+    "applesauce-extra": "^4.1.0",
     "applesauce-loaders": "^4.0.0",
     "applesauce-relay": "^4.1.0",
     "applesauce-signers": "^4.1.0",
     "daisyui": "^5.3.8",
+    "localforage": "^1.10.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-error-boundary": "^6.0.0",
     "rxjs": "^7.8.2",
-    "tailwindcss": "^4.1.16"
+    "tailwindcss": "^4.1.16",
+    "unique-names-generator": "^4.7.1"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

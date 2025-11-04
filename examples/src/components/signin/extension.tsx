@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ExtensionSigner } from "applesauce-signers";
 import { ExtensionAccount } from "applesauce-accounts/accounts";
-import accountManager from "../lib/accounts";
+import accountManager from "../../lib/accounts";
 
 interface ExtensionSignInProps {
   onSuccess?: () => void;

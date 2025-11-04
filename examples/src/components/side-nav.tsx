@@ -1,7 +1,7 @@
 import examples from "../examples";
 import { useState, useMemo } from "react";
 import useHash from "../hooks/use-hash";
-import AccountSwitcher from "./Accounts";
+import AccountSwitcher from "./accounts/picker";
 
 export default function SideNav() {
   const [searchTerm, setSearchTerm] = useState<string>("");

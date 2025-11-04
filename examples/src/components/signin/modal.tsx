@@ -1,13 +1,14 @@
 import { useRef, useState } from "react";
-import BunkerUrlForm from "./BunkerUrlForm";
-import SignerConnectQR from "./SignerConnectQR";
-import ExtensionSignIn from "./ExtensionSignIn";
+import SignerBunker from "./bunker";
+import SignerConnectQR from "./connect-qr";
+import ExtensionSignIn from "./extension";
+import NewUser from "./new-user";
 
 export default function SignInModal() {
   const ref = useRef<HTMLDialogElement>(null);
-  const [activeTab, setActiveTab] = useState<"extension" | "bunker" | "qr">(
-    "extension",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "extension" | "bunker" | "qr" | "newuser"
+  >("newuser");
 
   const handleSuccess = () => {
     ref.current?.close();
@@ -26,6 +27,13 @@ export default function SignInModal() {
 
         {/* Tabs */}
         <div role="tablist" className="tabs tabs-border mb-6">
+          <button
+            role="tab"
+            className={`tab ${activeTab === "newuser" ? "tab-active" : ""}`}
+            onClick={() => setActiveTab("newuser")}
+          >
+            New User
+          </button>
           <button
             role="tab"
             className={`tab ${activeTab === "extension" ? "tab-active" : ""}`}
@@ -51,12 +59,11 @@ export default function SignInModal() {
 
         {/* Tab Content */}
         <div>
+          {activeTab === "newuser" && <NewUser onSuccess={handleSuccess} />}
           {activeTab === "extension" && (
             <ExtensionSignIn onSuccess={handleSuccess} />
           )}
-
-          {activeTab === "bunker" && <BunkerUrlForm />}
-
+          {activeTab === "bunker" && <SignerBunker />}
           {activeTab === "qr" && <SignerConnectQR />}
         </div>
       </div>
