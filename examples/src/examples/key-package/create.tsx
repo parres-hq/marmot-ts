@@ -1,4 +1,3 @@
-import { bytesToHex } from "@noble/hashes/utils.js";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 import {
@@ -9,15 +8,12 @@ import {
   getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
-import { CiphersuiteName, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
-import { encodeKeyPackage } from "ts-mls/keyPackage.js";
+import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 
 import { getKeyPackageRelayList } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
-import {
-  KEY_PACKAGE_KIND,
-  KEY_PACKAGE_RELAY_LIST_KIND,
-} from "../../../../src/core/protocol";
+import { createKeyPackageEvent } from "../../../../src/core/key-package";
+import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
 import {
   CIPHER_SUITES,
   CipherSuitePicker,
@@ -288,33 +284,20 @@ function useKeyPackageCreation() {
       setStorageKey(key);
       console.log("Stored with key:", key);
 
-      // Encode the public key package to bytes
-      const encodedBytes = encodeKeyPackage(keyPackage.publicPackage);
-      const contentHex = bytesToHex(encodedBytes);
-
       // Parse relay URLs
       const relayList = relays
         .split("\n")
         .map((r) => r.trim())
         .filter((r) => r.length > 0);
 
-      // Build the Nostr event with the selected cipher suite
-      const ciphersuiteId = ciphersuites[cipherSuite];
-      const ciphersuiteHex = `0x${ciphersuiteId.toString(16).padStart(4, "0")}`;
-
-      const unsignedEvent = {
-        kind: KEY_PACKAGE_KIND,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          ["mls_protocol_version", "1.0"],
-          ["mls_ciphersuite", ciphersuiteHex],
-          ["mls_extensions", "0x0003", "0x000a", "0x0002", "0xf2ee"],
-          ["client", "marmot-examples"],
-          ["relays", ...relayList],
-        ],
-        content: contentHex,
+      // Create the unsigned event using the library function
+      console.log("Creating key package event...");
+      const unsignedEvent = createKeyPackageEvent({
+        keyPackage: keyPackage.publicPackage,
         pubkey,
-      };
+        relays: relayList,
+        client: "marmot-examples",
+      });
 
       console.log("Signing event...");
       const signedEvent = await account.signEvent(unsignedEvent);

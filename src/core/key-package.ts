@@ -1,13 +1,17 @@
-import { hexToBytes } from "@noble/ciphers/utils.js";
-import { ExtensionType, KeyPackage } from "ts-mls";
+import { bytesToHex, hexToBytes } from "@noble/ciphers/utils.js";
+import { Extension, ExtensionType, KeyPackage } from "ts-mls";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
-import { decodeKeyPackage } from "ts-mls/keyPackage.js";
+import { decodeKeyPackage, encodeKeyPackage } from "ts-mls/keyPackage.js";
+import { protocolVersions } from "ts-mls/protocolVersion.js";
+
 import { getTagValue, NostrEvent } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
+import { getCredentialPubkey } from "./credential.js";
 import {
   KEY_PACKAGE_CIPHER_SUITE_TAG,
   KEY_PACKAGE_CLIENT_TAG,
   KEY_PACKAGE_EXTENSIONS_TAG,
+  KEY_PACKAGE_KIND,
   KEY_PACKAGE_MLS_VERSION_TAG,
   KEY_PACKAGE_RELAYS_TAG,
   KeyPackageClient,
@@ -83,5 +87,77 @@ export function getKeyPackageClient(
   // TODO: parse the rest of the client tag
   return {
     name: tag[1],
+  };
+}
+
+export type CreateKeyPackageEventOptions = {
+  /** The MLS key package to encode in the event */
+  keyPackage: KeyPackage;
+  /** The pubkey of the event author (must match the credential in the key package) */
+  pubkey: string;
+  /** The relays where this key package should be published */
+  relays: string[];
+  /** Optional client identifier (e.g., "marmot-examples") */
+  client?: string;
+};
+
+/**
+ * Creates an unsigned Nostr event (kind 443) for a MLS key package.
+ * The event can be signed and published to allow others to add the user to MLS groups.
+ *
+ * @param options - Configuration for creating the key package event
+ * @returns An unsigned Nostr event ready to be signed and published
+ */
+export function createKeyPackageEvent(
+  options: CreateKeyPackageEventOptions,
+): Omit<NostrEvent, "id" | "sig"> {
+  const { keyPackage, pubkey, relays, client } = options;
+
+  if (keyPackage.leafNode.credential.credentialType !== "basic")
+    throw new Error(
+      "Key package leaf node credential is not a basic credential",
+    );
+
+  if (pubkey !== getCredentialPubkey(keyPackage.leafNode.credential))
+    throw new Error(
+      "Key package leaf node credential pubkey does not match the event pubkey",
+    );
+
+  // Encode the public key package to bytes
+  const encodedBytes = encodeKeyPackage(keyPackage);
+  const contentHex = bytesToHex(encodedBytes);
+
+  // Get the cipher suite from the key package
+  const ciphersuiteId = ciphersuites[keyPackage.cipherSuite];
+  const ciphersuiteHex = `0x${ciphersuiteId.toString(16).padStart(4, "0")}`;
+
+  // Extract extension types from the key package
+  const extensionTypes = keyPackage.extensions.map((ext: Extension) => {
+    const extType =
+      typeof ext.extensionType === "number" ? ext.extensionType : 0; // Default extension types are handled as strings, fallback to 0
+    return `0x${extType.toString(16).padStart(4, "0")}`;
+  });
+
+  const version = protocolVersions[keyPackage.version].toFixed(1);
+
+  // Build tags
+  const tags: string[][] = [
+    [KEY_PACKAGE_MLS_VERSION_TAG, version],
+    [KEY_PACKAGE_CIPHER_SUITE_TAG, ciphersuiteHex],
+    [KEY_PACKAGE_EXTENSIONS_TAG, ...extensionTypes],
+  ];
+
+  // Add client tag if provided
+  if (client) tags.push([KEY_PACKAGE_CLIENT_TAG, client]);
+
+  // Add relays tag
+  tags.push([KEY_PACKAGE_RELAYS_TAG, ...relays]);
+
+  return {
+    kind: KEY_PACKAGE_KIND,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: contentHex,
+    pubkey,
   };
 }
