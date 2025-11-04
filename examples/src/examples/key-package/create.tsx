@@ -12,12 +12,15 @@ import {
 import { CiphersuiteName, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { encodeKeyPackage } from "ts-mls/keyPackage.js";
 
-import { getKeyPackageRelays } from "../../../../src";
+import { getKeyPackageRelayList } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
-import { KEY_PACKAGE_KIND } from "../../../../src/core/protocol";
 import {
-  CipherSuitePicker,
+  KEY_PACKAGE_KIND,
+  KEY_PACKAGE_RELAY_LIST_KIND,
+} from "../../../../src/core/protocol";
+import {
   CIPHER_SUITES,
+  CipherSuitePicker,
 } from "../../components/form/cipher-suite-picker";
 import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
@@ -32,12 +35,12 @@ const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
     account
       ? eventStore
           .replaceable({
-            kind: KEY_PACKAGE_KIND,
+            kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
             relays: mailboxes?.outboxes,
           })
           .pipe(
-            map((event) => (event ? getKeyPackageRelays(event) : undefined)),
+            map((event) => (event ? getKeyPackageRelayList(event) : undefined)),
           )
       : EMPTY,
   ),

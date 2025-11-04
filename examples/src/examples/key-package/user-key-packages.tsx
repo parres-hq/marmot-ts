@@ -1,13 +1,13 @@
-import { useMemo, useState } from "react";
-import { ErrorBoundary } from "react-error-boundary";
-import { BehaviorSubject, combineLatest, of, switchMap } from "rxjs";
-import { map } from "rxjs/operators";
-import { onlyEvents } from "applesauce-relay";
-import { mapEventsToTimeline } from "applesauce-core";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { mapEventsToTimeline } from "applesauce-core";
+import { useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
+import { map, tap } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import { getCiphersuiteFromId } from "ts-mls/crypto/ciphersuite.js";
 
+import { normalizeToPubkey } from "applesauce-core/helpers";
 import {
   getCredentialPubkey,
   getKeyPackage,
@@ -15,20 +15,19 @@ import {
   getKeyPackageClient,
   getKeyPackageExtensions,
   getKeyPackageMLSVersion,
-  getKeyPackageRelays,
   getKeyPackageRelayList,
+  getKeyPackageRelays,
   KEY_PACKAGE_KIND,
   KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
 import { NostrEvent } from "../../../../src/utils/nostr";
-import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import { pool } from "../../lib/nostr";
-import accounts from "../../lib/accounts";
-
 import ExtensionBadge from "../../components/extension-badge";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
 import { UserAvatar, UserName } from "../../components/nostr-user";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
+import accounts from "../../lib/accounts";
+import { eventStore, pool } from "../../lib/nostr";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -36,6 +35,19 @@ const formatDate = (timestamp: number) => {
 
 // Subject to hold the selected pubkey
 const selectedPubkey$ = new BehaviorSubject<string | null>(null);
+
+// Observable of pubkeys key package relays
+const keyPackageRelaysList$ = selectedPubkey$.pipe(
+  switchMap((pubkey) =>
+    pubkey
+      ? eventStore.replaceable({
+          kind: KEY_PACKAGE_RELAY_LIST_KIND,
+          pubkey,
+        })
+      : NEVER,
+  ),
+  map((event) => event && getKeyPackageRelayList(event)),
+);
 
 // ============================================================================
 // Key Package Card Component (simplified version)
@@ -227,13 +239,13 @@ export default function UserKeyPackages() {
   const [pubkeyInput, setPubkeyInput] = useState("");
   const allAccounts = useObservable(accounts.accounts$);
   const selectedPubkey = useObservable(selectedPubkey$);
+  const keyPackageRelays = useObservable(keyPackageRelaysList$);
 
   // Handle manual pubkey submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pubkeyInput.trim()) {
-      selectedPubkey$.next(pubkeyInput.trim());
-    }
+    if (pubkeyInput.trim())
+      selectedPubkey$.next(normalizeToPubkey(pubkeyInput.trim()));
   };
 
   // Handle clear
@@ -242,61 +254,30 @@ export default function UserKeyPackages() {
     selectedPubkey$.next(null);
   };
 
-  // Step 1: Fetch the user's relay list (kind 10051)
-  const relayListEvent = useObservableMemo(
-    () =>
-      selectedPubkey$.pipe(
-        switchMap((pubkey) => {
-          if (!pubkey) return of(null);
-
-          // Query for kind 10051 events by this author
-          return pool
-            .subscription([], {
-              kinds: [KEY_PACKAGE_RELAY_LIST_KIND],
-              authors: [pubkey],
-              limit: 1,
-            })
-            .pipe(
-              onlyEvents(),
-              mapEventsToTimeline(),
-              map((events) => (events.length > 0 ? events[0] : null)),
-            );
-        }),
-      ),
-    [],
-  );
-
-  // Extract relay URLs from the relay list event
-  const keyPackageRelays = useMemo(() => {
-    if (!relayListEvent) return [];
-    return getKeyPackageRelayList(relayListEvent);
-  }, [relayListEvent]);
-
   // Step 2: Fetch key packages from those relays (or default relays if none found)
   const keyPackages = useObservableMemo(
     () =>
-      combineLatest([selectedPubkey$, of(keyPackageRelays)]).pipe(
+      combineLatest([selectedPubkey$, keyPackageRelaysList$]).pipe(
         switchMap(([pubkey, relays]) => {
           if (!pubkey) return of([]);
 
           // Use the user's specified relays, or fall back to a default relay
           const relaysToUse =
-            relays.length > 0 ? relays : ["wss://relay.damus.io/"];
+            relays && relays.length > 0 ? relays : ["wss://relay.damus.io/"];
 
           return pool
-            .subscription(relaysToUse, {
+            .request(relaysToUse, {
               kinds: [KEY_PACKAGE_KIND],
               authors: [pubkey],
               limit: 50,
             })
             .pipe(
-              onlyEvents(),
               mapEventsToTimeline(),
               map((arr) => [...arr]),
             );
         }),
       ),
-    [keyPackageRelays],
+    [],
   );
 
   return (
@@ -383,11 +364,10 @@ export default function UserKeyPackages() {
               <div className="text-sm font-semibold mb-2">
                 Key Package Relay List (kind 10051)
               </div>
-              {relayListEvent ? (
+              {keyPackageRelays ? (
                 <div className="space-y-2">
                   <div className="text-xs text-base-content/60">
-                    Found relay list from{" "}
-                    {formatDate(relayListEvent.created_at)}
+                    Found relay list
                   </div>
                   {keyPackageRelays.length > 0 ? (
                     <div className="flex flex-wrap gap-2">

@@ -1,7 +1,7 @@
 import { PrivateKeyAccount } from "applesauce-accounts/accounts";
 import { build } from "applesauce-factory";
 import { Profile } from "applesauce-factory/operations";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   adjectives,
   animals,
@@ -27,7 +27,6 @@ export default function NewUser({ onSuccess }: NewUserProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUser, setPreviewUser] = useState<PreviewUser | null>(null);
-  const initializedRef = useRef(false);
 
   const generateRandomName = () => {
     return uniqueNamesGenerator({
@@ -38,7 +37,7 @@ export default function NewUser({ onSuccess }: NewUserProps) {
     });
   };
 
-  const generateRandomUser = () => {
+  const generateRandomUser = useCallback(() => {
     const name = generateRandomName();
     const account = PrivateKeyAccount.generateNew();
     const pubkey = account.pubkey;
@@ -48,7 +47,7 @@ export default function NewUser({ onSuccess }: NewUserProps) {
       pubkey,
       account,
     });
-  };
+  }, []);
 
   const handleCreateUser = async () => {
     if (!previewUser) {
@@ -105,10 +104,9 @@ export default function NewUser({ onSuccess }: NewUserProps) {
   };
 
   // Generate initial random user on component mount
-  if (!initializedRef.current) {
-    initializedRef.current = true;
+  useEffect(() => {
     generateRandomUser();
-  }
+  }, []);
 
   const robohashUrl = previewUser
     ? `https://robohash.org/${previewUser.pubkey}.png`
