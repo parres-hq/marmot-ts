@@ -1,4 +1,4 @@
-import { bytesToHex } from "@noble/ciphers/utils.js";
+import { bytesToHex } from "@noble/ciphers/utils";
 import { BehaviorSubject, mapEventsToTimeline } from "applesauce-core";
 import { onlyEvents } from "applesauce-relay";
 import { useMemo, useState, type ReactNode } from "react";
@@ -290,7 +290,7 @@ function NostrEventTab(props: { event: NostrEvent }) {
         </DetailsField>
       </div>
 
-      {/* Raw Nostr Event - Collapsible */}
+      {/* Raw Nostr Event Collapsible */}
       <div className="collapse collapse-arrow bg-base-200">
         <input type="checkbox" />
         <div className="collapse-title text-sm font-medium py-2 min-h-0">
@@ -313,7 +313,7 @@ function MLSKeyPackageTab(props: { keyPackage: KeyPackage }) {
       {/* Leaf Node Information */}
       <LeafNodeInfo leafNode={props.keyPackage.leafNode} />
 
-      {/* Full Key Package Data - Collapsible */}
+      {/* Full Key Package Data Collapsible */}
       <div className="collapse collapse-arrow bg-base-200">
         <input
           type="checkbox"
