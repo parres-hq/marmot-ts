@@ -1,5 +1,5 @@
-import { NostrEvent } from "../lib/nostr.js";
-import { isValidRelayUrl, normalizeRelayUrl } from "./relay-url.js";
+import { NostrEvent } from "../utils/nostr.js";
+import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 
 /** Event kind for key package relay list events */
 export const KEY_PACKAGE_RELAY_LIST_KIND = 10051;

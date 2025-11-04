@@ -1,11 +1,13 @@
 import { mapEventsToStore, mapEventsToTimeline } from "applesauce-core";
+import { NostrEvent, getSeenRelays, kinds } from "applesauce-core/helpers";
 import {
-  NostrEvent,
-  getSeenRelays,
-  kinds,
-  neventEncode,
-} from "applesauce-core/helpers";
-import { EMPTY, combineLatest, map, switchMap, throttleTime } from "rxjs";
+  BehaviorSubject,
+  EMPTY,
+  combineLatest,
+  map,
+  switchMap,
+  throttleTime,
+} from "rxjs";
 import {
   KEY_PACKAGE_KIND,
   KEY_PACKAGE_RELAY_LIST_KIND,
@@ -23,6 +25,8 @@ const contacts$ = accounts.active$.pipe(
     account ? eventStore.contacts(account.pubkey) : EMPTY,
   ),
 );
+
+const preview$ = new BehaviorSubject<NostrEvent | null>(null);
 
 function KeyPackageItem({
   pkg,
@@ -69,14 +73,12 @@ function KeyPackageItem({
               </span>
             ))}
         </div>
-        <a
-          href={`https://nostr.at/${neventEncode({ id: pkg.id, relays })}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={() => preview$.next(pkg)}
           className="btn btn-xs btn-ghost ms-auto"
         >
           View
-        </a>
+        </button>
       </div>
     </div>
   );
@@ -151,6 +153,28 @@ function ContactCard(props: { pubkey: string; relays: string[] }) {
   );
 }
 
+function JsonPreviewModal() {
+  const previewEvent = useObservableMemo(() => preview$, []);
+
+  if (!previewEvent) return null;
+
+  return (
+    <div className="modal modal-open">
+      <div className="modal-box max-w-4xl">
+        <h3 className="font-bold text-lg mb-4">Key Package Event</h3>
+        <pre className="bg-base-300 p-4 rounded-lg overflow-auto max-h-[60vh] text-xs">
+          {JSON.stringify(previewEvent, null, 2)}
+        </pre>
+        <div className="modal-action">
+          <button className="btn" onClick={() => preview$.next(null)}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default withSignIn(() => {
   const contacts = useObservableMemo(() => contacts$, []);
 
@@ -177,63 +201,69 @@ export default withSignIn(() => {
   }, []);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Contact Key Package Relays</h1>
-        <p className="text-base-content/70">
-          Contacts who have published a kind 10051 key package relay list.
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="stats shadow">
-        <div className="stat">
-          <div className="stat-title">Total Contacts</div>
-          <div className="stat-value text-primary">{contacts?.length ?? 0}</div>
+    <>
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold">Contact Key Package Relays</h1>
+          <p className="text-base-content/70">
+            Contacts who have published a kind 10051 key package relay list.
+          </p>
         </div>
-        <div className="stat">
-          <div className="stat-title">With Relay Lists</div>
-          <div className="stat-value text-secondary">
-            {contactsWithRelays?.length ?? 0}
+
+        {/* Stats */}
+        <div className="stats shadow">
+          <div className="stat">
+            <div className="stat-title">Total Contacts</div>
+            <div className="stat-value text-primary">
+              {contacts?.length ?? 0}
+            </div>
+          </div>
+          <div className="stat">
+            <div className="stat-title">With Relay Lists</div>
+            <div className="stat-value text-secondary">
+              {contactsWithRelays?.length ?? 0}
+            </div>
           </div>
         </div>
+
+        {/* Empty State */}
+        {contactsWithRelays && contactsWithRelays.length === 0 && (
+          <div className="alert alert-info">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              className="stroke-current shrink-0 w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <span>
+              None of your contacts have published a key package relay list yet.
+            </span>
+          </div>
+        )}
+
+        {/* Grid of Contacts */}
+        {contactsWithRelays && contactsWithRelays.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {contactsWithRelays.map((contact) => (
+              <ContactCard
+                key={contact.pubkey}
+                pubkey={contact.pubkey}
+                relays={contact.relays}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Empty State */}
-      {contactsWithRelays && contactsWithRelays.length === 0 && (
-        <div className="alert alert-info">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            className="stroke-current shrink-0 w-6 h-6"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <span>
-            None of your contacts have published a key package relay list yet.
-          </span>
-        </div>
-      )}
-
-      {/* Grid of Contacts */}
-      {contactsWithRelays && contactsWithRelays.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {contactsWithRelays.map((contact) => (
-            <ContactCard
-              key={contact.pubkey}
-              pubkey={contact.pubkey}
-              relays={contact.relays}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+      <JsonPreviewModal />
+    </>
   );
 });

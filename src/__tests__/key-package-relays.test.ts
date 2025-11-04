@@ -1,10 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   getKeyPackageRelayList,
   isValidKeyPackageRelayListEvent,
-  KEY_PACKAGE_RELAY_LIST_KIND,
-} from "../helpers/key-package-relay-list.js";
-import { NostrEvent } from "../lib/nostr.js";
+} from "../core/key-package-relay-list.js";
+import { NostrEvent } from "../utils/nostr.js";
 
 const mockPubkey =
   "02a1633cafe37eeebe2b39b4ec5f3d74c35e61fa7e7e6b7b8c5f7c4f3b2a1b2c3d";
