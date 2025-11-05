@@ -9,13 +9,12 @@ import {
 } from "ts-mls";
 import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 
-import {
-  defaultExtensions,
-  defaultCapabilities,
-  getKeyPackageRelayList,
-} from "../../../../src";
+import { defaultCapabilities, getKeyPackageRelayList } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
-import { createKeyPackageEvent } from "../../../../src/core/key-package";
+import {
+  createKeyPackageEvent,
+  keyPackageDefaultExtensions,
+} from "../../../../src/core/key-package";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
 import {
   CIPHER_SUITES,
@@ -276,7 +275,7 @@ function useKeyPackageCreation() {
         credential,
         defaultCapabilities(),
         defaultLifetime,
-        defaultExtensions,
+        keyPackageDefaultExtensions(),
         ciphersuiteImpl,
       );
 

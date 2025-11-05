@@ -1,3 +1,4 @@
+import { ProposalAdd } from "ts-mls/proposal.js";
 import { expect, it } from "vitest";
 import { Marmot } from "..";
 
@@ -21,8 +22,8 @@ it("should handle basic MLS workflow: create group, add member, exchange message
   const bobKeyPackage = await marmot.createKeyPackage(bobCredential);
 
   // Alice creates a proposal to add Bob to the group
-  const addBobProposal = {
-    proposalType: "add" as const,
+  const addBobProposal: ProposalAdd = {
+    proposalType: "add",
     add: { keyPackage: bobKeyPackage.publicPackage },
   };
 

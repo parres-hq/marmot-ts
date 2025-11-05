@@ -21,6 +21,7 @@ import {
   KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
 import { NostrEvent } from "../../../../src/utils/nostr";
+import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ExtensionBadge from "../../components/extension-badge";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
@@ -110,9 +111,11 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
             <div className="text-xs text-base-content/60 mb-1">
               Cipher Suite
             </div>
-            <span className="badge badge-outline font-mono">
-              {cipherSuite?.name || "Unknown"}
-            </span>
+            {cipherSuiteId !== undefined ? (
+              <CipherSuiteBadge cipherSuite={cipherSuiteId} />
+            ) : (
+              <span className="badge badge-error badge-outline">Unknown</span>
+            )}
           </div>
 
           {client && (

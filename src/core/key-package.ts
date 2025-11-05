@@ -20,8 +20,11 @@ import {
   KEY_PACKAGE_MLS_VERSION_TAG,
   KEY_PACKAGE_RELAYS_TAG,
   KeyPackageClient,
+  MARMOT_GROUP_DATA_EXTENSION_TYPE,
   MLS_VERSIONS,
 } from "./protocol.js";
+import { createRequiredCapabilitiesExtension } from "./extensions.js";
+import { createMarmotGroupData } from "./marmot-group-data.js";
 
 /** Get the {@link KeyPackage} from a kind 443 event */
 export function getKeyPackage(event: NostrEvent): KeyPackage {
@@ -95,6 +98,34 @@ export function getKeyPackageClient(
   };
 }
 
+/**
+ * Default extensions for Marmot key packages.
+ *
+ * According to MIP-01, key packages should support the Marmot Group Data Extension
+ * and other standard MLS extensions that groups will require.
+ *
+ * Key packages MUST include:
+ * - required_capabilities (extension type 3) - Defines required MLS features
+ * - ratchet_tree (extension type 2) - Manages cryptographic key tree structure
+ * - marmot_group_data (extension type 0xF2EE) - Marmot-specific group data
+ */
+export function keyPackageDefaultExtensions(): Extension[] {
+  return [
+    createRequiredCapabilitiesExtension(),
+    {
+      extensionType: "ratchet_tree",
+      extensionData: new Uint8Array(),
+    },
+    {
+      extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
+      extensionData: createMarmotGroupData({
+        // Empty group id for key packages
+        nostrGroupId: new Uint8Array(32),
+      }),
+    },
+  ];
+}
+
 export type CreateKeyPackageEventOptions = {
   /** The MLS key package to encode in the event */
   keyPackage: KeyPackage;
@@ -141,7 +172,7 @@ export function createKeyPackageEvent(
     let extType: number;
 
     if (typeof ext.extensionType === "number") {
-      // Custom extension types (like Marmot Group Data Extension 0xF2EE)
+      // Custom extension types (like Marmot Group Data Extension 0xF2EE or GREASE values)
       extType = ext.extensionType;
     } else {
       // Default extension types (like "required_capabilities", "ratchet_tree")

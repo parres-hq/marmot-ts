@@ -55,6 +55,11 @@ function renderValue(value: any, depth = 0): any {
     return `"${value}"`;
   }
 
+  if (typeof value === "number") {
+    // Return number as 0x hex string
+    return `0x${value.toString(16).padStart(4, "0")}`;
+  }
+
   return String(value);
 }
 

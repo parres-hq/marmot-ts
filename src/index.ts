@@ -28,12 +28,12 @@ import {
   Welcome,
 } from "ts-mls";
 import { createCredential } from "./core/credential.js";
-import { CompleteKeyPackage } from "./core/key-package-store.js";
 import {
-  defaultExtensions,
-  groupExtensions,
   defaultCapabilities,
-} from "./core/extensions.js";
+  groupExtensions,
+} from "./core/default-capabilities.js";
+import { CompleteKeyPackage } from "./core/key-package-store.js";
+import { keyPackageDefaultExtensions } from "./core/key-package.js";
 
 // export all helpers
 export * from "./core/index.js";
@@ -42,8 +42,6 @@ export * from "./utils/index.js";
 export const ciphersuite: Ciphersuite = getCiphersuiteFromName(
   "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
 );
-
-export { defaultExtensions, groupExtensions } from "./core/extensions.js";
 
 /**
  * Main class providing MLS (Messaging Layer Security) functionality for the Marmot protocol.
@@ -109,7 +107,7 @@ export class Marmot {
       credential,
       defaultCapabilities(),
       defaultLifetime,
-      defaultExtensions,
+      keyPackageDefaultExtensions(),
       await this.ciphersuiteImpl,
     );
   }

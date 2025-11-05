@@ -24,6 +24,8 @@ import { NostrEvent } from "../../../../src/utils/nostr";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { pool } from "../../lib/nostr";
 
+import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import CredentialTypeBadge from "../../components/credential-type-badge";
 import ExtensionBadge from "../../components/extension-badge";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
@@ -93,9 +95,7 @@ function LeafNodeCapabilitiesSection(props: { leafNode: LeafNode }) {
         <DetailsField label="Cipher Suites">
           <div className="flex flex-wrap gap-2">
             {props.leafNode.capabilities.ciphersuites.map((suite) => (
-              <span key={suite} className="badge badge-outline">
-                {suite}
-              </span>
+              <CipherSuiteBadge key={suite} cipherSuite={suite} />
             ))}
           </div>
         </DetailsField>
@@ -104,9 +104,7 @@ function LeafNodeCapabilitiesSection(props: { leafNode: LeafNode }) {
         <DetailsField label="Credential Types">
           <div className="flex flex-wrap gap-2">
             {props.leafNode.capabilities.credentials.map((cred) => (
-              <span key={cred} className="badge badge-success badge-outline">
-                {cred}
-              </span>
+              <CredentialTypeBadge key={cred} credentialType={cred} />
             ))}
           </div>
         </DetailsField>
@@ -234,9 +232,7 @@ function KeyPackageTopLevelInfo(props: { event: NostrEvent }) {
         {/* Cipher Suite */}
         <DetailsField label="Cipher Suite">
           {cipherSuiteId !== undefined ? (
-            <span className="badge badge-outline font-mono">
-              {cipherSuite?.name}
-            </span>
+            <CipherSuiteBadge cipherSuite={cipherSuiteId} />
           ) : (
             <span className="badge badge-error badge-outline">Unknown</span>
           )}
@@ -336,9 +332,7 @@ function CredentialSection({
       {/* Credential Type */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DetailsField label="Credential Type">
-          <span className="badge badge-success badge-outline">
-            {credential.credentialType}
-          </span>
+          <CredentialTypeBadge credentialType={credential.credentialType} />
         </DetailsField>
 
         <DetailsField label="Identity (hex)">

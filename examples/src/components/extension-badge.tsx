@@ -1,4 +1,5 @@
 import { defaultExtensionTypes, ExtensionType } from "ts-mls";
+import { greaseValues } from "ts-mls/grease.js";
 
 interface ExtensionBadgeProps {
   extensionType: ExtensionType;
@@ -18,20 +19,22 @@ export default function ExtensionBadge({
       ? extensionType
       : parseInt(String(extensionType));
 
+  const isGrease = greaseValues.includes(typeAsNumber);
+
   // Find the extension name from the defaultExtensionTypes map
   const extensionName =
     Object.entries(defaultExtensionTypes).find(
       ([_, value]) => value === typeAsNumber,
-    )?.[0] ?? "Unknown";
+    )?.[0] ?? (isGrease ? "GREASE" : "Unknown");
 
   // Format the hex ID with 0x prefix
   const hexId = `0x${typeAsNumber.toString(16).padStart(4, "0")}`;
 
   return (
-    <div className="tooltip" data-tip={extensionName}>
-      <span className={`badge badge-outline font-mono ${className}`}>
-        {hexId}
-      </span>
-    </div>
+    <span
+      className={`badge badge-outline font-mono whitespace-pre ${className}`}
+    >
+      {extensionName} ({hexId})
+    </span>
   );
 }
