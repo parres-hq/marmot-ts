@@ -31,11 +31,12 @@ export default function PlaceholderExample({
 
       {/* Feature List */}
       <ul className="space-y-2 list-disc list-inside">
-        {features.split("\n")
-          .filter(feature => feature.trim())
+        {features
+          .split("\n")
+          .filter((feature) => feature.trim())
           .map((feature, index) => (
-          <li key={index}>{feature}</li>
-        ))}
+            <li key={index}>{feature}</li>
+          ))}
       </ul>
     </div>
   );

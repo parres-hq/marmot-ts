@@ -29,7 +29,11 @@ import {
 } from "ts-mls";
 import { createCredential } from "./core/credential.js";
 import { CompleteKeyPackage } from "./core/key-package-store.js";
-import { defaultExtensions, groupExtensions, defaultCapabilities } from "./core/extensions.js";
+import {
+  defaultExtensions,
+  groupExtensions,
+  defaultCapabilities,
+} from "./core/extensions.js";
 
 // export all helpers
 export * from "./core/index.js";

@@ -9,7 +9,11 @@ import {
 } from "ts-mls";
 import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 
-import { defaultExtensions, defaultCapabilities, getKeyPackageRelayList } from "../../../../src";
+import {
+  defaultExtensions,
+  defaultCapabilities,
+  getKeyPackageRelayList,
+} from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
 import { createKeyPackageEvent } from "../../../../src/core/key-package";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
