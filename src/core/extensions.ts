@@ -122,17 +122,14 @@ export function defaultCapabilities() {
 }
 
 /**
- * Default extensions for Marmot key packages.
+ * Core Marmot extensions used by both key packages and groups.
  *
- * According to MIP-01, key packages should support the Marmot Group Data Extension
- * and other standard MLS extensions that groups will require.
- *
- * Key packages MUST include:
+ * According to MIP-01, both key packages and groups MUST include:
  * - required_capabilities (extension type 3) - Defines required MLS features
  * - ratchet_tree (extension type 2) - Manages cryptographic key tree structure
  * - marmot_group_data (extension type 0xF2EE) - Marmot-specific group data
  */
-export const defaultExtensions: Extension[] = [
+const marmotExtensions: Extension[] = [
   createRequiredCapabilitiesExtension(),
   {
     extensionType: "ratchet_tree",
@@ -145,6 +142,14 @@ export const defaultExtensions: Extension[] = [
 ];
 
 /**
+ * Default extensions for Marmot key packages.
+ *
+ * According to MIP-01, key packages should support the Marmot Group Data Extension
+ * and other standard MLS extensions that groups will require.
+ */
+export const defaultExtensions: Extension[] = marmotExtensions;
+
+/**
  * Extensions required for Marmot groups.
  *
  * According to MIP-01, groups MUST include:
@@ -152,17 +157,7 @@ export const defaultExtensions: Extension[] = [
  * - ratchet_tree
  * - marmot_group_data
  */
-export const groupExtensions: Extension[] = [
-  createRequiredCapabilitiesExtension(),
-  {
-    extensionType: "ratchet_tree",
-    extensionData: new Uint8Array(),
-  },
-  {
-    extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
-    extensionData: createEmptyMarmotGroupDataExtension(),
-  },
-];
+export const groupExtensions: Extension[] = marmotExtensions;
 
 /**
  * Validates that a key package supports the required Marmot extensions.
