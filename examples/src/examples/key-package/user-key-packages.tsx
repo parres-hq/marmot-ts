@@ -1,13 +1,13 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
+import { normalizeToPubkey } from "applesauce-core/helpers";
 import { useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
-import { map, tap } from "rxjs/operators";
+import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import { getCiphersuiteFromId } from "ts-mls/crypto/ciphersuite.js";
 
-import { normalizeToPubkey } from "applesauce-core/helpers";
 import {
   getCredentialPubkey,
   getKeyPackage,
