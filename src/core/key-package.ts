@@ -1,5 +1,10 @@
 import { bytesToHex, hexToBytes } from "@noble/ciphers/utils.js";
-import { Extension, ExtensionType, KeyPackage } from "ts-mls";
+import {
+  Extension,
+  ExtensionType,
+  KeyPackage,
+  defaultExtensionTypes,
+} from "ts-mls";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { decodeKeyPackage, encodeKeyPackage } from "ts-mls/keyPackage.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
@@ -133,8 +138,22 @@ export function createKeyPackageEvent(
 
   // Extract extension types from the key package
   const extensionTypes = keyPackage.extensions.map((ext: Extension) => {
-    const extType =
-      typeof ext.extensionType === "number" ? ext.extensionType : 0; // Default extension types are handled as strings, fallback to 0
+    let extType: number;
+
+    if (typeof ext.extensionType === "number") {
+      // Custom extension types (like Marmot Group Data Extension 0xF2EE)
+      extType = ext.extensionType;
+    } else {
+      // Default extension types (like "required_capabilities", "ratchet_tree")
+      // Use the actual defaultExtensionTypes from ts-mls for proper mapping
+      extType = defaultExtensionTypes[ext.extensionType];
+
+      // Validate that we have a valid extension type
+      if (extType === undefined) {
+        throw new Error(`Unknown extension type: ${ext.extensionType}`);
+      }
+    }
+
     return `0x${extType.toString(16).padStart(4, "0")}`;
   });
 

@@ -3,6 +3,7 @@ import {
   RequiredCapabilities,
   encodeRequiredCapabilities,
   defaultCapabilities as baseCapabilities,
+  defaultExtensionTypes,
 } from "ts-mls";
 import { MARMOT_GROUP_DATA_EXTENSION_TYPE } from "./protocol.js";
 
@@ -81,13 +82,16 @@ export function createEmptyMarmotGroupDataExtension(): Uint8Array {
 }
 
 /**
- * Creates required capabilities extension that mandates the Marmot Group Data Extension.
+ * Creates required capabilities extension that mandates the Marmot Group Data Extension and ratchet_tree.
  *
- * According to MIP-01, all groups MUST require the Marmot Group Data Extension.
+ * According to MIP-01, all groups MUST require the Marmot Group Data Extension and ratchet_tree.
  */
 function createRequiredCapabilitiesExtension(): Extension {
   const requiredCapabilities: RequiredCapabilities = {
-    extensionTypes: [MARMOT_GROUP_DATA_EXTENSION_TYPE],
+    extensionTypes: [
+      MARMOT_GROUP_DATA_EXTENSION_TYPE,
+      defaultExtensionTypes.ratchet_tree,
+    ],
     proposalTypes: [],
     credentialTypes: ["basic"],
   };
@@ -102,13 +106,17 @@ function createRequiredCapabilitiesExtension(): Extension {
  * Default capabilities for Marmot key packages.
  *
  * According to MIP-01, key packages MUST signal support for the Marmot Group Data Extension
- * in their capabilities to pass validation when being added to groups.
+ * and ratchet_tree in their capabilities to pass validation when being added to groups.
  */
 export function defaultCapabilities() {
   const caps = baseCapabilities();
 
-  // Add Marmot Group Data Extension to capabilities
-  caps.extensions = [...caps.extensions, MARMOT_GROUP_DATA_EXTENSION_TYPE];
+  // Add Marmot Group Data Extension and ratchet_tree to capabilities
+  caps.extensions = [
+    ...caps.extensions,
+    MARMOT_GROUP_DATA_EXTENSION_TYPE,
+    defaultExtensionTypes.ratchet_tree,
+  ];
 
   return caps;
 }
@@ -118,8 +126,18 @@ export function defaultCapabilities() {
  *
  * According to MIP-01, key packages should support the Marmot Group Data Extension
  * and other standard MLS extensions that groups will require.
+ *
+ * Key packages MUST include:
+ * - required_capabilities (extension type 3) - Defines required MLS features
+ * - ratchet_tree (extension type 2) - Manages cryptographic key tree structure
+ * - marmot_group_data (extension type 0xF2EE) - Marmot-specific group data
  */
 export const defaultExtensions: Extension[] = [
+  createRequiredCapabilitiesExtension(),
+  {
+    extensionType: "ratchet_tree",
+    extensionData: new Uint8Array(),
+  },
   {
     extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
     extensionData: createEmptyMarmotGroupDataExtension(),
