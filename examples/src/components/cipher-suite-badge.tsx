@@ -19,8 +19,10 @@ export default function CipherSuiteBadge({
   className = "",
 }: CipherSuiteBadgeProps) {
   // Convert to number if needed
-  const cipherSuiteId =
-    typeof cipherSuite === "number" ? cipherSuite : ciphersuites[cipherSuite];
+  const cipherSuiteId: CiphersuiteId =
+    typeof cipherSuite === "number"
+      ? cipherSuite
+      : ciphersuites[cipherSuite] || parseInt(cipherSuite);
 
   const isGrease = greaseValues.includes(cipherSuiteId);
 

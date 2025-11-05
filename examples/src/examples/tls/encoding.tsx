@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import ErrorBoundary from "../../components/error-boundary";
 
 // ============================================================================
 // TLS Presentation Language Types (RFC 8446 Section 3)
@@ -1320,19 +1320,7 @@ export default function TLSEncodingExplorer() {
             onChange={() => setMode("auto")}
           />
           <div className="tab-content bg-base-100 border-base-300 p-6">
-            <ErrorBoundary
-              fallbackRender={({ error, resetErrorBoundary }) => (
-                <div className="alert alert-error">
-                  <div>
-                    <div className="font-bold">Parse Error</div>
-                    <div className="text-sm">{error.message}</div>
-                  </div>
-                  <button className="btn btn-sm" onClick={resetErrorBoundary}>
-                    Try Again
-                  </button>
-                </div>
-              )}
-            >
+            <ErrorBoundary>
               {/* Raw Hex View */}
               <div className="mb-6">
                 <h2 className="text-lg font-semibold mb-4">Raw Bytes</h2>
@@ -1371,19 +1359,7 @@ export default function TLSEncodingExplorer() {
             disabled={!structDef}
           />
           <div className="tab-content bg-base-100 border-base-300 p-6">
-            <ErrorBoundary
-              fallbackRender={({ error, resetErrorBoundary }) => (
-                <div className="alert alert-error">
-                  <div>
-                    <div className="font-bold">Parse Error</div>
-                    <div className="text-sm">{error.message}</div>
-                  </div>
-                  <button className="btn btn-sm" onClick={resetErrorBoundary}>
-                    Try Again
-                  </button>
-                </div>
-              )}
-            >
+            <ErrorBoundary>
               {structDef ? (
                 <>
                   {/* Raw Hex View */}
@@ -1449,7 +1425,7 @@ export default function TLSEncodingExplorer() {
         <div className="card bg-base-200">
           <div className="card-body items-center text-center">
             <h3 className="text-xl font-semibold mb-2">
-              👆 Enter binary data above to get started
+              Enter binary data above to get started
             </h3>
             <p className="text-base-content/70">
               Try clicking one of the example buttons or paste your own TLS

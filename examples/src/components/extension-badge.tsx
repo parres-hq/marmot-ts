@@ -14,21 +14,21 @@ export default function ExtensionBadge({
   className = "",
 }: ExtensionBadgeProps) {
   // Convert to number if needed
-  const typeAsNumber =
+  const extensionTypeId =
     typeof extensionType === "number"
       ? extensionType
-      : parseInt(String(extensionType));
+      : defaultExtensionTypes[extensionType];
 
-  const isGrease = greaseValues.includes(typeAsNumber);
+  const isGrease = greaseValues.includes(extensionTypeId);
 
   // Find the extension name from the defaultExtensionTypes map
   const extensionName =
     Object.entries(defaultExtensionTypes).find(
-      ([_, value]) => value === typeAsNumber,
+      ([_, value]) => value === extensionTypeId,
     )?.[0] ?? (isGrease ? "GREASE" : "Unknown");
 
   // Format the hex ID with 0x prefix
-  const hexId = `0x${typeAsNumber.toString(16).padStart(4, "0")}`;
+  const hexId = `0x${extensionTypeId.toString(16).padStart(4, "0")}`;
 
   return (
     <span

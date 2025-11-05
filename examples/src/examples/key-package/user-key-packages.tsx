@@ -2,11 +2,9 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
 import { normalizeToPubkey } from "applesauce-core/helpers";
 import { useState } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
-import { getCiphersuiteFromId } from "ts-mls/crypto/ciphersuite.js";
 
 import {
   getCredentialPubkey,
@@ -22,6 +20,7 @@ import {
 } from "../../../../src";
 import { NostrEvent } from "../../../../src/utils/nostr";
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
@@ -62,11 +61,6 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
   const extensions = getKeyPackageExtensions(event);
   const relays = getKeyPackageRelays(event);
   const client = getKeyPackageClient(event);
-
-  const cipherSuite =
-    cipherSuiteId !== undefined
-      ? getCiphersuiteFromId(cipherSuiteId)
-      : undefined;
 
   // Parse the key package
   let keyPackage: KeyPackage | null = null;
@@ -413,20 +407,7 @@ export default function UserKeyPackages() {
           {keyPackages && keyPackages.length > 0 ? (
             <div className="space-y-3">
               {keyPackages.map((event) => (
-                <ErrorBoundary
-                  key={event.id}
-                  fallbackRender={({ error }) => (
-                    <div className="card bg-base-100 border border-error">
-                      <div className="card-body p-4">
-                        <div className="alert alert-error p-2">
-                          <span className="text-xs">
-                            Error rendering key package: {error.message}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                >
+                <ErrorBoundary key={event.id}>
                   <KeyPackageCard event={event as NostrEvent} />
                 </ErrorBoundary>
               ))}

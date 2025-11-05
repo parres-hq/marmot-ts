@@ -70,7 +70,7 @@ function renderValue(value: any, depth = 0): ReactNode {
  */
 export default function KeyPackageDataView(props: { keyPackage: KeyPackage }) {
   return (
-    <div className="font-mono text-xs bg-base-200 py-4 rounded break-all">
+    <div className="font-mono text-xs rounded break-all">
       {renderValue(props.keyPackage)}
     </div>
   );
