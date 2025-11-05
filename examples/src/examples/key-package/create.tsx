@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 import {
-  defaultCapabilities,
   defaultCryptoProvider,
   defaultLifetime,
   generateKeyPackage,
@@ -10,7 +9,7 @@ import {
 } from "ts-mls";
 import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 
-import { getKeyPackageRelayList } from "../../../../src";
+import { defaultExtensions, defaultCapabilities, getKeyPackageRelayList } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
 import { createKeyPackageEvent } from "../../../../src/core/key-package";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
@@ -41,8 +40,6 @@ const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
       : EMPTY,
   ),
 );
-
-const defaultExtensions: never[] = [];
 
 // ============================================================================
 // Component: ConfigurationForm
@@ -219,6 +216,7 @@ function InfoSection() {
             Choose from {CIPHER_SUITES.length} different MLS cipher suites with
             various cryptographic algorithms
           </li>
+          <li>Includes Marmot Group Data Extension for Nostr integration</li>
           <li>Tagged with "client" for identification purposes</li>
         </ul>
       </div>

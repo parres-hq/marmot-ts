@@ -18,7 +18,9 @@ describe("exports", () => {
         "Marmot",
         "ciphersuite",
         "createCredential",
+        "createEmptyMarmotGroupDataExtension",
         "createKeyPackageEvent",
+        "defaultCapabilities",
         "defaultExtensions",
         "getCredentialPubkey",
         "getKeyPackage",
@@ -29,9 +31,11 @@ describe("exports", () => {
         "getKeyPackageRelayList",
         "getKeyPackageRelays",
         "getTagValue",
+        "groupExtensions",
         "isValidKeyPackageRelayListEvent",
         "isValidRelayUrl",
         "normalizeRelayUrl",
+        "supportsMarmotExtensions",
       ]
     `);
   });
