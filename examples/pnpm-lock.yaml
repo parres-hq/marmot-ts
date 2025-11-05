@@ -7,6 +7,9 @@ settings:
 importers:
   .:
     dependencies:
+      "@noble/hashes":
+        specifier: ^2.0.1
+        version: 2.0.1
       "@tailwindcss/vite":
         specifier: ^4.1.16
         version: 4.1.16(vite@7.1.12(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2))
@@ -14,6 +17,9 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(typescript@5.9.3)
       applesauce-core:
+        specifier: ^4.1.0
+        version: 4.1.0(typescript@5.9.3)
+      applesauce-extra:
         specifier: ^4.1.0
         version: 4.1.0(typescript@5.9.3)
       applesauce-loaders:
@@ -28,6 +34,9 @@ importers:
       daisyui:
         specifier: ^5.3.8
         version: 5.3.8
+      localforage:
+        specifier: ^1.10.0
+        version: 1.10.0
       react:
         specifier: ^19.0.0
         version: 19.2.0
@@ -43,6 +52,9 @@ importers:
       tailwindcss:
         specifier: ^4.1.16
         version: 4.1.16
+      unique-names-generator:
+        specifier: ^4.7.1
+        version: 4.7.1
     devDependencies:
       "@types/node":
         specifier: ^24.6.0
@@ -515,6 +527,13 @@ packages:
       }
     engines: { node: ^14.21.3 || >=16 }
 
+  "@noble/hashes@2.0.1":
+    resolution:
+      {
+        integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==,
+      }
+    engines: { node: ">= 20.19.0" }
+
   "@noble/secp256k1@1.7.2":
     resolution:
       {
@@ -933,6 +952,12 @@ packages:
         integrity: sha512-vFOHfqWW4DJfvPkMYLYNiy2ozO2IF+ZNwetGqaLuPjgE1Iwu4trZmG3GJUH+lO1Oq1N4e/OQ/EcotJoEBEiW7Q==,
       }
 
+  applesauce-extra@4.1.0:
+    resolution:
+      {
+        integrity: sha512-cUUd3zX+o+innCYGgusDA+8rJflzbBWJ0BI8wODDfhaPD3ZBgGYTU0V/GfUjZgqcayB8WIS1BHGlquxfOxvF6g==,
+      }
+
   applesauce-loaders@4.0.0:
     resolution:
       {
@@ -1082,6 +1107,12 @@ packages:
         integrity: sha512-WdZTbAByD+pHfl/g9QSsBIIwy8IT+EsPiKDs0KNX+zSHhdDLFKdZu0BQHljvO+0QI/BasbMSUa8wYNCZTvhslg==,
       }
 
+  immediate@3.0.6:
+    resolution:
+      {
+        integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ==,
+      }
+
   jiti@2.6.1:
     resolution:
       {
@@ -1110,6 +1141,12 @@ packages:
       }
     engines: { node: ">=6" }
     hasBin: true
+
+  lie@3.1.1:
+    resolution:
+      {
+        integrity: sha512-RiNhHysUjhrDQntfYSfY4MU24coXXdEOgw9WGcKHNeEwffDYbF//u87M1EWaMGzuFoSbqW0C9C6lEEhDOAswfw==,
+      }
 
   light-bolt11-decoder@3.2.0:
     resolution:
@@ -1222,6 +1259,12 @@ packages:
         integrity: sha512-utfs7Pr5uJyyvDETitgsaqSyjCb2qNRAtuqUeWIAKztsOYdcACf2KtARYXg2pSvhkt+9NfoaNY7fxjl6nuMjIQ==,
       }
     engines: { node: ">= 12.0.0" }
+
+  localforage@1.10.0:
+    resolution:
+      {
+        integrity: sha512-14/H1aX7hzBBmmh7sGPd+AOMkkIrHM3Z1PAyGgZigA1H1p5O5ANnMyWzvpAETtG68/dC4pC0ncy3+PPGzXZHPg==,
+      }
 
   lru-cache@5.1.1:
     resolution:
@@ -1403,6 +1446,13 @@ packages:
       {
         integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==,
       }
+
+  unique-names-generator@4.7.1:
+    resolution:
+      {
+        integrity: sha512-lMx9dX+KRmG8sq6gulYYpKWZc9RlGsgBR6aoO8Qsm3qvkSJ+3rAymr+TnV8EDMrIrwuFJ4kruzMWM/OpYzPoow==,
+      }
+    engines: { node: ">=8" }
 
   update-browserslist-db@1.1.4:
     resolution:
@@ -1690,6 +1740,8 @@ snapshots:
 
   "@noble/hashes@1.8.0": {}
 
+  "@noble/hashes@2.0.1": {}
+
   "@noble/secp256k1@1.7.2": {}
 
   "@rolldown/pluginutils@1.0.0-beta.27": {}
@@ -1767,12 +1819,12 @@ snapshots:
   "@scure/bip32@1.3.1":
     dependencies:
       "@noble/curves": 1.1.0
-      "@noble/hashes": 1.3.1
+      "@noble/hashes": 1.3.2
       "@scure/base": 1.1.1
 
   "@scure/bip39@1.2.1":
     dependencies:
-      "@noble/hashes": 1.3.1
+      "@noble/hashes": 1.3.2
       "@scure/base": 1.1.1
 
   "@tailwindcss/node@4.1.16":
@@ -1917,6 +1969,16 @@ snapshots:
       - supports-color
       - typescript
 
+  applesauce-extra@4.1.0(typescript@5.9.3):
+    dependencies:
+      applesauce-core: 4.1.0(typescript@5.9.3)
+      applesauce-relay: 4.1.0(typescript@5.9.3)
+      applesauce-signers: 4.1.0(typescript@5.9.3)
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
+
   applesauce-loaders@4.0.0(typescript@5.9.3):
     dependencies:
       applesauce-core: 4.1.0(typescript@5.9.3)
@@ -2029,6 +2091,8 @@ snapshots:
 
   hash-sum@2.0.0: {}
 
+  immediate@3.0.6: {}
+
   jiti@2.6.1: {}
 
   js-tokens@4.0.0: {}
@@ -2036,6 +2100,10 @@ snapshots:
   jsesc@3.1.0: {}
 
   json5@2.2.3: {}
+
+  lie@3.1.1:
+    dependencies:
+      immediate: 3.0.6
 
   light-bolt11-decoder@3.2.0:
     dependencies:
@@ -2089,6 +2157,10 @@ snapshots:
       lightningcss-linux-x64-musl: 1.30.2
       lightningcss-win32-arm64-msvc: 1.30.2
       lightningcss-win32-x64-msvc: 1.30.2
+
+  localforage@1.10.0:
+    dependencies:
+      lie: 3.1.1
 
   lru-cache@5.1.1:
     dependencies:
@@ -2196,6 +2268,8 @@ snapshots:
   typescript@5.9.3: {}
 
   undici-types@7.16.0: {}
+
+  unique-names-generator@4.7.1: {}
 
   update-browserslist-db@1.1.4(browserslist@4.27.0):
     dependencies:

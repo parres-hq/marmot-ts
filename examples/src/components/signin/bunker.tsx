@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { NostrConnectSigner } from "applesauce-signers";
 import { NostrConnectAccount } from "applesauce-accounts/accounts";
-import accountManager from "../lib/accounts";
+import accountManager from "../../lib/accounts";
 
-export default function BunkerUrlForm() {
+export default function SignerBunker() {
   const [bunkerUrl, setBunkerUrl] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);

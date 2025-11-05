@@ -1,11 +1,11 @@
 import { useEffect, useState, type ComponentType, Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
-import SideNav from "./components/SideNav.tsx";
+import SideNav from "./components/side-nav";
 
-import { CodeIcon } from "./components/items.tsx";
+import { CodeIcon } from "./components/icons.tsx";
 import examples, { type Example } from "./examples";
 import useHash from "./hooks/use-hash";
-import SignInModal from "./components/SignInModal.tsx";
+import SignInModal from "./components/signin/modal.tsx";
 
 function ExampleView(props: { example?: Example }) {
   const [path, setPath] = useState("");

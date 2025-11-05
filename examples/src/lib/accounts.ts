@@ -1,8 +1,9 @@
 import { AccountManager, SerializedAccount } from "applesauce-accounts";
 import { registerCommonAccountTypes } from "applesauce-accounts/accounts";
 import { NostrConnectSigner } from "applesauce-signers";
-import { pool } from "./nostr";
+import { eventStore, pool } from "./nostr";
 import { parse } from "./setting";
+import { EMPTY, switchMap } from "rxjs";
 
 // create an account manager instance
 const accounts = new AccountManager();
@@ -36,5 +37,12 @@ accounts.active$.subscribe((account) => {
   if (account) localStorage.setItem("active", account.id);
   else localStorage.removeItem("active");
 });
+
+/** An observable of the current account's mailboxes */
+export const mailboxes$ = accounts.active$.pipe(
+  switchMap((account) =>
+    account ? eventStore.mailboxes(account.pubkey) : EMPTY,
+  ),
+);
 
 export default accounts;

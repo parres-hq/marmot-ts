@@ -30,3 +30,6 @@ export type KeyPackageClient = {
   name: string;
   // TODO: this is probably a NIP-89 client tag, so it should probably have the rest of the fields
 };
+
+/** The identifier for the Marmot Group Data Extension (MIP-01) */
+export const MARMOT_GROUP_DATA_EXTENSION_TYPE = 0xf2ee;

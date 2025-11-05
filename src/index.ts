@@ -9,7 +9,6 @@ import {
   createGroup,
   Credential,
   CryptoProvider,
-  defaultCapabilities,
   defaultCryptoProvider,
   defaultLifetime,
   emptyPskIndex,
@@ -30,6 +29,11 @@ import {
 } from "ts-mls";
 import { createCredential } from "./core/credential.js";
 import { CompleteKeyPackage } from "./core/key-package-store.js";
+import {
+  defaultExtensions,
+  groupExtensions,
+  defaultCapabilities,
+} from "./core/extensions.js";
 
 // export all helpers
 export * from "./core/index.js";
@@ -39,7 +43,7 @@ export const ciphersuite: Ciphersuite = getCiphersuiteFromName(
   "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
 );
 
-export const defaultExtensions = [];
+export { defaultExtensions, groupExtensions } from "./core/extensions.js";
 
 /**
  * Main class providing MLS (Messaging Layer Security) functionality for the Marmot protocol.
@@ -136,7 +140,7 @@ export class Marmot {
       actualGroupId,
       keyPackage.publicPackage,
       keyPackage.privatePackage,
-      defaultExtensions,
+      groupExtensions,
       ciphersuiteImpl,
     );
   }

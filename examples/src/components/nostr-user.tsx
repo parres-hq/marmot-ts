@@ -1,7 +1,3 @@
-// ============================================================================
-// User Profile Components
-// ============================================================================
-
 import { getDisplayName, getProfilePicture } from "applesauce-core/helpers";
 import { useObservableMemo } from "../hooks/use-observable";
 import { eventStore } from "../lib/nostr";
@@ -15,11 +11,8 @@ export function UserName(props: { pubkey: string }) {
   return <span>{getDisplayName(profile, props.pubkey.slice(0, 16))}</span>;
 }
 
-export function UserAvatar(props: { pubkey: string }) {
-  const profile = useObservableMemo(
-    () => eventStore.profile(props.pubkey),
-    [props.pubkey],
-  );
+export function UserAvatar({ pubkey }: { pubkey: string }) {
+  const profile = useObservableMemo(() => eventStore.profile(pubkey), [pubkey]);
 
   return (
     <div className="avatar">
@@ -27,7 +20,7 @@ export function UserAvatar(props: { pubkey: string }) {
         <img
           src={
             getProfilePicture(profile) ||
-            `https://api.dicebear.com/7.x/identicon/svg?seed=${props.pubkey}`
+            `https://api.dicebear.com/7.x/identicon/svg?seed=${pubkey}`
           }
           alt="avatar"
         />
