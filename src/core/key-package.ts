@@ -1,15 +1,10 @@
 import { bytesToHex, hexToBytes } from "@noble/ciphers/utils.js";
-import {
-  Extension,
-  ExtensionType,
-  KeyPackage,
-  defaultExtensionTypes,
-} from "ts-mls";
+import { Extension, ExtensionType, KeyPackage } from "ts-mls";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { decodeKeyPackage, encodeKeyPackage } from "ts-mls/keyPackage.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
 
-import { getTagValue, NostrEvent } from "../utils/nostr.js";
+import { getTagValue } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 import { getCredentialPubkey } from "./credential.js";
 import {
@@ -22,9 +17,11 @@ import {
   KeyPackageClient,
   MARMOT_GROUP_DATA_EXTENSION_TYPE,
   MLS_VERSIONS,
+  extendedExtensionTypes,
 } from "./protocol.js";
 import { createRequiredCapabilitiesExtension } from "./extensions.js";
 import { createMarmotGroupData } from "./marmot-group-data.js";
+import { NostrEvent } from "applesauce-core/helpers";
 
 /** Get the {@link KeyPackage} from a kind 443 event */
 export function getKeyPackage(event: NostrEvent): KeyPackage {
@@ -175,9 +172,9 @@ export function createKeyPackageEvent(
       // Custom extension types (like Marmot Group Data Extension 0xF2EE or GREASE values)
       extType = ext.extensionType;
     } else {
-      // Default extension types (like "required_capabilities", "ratchet_tree")
-      // Use the actual defaultExtensionTypes from ts-mls for proper mapping
-      extType = defaultExtensionTypes[ext.extensionType];
+      // Extended extension types (including Marmot-specific extensions)
+      // Use the extendedExtensionTypes for proper mapping
+      extType = extendedExtensionTypes[ext.extensionType];
 
       // Validate that we have a valid extension type
       if (extType === undefined) {

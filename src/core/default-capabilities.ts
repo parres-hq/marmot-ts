@@ -1,11 +1,8 @@
 import {
   Capabilities,
-  Extension,
   defaultCapabilities as mlsDefaultCapabilities,
 } from "ts-mls";
-import { createMarmotGroupData } from "./marmot-group-data.js";
 import { MARMOT_GROUP_DATA_EXTENSION_TYPE } from "./protocol.js";
-import { createRequiredCapabilitiesExtension } from "./extensions.js";
 
 /**
  * Default capabilities for Marmot key packages.
@@ -25,25 +22,3 @@ export function defaultCapabilities(): Capabilities {
 
   return capabilities;
 }
-
-/**
- * Extensions required for Marmot groups.
- *
- * According to MIP-01, groups MUST include:
- * - required_capabilities (mandating Marmot Group Data Extension)
- * - ratchet_tree
- * - marmot_group_data
- */
-export const groupExtensions: Extension[] = [
-  createRequiredCapabilitiesExtension(),
-  {
-    extensionType: "ratchet_tree",
-    extensionData: new Uint8Array(),
-  },
-  {
-    extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
-    extensionData: createMarmotGroupData({
-      nostrGroupId: new Uint8Array(32),
-    }),
-  },
-];

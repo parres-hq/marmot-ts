@@ -1,6 +1,10 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
-import { normalizeToPubkey } from "applesauce-core/helpers";
+import {
+  getDisplayName,
+  normalizeToPubkey,
+  NostrEvent,
+} from "applesauce-core/helpers";
 import { useState } from "react";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
@@ -18,7 +22,6 @@ import {
   KEY_PACKAGE_KIND,
   KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
-import { NostrEvent } from "../../../../src/utils/nostr";
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
@@ -234,9 +237,34 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 
 export default function UserKeyPackages() {
   const [pubkeyInput, setPubkeyInput] = useState("");
+  const [manualRelayInput, setManualRelayInput] = useState(
+    "wss://relay.damus.io/",
+  );
+  const [manualRelay, setManualRelay] = useState("wss://relay.damus.io/");
   const allAccounts = useObservable(accounts.accounts$);
   const selectedPubkey = useObservable(selectedPubkey$);
   const keyPackageRelays = useObservable(keyPackageRelaysList$);
+
+  const handleSetRelay = () => {
+    setManualRelay(manualRelayInput);
+  };
+
+  // Observable for account profiles with display names
+  const accountProfiles = useObservableMemo(() => {
+    if (!allAccounts || allAccounts.length === 0) return of([]);
+
+    // Create observables for each account's profile
+    const profileObservables = allAccounts.map((account) =>
+      eventStore.profile(account.pubkey).pipe(
+        map((profile) => ({
+          pubkey: account.pubkey,
+          displayName: getDisplayName(profile, account.pubkey.slice(0, 16)),
+        })),
+      ),
+    );
+
+    return combineLatest(profileObservables);
+  }, [allAccounts]);
 
   // Handle manual pubkey submission
   const handleSubmit = (e: React.FormEvent) => {
@@ -251,16 +279,16 @@ export default function UserKeyPackages() {
     selectedPubkey$.next(null);
   };
 
-  // Step 2: Fetch key packages from those relays (or default relays if none found)
+  // Step 2: Fetch key packages from those relays (or manual relay if none found)
   const keyPackages = useObservableMemo(
     () =>
       combineLatest([selectedPubkey$, keyPackageRelaysList$]).pipe(
         switchMap(([pubkey, relays]) => {
           if (!pubkey) return of([]);
 
-          // Use the user's specified relays, or fall back to a default relay
+          // Use the user's specified relays, or fall back to manual relay
           const relaysToUse =
-            relays && relays.length > 0 ? relays : ["wss://relay.damus.io/"];
+            relays && relays.length > 0 ? relays : [manualRelay];
 
           return pool
             .request(relaysToUse, {
@@ -274,7 +302,7 @@ export default function UserKeyPackages() {
             );
         }),
       ),
-    [],
+    [manualRelay],
   );
 
   return (
@@ -328,9 +356,9 @@ export default function UserKeyPackages() {
                   <option value="" disabled>
                     Select an account
                   </option>
-                  {allAccounts.map((account) => (
-                    <option key={account.pubkey} value={account.pubkey}>
-                      <UserName pubkey={account.pubkey} />
+                  {accountProfiles?.map(({ pubkey, displayName }) => (
+                    <option key={pubkey} value={pubkey}>
+                      {displayName}
                     </option>
                   ))}
                 </select>
@@ -384,10 +412,28 @@ export default function UserKeyPackages() {
                 </div>
               ) : (
                 <div className="alert alert-info">
-                  <span>
-                    No relay list found. Using default relay
-                    (wss://relay.damus.io/)
-                  </span>
+                  <div className="space-y-2">
+                    <span>No relay list found. Using relay:</span>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="text"
+                        className="input input-bordered input-sm flex-1"
+                        value={manualRelayInput}
+                        onChange={(e) => setManualRelayInput(e.target.value)}
+                        placeholder="wss://relay.example.com"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleSetRelay}
+                      >
+                        Set
+                      </button>
+                    </div>
+                    <div className="text-xs text-base-content/60">
+                      Current: {manualRelay}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

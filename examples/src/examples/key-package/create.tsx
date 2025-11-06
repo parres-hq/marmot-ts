@@ -14,14 +14,16 @@ import {
   CompleteKeyPackage,
   defaultCapabilities,
   getKeyPackageRelayList,
-  NostrEvent,
 } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
 import {
   createKeyPackageEvent,
   keyPackageDefaultExtensions,
 } from "../../../../src/core/key-package";
-import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
+import {
+  KEY_PACKAGE_RELAY_LIST_KIND,
+  KEY_PACKAGE_RELAYS_TAG,
+} from "../../../../src/core/protocol";
 import { CipherSuitePicker } from "../../components/form/cipher-suite-picker";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
@@ -30,6 +32,7 @@ import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
+import { NostrEvent } from "applesauce-core/helpers";
 
 /** Observable of current accounts key package relays */
 const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
@@ -379,7 +382,7 @@ function useKeyPackageCreation() {
 
       // Parse relay URLs from the draft event
       const relayList = signedEvent.tags
-        .filter((tag: string[]) => tag[0] === "relay")
+        .filter((tag: string[]) => tag[0] === KEY_PACKAGE_RELAYS_TAG)
         .map((tag: string[]) => tag[1]);
 
       // Publish to relays

@@ -1,4 +1,6 @@
 import { randomBytes } from "@noble/hashes/utils.js";
+import { MARMOT_GROUP_DATA_VERSION, MarmotGroupData } from "./protocol.js";
+import { isHexKey } from "./credential.js";
 
 /**
  * Marmot Group Data Extension Implementation (MIP-01)
@@ -12,32 +14,6 @@ import { randomBytes } from "@noble/hashes/utils.js";
  *
  * @see https://github.com/parres-hq/marmot/blob/master/01.md#marmot-group-data-extension
  */
-
-export const MARMOT_GROUP_DATA_VERSION = 1;
-
-/**
- * Represents the decoded Marmot Group Data Extension structure.
- */
-export interface MarmotGroupData {
-  /** Extension format version number (current: 1) */
-  version: number;
-  /** 32-byte identifier for the group used in Nostr protocol operations */
-  nostrGroupId: Uint8Array;
-  /** UTF-8 encoded group name */
-  name: string;
-  /** UTF-8 encoded group description */
-  description: string;
-  /** Array of 32-byte Nostr public keys (hex-encoded strings) */
-  adminPubkeys: string[];
-  /** Array of WebSocket URLs for Nostr relays */
-  relays: string[];
-  /** SHA-256 hash of the encrypted group image (all zeros if no image) */
-  imageHash: Uint8Array;
-  /** ChaCha20-Poly1305 encryption key for the group image (all zeros if no image) */
-  imageKey: Uint8Array;
-  /** ChaCha20-Poly1305 nonce for group image encryption (all zeros if no image) */
-  imageNonce: Uint8Array;
-}
 
 /**
  * Parameters for creating a new Marmot Group Data Extension.
@@ -374,7 +350,7 @@ function validateMarmotGroupData(data: MarmotGroupData): void {
 
   // Validate admin pubkeys
   for (const pubkey of data.adminPubkeys) {
-    if (!/^[0-9a-fA-F]{64}$/.test(pubkey)) {
+    if (!isHexKey(pubkey)) {
       throw new Error(
         `Invalid admin public key format: ${pubkey} (must be 64 hex characters)`,
       );

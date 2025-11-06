@@ -18,7 +18,6 @@ import {
   getKeyPackageRelays,
   KEY_PACKAGE_KIND,
 } from "../../../../src";
-import { NostrEvent } from "../../../../src/utils/nostr";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { pool } from "../../lib/nostr";
 
@@ -31,6 +30,7 @@ import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { encodeKeyPackage } from "ts-mls/keyPackage.js";
+import { NostrEvent } from "applesauce-core/helpers";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();

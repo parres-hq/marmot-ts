@@ -1,4 +1,4 @@
-import { NostrEvent } from "../utils/nostr.js";
+import { NostrEvent } from "applesauce-core/helpers";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 import {
   KEY_PACKAGE_RELAY_LIST_KIND,

@@ -28,10 +28,7 @@ import {
   Welcome,
 } from "ts-mls";
 import { createCredential } from "./core/credential.js";
-import {
-  defaultCapabilities,
-  groupExtensions,
-} from "./core/default-capabilities.js";
+import { defaultCapabilities } from "./core/default-capabilities.js";
 import { CompleteKeyPackage } from "./core/key-package-store.js";
 import { keyPackageDefaultExtensions } from "./core/key-package.js";
 
@@ -138,7 +135,7 @@ export class Marmot {
       actualGroupId,
       keyPackage.publicPackage,
       keyPackage.privatePackage,
-      groupExtensions,
+      keyPackageDefaultExtensions(),
       ciphersuiteImpl,
     );
   }
