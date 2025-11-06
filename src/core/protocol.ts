@@ -1,3 +1,5 @@
+import { defaultExtensionTypes } from "ts-mls";
+
 /** Event kind for key package relay list events */
 export const KEY_PACKAGE_RELAY_LIST_KIND = 10051;
 
@@ -33,3 +35,40 @@ export type KeyPackageClient = {
 
 /** The identifier for the Marmot Group Data Extension (MIP-01) */
 export const MARMOT_GROUP_DATA_EXTENSION_TYPE = 0xf2ee;
+
+/** The version number for the Marmot Group Data Extension (MIP-01) */
+export const MARMOT_GROUP_DATA_VERSION = 1;
+
+/** Extended extension types that include Marmot-specific extensions */
+export const extendedExtensionTypes = {
+  ...defaultExtensionTypes,
+  marmot_group_data: MARMOT_GROUP_DATA_EXTENSION_TYPE,
+} as const;
+
+export type ExtendedExtensionTypeName = keyof typeof extendedExtensionTypes;
+export type ExtendedExtensionTypeValue =
+  (typeof extendedExtensionTypes)[ExtendedExtensionTypeName];
+
+/**
+ * Represents the decoded Marmot Group Data Extension structure.
+ */
+export interface MarmotGroupData {
+  /** Extension format version number (current: 1) */
+  version: number;
+  /** 32-byte identifier for the group used in Nostr protocol operations */
+  nostrGroupId: Uint8Array;
+  /** UTF-8 encoded group name */
+  name: string;
+  /** UTF-8 encoded group description */
+  description: string;
+  /** Array of 32-byte Nostr public keys (hex-encoded strings) */
+  adminPubkeys: string[];
+  /** Array of WebSocket URLs for Nostr relays */
+  relays: string[];
+  /** SHA-256 hash of the encrypted group image (all zeros if no image) */
+  imageHash: Uint8Array;
+  /** ChaCha20-Poly1305 encryption key for the group image (all zeros if no image) */
+  imageKey: Uint8Array;
+  /** ChaCha20-Poly1305 nonce for group image encryption (all zeros if no image) */
+  imageNonce: Uint8Array;
+}

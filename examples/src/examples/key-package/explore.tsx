@@ -2,11 +2,9 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { BehaviorSubject, mapEventsToTimeline } from "applesauce-core";
 import { onlyEvents } from "applesauce-relay";
 import { useMemo, useState, type ReactNode } from "react";
-import { ErrorBoundary } from "react-error-boundary";
 import { map, switchMap } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import { CredentialBasic } from "ts-mls/credential.js";
-import { getCiphersuiteFromId } from "ts-mls/crypto/ciphersuite.js";
 import { LeafNode } from "ts-mls/leafNode.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
 
@@ -20,15 +18,19 @@ import {
   getKeyPackageRelays,
   KEY_PACKAGE_KIND,
 } from "../../../../src";
-import { NostrEvent } from "../../../../src/utils/nostr";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { pool } from "../../lib/nostr";
 
+import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import CredentialTypeBadge from "../../components/credential-type-badge";
+import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
+import RelayPicker from "../../components/form/relay-picker";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
 import { UserAvatar, UserName } from "../../components/nostr-user";
-import RelayPicker from "../../components/form/relay-picker";
+import { encodeKeyPackage } from "ts-mls/keyPackage.js";
+import { NostrEvent } from "applesauce-core/helpers";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -93,9 +95,7 @@ function LeafNodeCapabilitiesSection(props: { leafNode: LeafNode }) {
         <DetailsField label="Cipher Suites">
           <div className="flex flex-wrap gap-2">
             {props.leafNode.capabilities.ciphersuites.map((suite) => (
-              <span key={suite} className="badge badge-outline">
-                {suite}
-              </span>
+              <CipherSuiteBadge key={suite} cipherSuite={suite} />
             ))}
           </div>
         </DetailsField>
@@ -104,9 +104,7 @@ function LeafNodeCapabilitiesSection(props: { leafNode: LeafNode }) {
         <DetailsField label="Credential Types">
           <div className="flex flex-wrap gap-2">
             {props.leafNode.capabilities.credentials.map((cred) => (
-              <span key={cred} className="badge badge-success badge-outline">
-                {cred}
-              </span>
+              <CredentialTypeBadge key={cred} credentialType={cred} />
             ))}
           </div>
         </DetailsField>
@@ -205,11 +203,6 @@ function KeyPackageTopLevelInfo(props: { event: NostrEvent }) {
   const relays = getKeyPackageRelays(props.event);
   const client = getKeyPackageClient(props.event);
 
-  const cipherSuite =
-    cipherSuiteId !== undefined
-      ? getCiphersuiteFromId(cipherSuiteId)
-      : undefined;
-
   return (
     <div className="space-y-4">
       {/* Section Header */}
@@ -234,9 +227,7 @@ function KeyPackageTopLevelInfo(props: { event: NostrEvent }) {
         {/* Cipher Suite */}
         <DetailsField label="Cipher Suite">
           {cipherSuiteId !== undefined ? (
-            <span className="badge badge-outline font-mono">
-              {cipherSuite?.name}
-            </span>
+            <CipherSuiteBadge cipherSuite={cipherSuiteId} />
           ) : (
             <span className="badge badge-error badge-outline">Unknown</span>
           )}
@@ -336,9 +327,7 @@ function CredentialSection({
       {/* Credential Type */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DetailsField label="Credential Type">
-          <span className="badge badge-success badge-outline">
-            {credential.credentialType}
-          </span>
+          <CredentialTypeBadge credentialType={credential.credentialType} />
         </DetailsField>
 
         <DetailsField label="Identity (hex)">
@@ -359,22 +348,11 @@ function MLSKeyPackageContent({
   keyPackage: KeyPackage;
   event: NostrEvent;
 }) {
-  const [showKeyPackageData, setShowKeyPackageData] = useState(false);
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Credential Section */}
       {keyPackage.leafNode.credential.credentialType === "basic" && (
-        <ErrorBoundary
-          fallbackRender={({ error, resetErrorBoundary }) => (
-            <div className="alert alert-error">
-              <div className="font-bold">Error: {error.message}</div>
-              <button className="btn btn-xs" onClick={resetErrorBoundary}>
-                Try Again
-              </button>
-            </div>
-          )}
-        >
+        <ErrorBoundary>
           <CredentialSection
             credential={keyPackage.leafNode.credential}
             event={event}
@@ -389,17 +367,26 @@ function MLSKeyPackageContent({
       <LeafNodeCapabilitiesSection leafNode={keyPackage.leafNode} />
 
       {/* Full Key Package Data Collapsible */}
-      <div className="collapse collapse-arrow bg-base-200 mt-6">
-        <input
-          type="checkbox"
-          checked={showKeyPackageData}
-          onChange={(e) => setShowKeyPackageData(e.target.checked)}
-        />
+      <div className="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" />
         <div className="collapse-title text-sm font-medium py-2 min-h-0">
           Full Key Package Data (Advanced)
         </div>
         <div className="collapse-content">
           <KeyPackageDataView keyPackage={keyPackage} />
+        </div>
+      </div>
+
+      {/* Raw Key Package Data Collapsible */}
+      <div className="collapse collapse-arrow bg-base-200">
+        <input type="checkbox" />
+        <div className="collapse-title text-sm font-medium py-2 min-h-0">
+          Raw Key Package Data (Binary)
+        </div>
+        <div className="collapse-content">
+          <code className="text-xs break-all select-all block">
+            {bytesToHex(encodeKeyPackage(keyPackage))}
+          </code>
         </div>
       </div>
     </div>
@@ -461,53 +448,7 @@ function KeyPackageCardContent(props: { event: NostrEvent }) {
 
 function KeyPackageCard(props: { event: NostrEvent }) {
   return (
-    <ErrorBoundary
-      fallbackRender={({ error, resetErrorBoundary }) => (
-        <div className="bg-base-100 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold text-error mb-2">
-            Failed to Parse Key Package
-          </h3>
-          <p className="text-sm text-base-content/60 mb-4">
-            Event ID: {props.event.id}
-          </p>
-          <div className="alert alert-error p-4 mb-4">
-            <div className="flex-1">
-              <div className="font-bold">Error: {error.message}</div>
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs">
-                  Show details
-                </summary>
-                <pre className="text-xs mt-2 overflow-auto max-h-40">
-                  {error.stack}
-                </pre>
-              </details>
-            </div>
-          </div>
-          <div className="collapse collapse-arrow bg-base-200 mb-4">
-            <input type="checkbox" />
-            <div className="collapse-title text-sm font-medium py-2 min-h-0">
-              Raw Event (for debugging)
-            </div>
-            <div className="collapse-content">
-              <JsonBlock value={props.event} />
-            </div>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <button className="btn btn-sm" onClick={resetErrorBoundary}>
-              Try Again
-            </button>
-            <a
-              href={`https://njump.me/${props.event.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-sm btn-ghost"
-            >
-              View on njump.me
-            </a>
-          </div>
-        </div>
-      )}
-    >
+    <ErrorBoundary>
       <KeyPackageCardContent event={props.event} />
     </ErrorBoundary>
   );

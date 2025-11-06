@@ -8,25 +8,31 @@ import {
   getCiphersuiteImpl,
 } from "ts-mls";
 import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
+import { KeyPackage } from "ts-mls/keyPackage.js";
 
 import {
-  defaultExtensions,
+  CompleteKeyPackage,
   defaultCapabilities,
   getKeyPackageRelayList,
 } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
-import { createKeyPackageEvent } from "../../../../src/core/key-package";
-import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
 import {
-  CIPHER_SUITES,
-  CipherSuitePicker,
-} from "../../components/form/cipher-suite-picker";
+  createKeyPackageEvent,
+  keyPackageDefaultExtensions,
+} from "../../../../src/core/key-package";
+import {
+  KEY_PACKAGE_RELAY_LIST_KIND,
+  KEY_PACKAGE_RELAYS_TAG,
+} from "../../../../src/core/protocol";
+import { CipherSuitePicker } from "../../components/form/cipher-suite-picker";
 import JsonBlock from "../../components/json-block";
+import KeyPackageDataView from "../../components/key-package/data-view";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
+import { NostrEvent } from "applesauce-core/helpers";
 
 /** Observable of current accounts key package relays */
 const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
@@ -67,7 +73,7 @@ function ConfigurationForm({
   onSubmit,
 }: ConfigurationFormProps) {
   return (
-    <div className="card bg-base-200 shadow-md">
+    <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
         <h2 className="card-title">Configuration</h2>
 
@@ -115,7 +121,7 @@ function ConfigurationForm({
                 Creating...
               </>
             ) : (
-              "Create & Publish Key Package"
+              "Show Binary & Draft Event"
             )}
           </button>
         </div>
@@ -152,6 +158,71 @@ function ErrorAlert({ error }: { error: string | null }) {
 }
 
 // ============================================================================
+// Component: DraftDisplay
+// ============================================================================
+
+interface DraftDisplayProps {
+  event: Omit<NostrEvent, "id" | "sig">;
+  keyPackage: KeyPackage;
+  isPublishing: boolean;
+  onPublish: () => void;
+  onReset: () => void;
+}
+
+function DraftDisplay({
+  event,
+  keyPackage,
+  isPublishing,
+  onPublish,
+  onReset,
+}: DraftDisplayProps) {
+  return (
+    <div className="space-y-4">
+      {/* Draft Event */}
+      <div className="card bg-base-200">
+        <div className="card-body">
+          <h2 className="card-title">Draft Event (Unsigned)</h2>
+          <JsonBlock value={event} />
+        </div>
+      </div>
+
+      {/* Key Package */}
+      <div className="card bg-base-200">
+        <div className="card-body">
+          <h2 className="card-title">Key Package</h2>
+          <KeyPackageDataView keyPackage={keyPackage} />
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-between">
+        <button
+          className="btn btn-outline"
+          onClick={onReset}
+          disabled={isPublishing}
+        >
+          Reset
+        </button>
+        <button
+          className="btn btn-success btn-lg"
+          onClick={onPublish}
+          disabled={isPublishing}
+        >
+          {isPublishing ? (
+            <>
+              <span className="loading loading-spinner"></span>
+              Publishing...
+            </>
+          ) : (
+            "Publish Key Package"
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Component: SuccessDisplay
 // ============================================================================
 
@@ -178,7 +249,7 @@ function SuccessDisplay({ event, storageKey }: SuccessDisplayProps) {
           />
         </svg>
         <div>
-          <div className="font-bold">Key package created successfully!</div>
+          <div className="font-bold">Key package published successfully!</div>
           <div className="text-sm">
             Event ID: {event.id}
             <br />
@@ -188,41 +259,12 @@ function SuccessDisplay({ event, storageKey }: SuccessDisplayProps) {
       </div>
 
       {/* Event Details */}
-      <div className="card bg-base-200 shadow-md">
+      <div className="card bg-base-200">
         <div className="card-body">
           <h2 className="card-title">Published Event</h2>
           <div className="divider my-1"></div>
           <JsonBlock value={event} />
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Component: InfoSection
-// ============================================================================
-
-function InfoSection() {
-  return (
-    <div className="card bg-base-100 border border-base-300">
-      <div className="card-body">
-        <h3 className="font-bold">ℹ️ About Key Packages</h3>
-        <ul className="list-disc list-inside space-y-2 text-sm text-base-content/80">
-          <li>Key packages are published as kind 443 events on Nostr relays</li>
-          <li>
-            They enable others to add you to encrypted MLS group conversations
-          </li>
-          <li>
-            The private key is stored locally in your browser using IndexedDB
-          </li>
-          <li>
-            Choose from {CIPHER_SUITES.length} different MLS cipher suites with
-            various cryptographic algorithms
-          </li>
-          <li>Includes Marmot Group Data Extension for Nostr integration</li>
-          <li>Tagged with "client" for identification purposes</li>
-        </ul>
       </div>
     </div>
   );
@@ -239,17 +281,21 @@ interface CreateKeyPackageParams {
 
 function useKeyPackageCreation() {
   const [isCreating, setIsCreating] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<any>(null);
+  const [draftEvent, setDraftEvent] = useState<any>(null);
+  const [keyPackage, setKeyPackage] = useState<CompleteKeyPackage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [storageKey, setStorageKey] = useState<string | null>(null);
 
-  const createKeyPackage = async ({
+  const showBinary = async ({
     relays,
     cipherSuite,
   }: CreateKeyPackageParams) => {
     try {
       setIsCreating(true);
       setError(null);
+      setDraftEvent(null);
       setCreatedEvent(null);
       setStorageKey(null);
 
@@ -276,7 +322,7 @@ function useKeyPackageCreation() {
         credential,
         defaultCapabilities(),
         defaultLifetime,
-        defaultExtensions,
+        keyPackageDefaultExtensions(),
         ciphersuiteImpl,
       );
 
@@ -285,6 +331,9 @@ function useKeyPackageCreation() {
       const key = await keyPackageStore.add(keyPackage);
       setStorageKey(key);
       console.log("Stored with key:", key);
+
+      // Set the key package in the state
+      setKeyPackage(keyPackage);
 
       // Parse relay URLs
       const relayList = relays
@@ -301,9 +350,40 @@ function useKeyPackageCreation() {
         client: "marmot-examples",
       });
 
+      setDraftEvent(unsignedEvent);
+      console.log("✅ Key package created! Ready to publish.");
+    } catch (err) {
+      console.error("Error creating key package:", err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const publishKeyPackage = async () => {
+    if (!draftEvent) {
+      setError("No draft event to publish");
+      return;
+    }
+
+    try {
+      setIsPublishing(true);
+      setError(null);
+
+      const account = accounts.active;
+      if (!account) {
+        throw new Error("No active account");
+      }
+
+      // Sign the event
       console.log("Signing event...");
-      const signedEvent = await account.signEvent(unsignedEvent);
+      const signedEvent = await account.signEvent(draftEvent);
       console.log("Signed event:", signedEvent);
+
+      // Parse relay URLs from the draft event
+      const relayList = signedEvent.tags
+        .filter((tag: string[]) => tag[0] === KEY_PACKAGE_RELAYS_TAG)
+        .map((tag: string[]) => tag[1]);
 
       // Publish to relays
       console.log("Publishing to relays:", relayList);
@@ -317,21 +397,36 @@ function useKeyPackageCreation() {
       }
 
       setCreatedEvent(signedEvent);
-      console.log("✅ Key package created and published successfully!");
+      setDraftEvent(null);
+      setKeyPackage(null);
+      console.log("✅ Key package published successfully!");
     } catch (err) {
-      console.error("Error creating key package:", err);
+      console.error("Error publishing key package:", err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setIsCreating(false);
+      setIsPublishing(false);
     }
+  };
+
+  const reset = () => {
+    setDraftEvent(null);
+    setKeyPackage(null);
+    setCreatedEvent(null);
+    setStorageKey(null);
+    setError(null);
   };
 
   return {
     isCreating,
+    isPublishing,
     createdEvent,
+    draftEvent,
+    keyPackage,
     error,
     storageKey,
-    createKeyPackage,
+    showBinary,
+    publishKeyPackage,
+    reset,
   };
 }
 
@@ -355,11 +450,21 @@ export default withSignIn(function KeyPackageCreate() {
     }
   }, [keyPackageRelays]);
 
-  const { isCreating, createdEvent, error, storageKey, createKeyPackage } =
-    useKeyPackageCreation();
+  const {
+    isCreating,
+    isPublishing,
+    createdEvent,
+    draftEvent,
+    keyPackage,
+    error,
+    storageKey,
+    showBinary,
+    publishKeyPackage,
+    reset,
+  } = useKeyPackageCreation();
 
-  const handleCreate = () => {
-    createKeyPackage({ relays, cipherSuite });
+  const handleShowBinary = () => {
+    showBinary({ relays, cipherSuite });
   };
 
   return (
@@ -374,25 +479,35 @@ export default withSignIn(function KeyPackageCreate() {
       </div>
 
       {/* Configuration Form */}
-      <ConfigurationForm
-        relays={relays}
-        cipherSuite={cipherSuite}
-        isCreating={isCreating}
-        onRelaysChange={setRelays}
-        onCipherSuiteChange={setCipherSuite}
-        onSubmit={handleCreate}
-      />
+      {!draftEvent && !createdEvent && (
+        <ConfigurationForm
+          relays={relays}
+          cipherSuite={cipherSuite}
+          isCreating={isCreating}
+          onRelaysChange={setRelays}
+          onCipherSuiteChange={setCipherSuite}
+          onSubmit={handleShowBinary}
+        />
+      )}
 
       {/* Error Display */}
       <ErrorAlert error={error} />
+
+      {/* Draft Display */}
+      {draftEvent && keyPackage && storageKey && !createdEvent && (
+        <DraftDisplay
+          event={draftEvent}
+          keyPackage={keyPackage.publicPackage}
+          isPublishing={isPublishing}
+          onPublish={publishKeyPackage}
+          onReset={reset}
+        />
+      )}
 
       {/* Success Display */}
       {createdEvent && storageKey && (
         <SuccessDisplay event={createdEvent} storageKey={storageKey} />
       )}
-
-      {/* Info Section */}
-      <InfoSection />
     </div>
   );
 });

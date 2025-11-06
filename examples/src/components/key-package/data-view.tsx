@@ -1,11 +1,12 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { ReactNode } from "react";
 import { KeyPackage } from "ts-mls";
 
 // ============================================================================
 // Key Package Data Renderer (handles BigInt and Uint8Array)
 // ============================================================================
 
-function renderValue(value: any, depth = 0): any {
+function renderValue(value: any, depth = 0): ReactNode {
   if (value === null) return "null";
   if (value === undefined) return "undefined";
 
@@ -16,7 +17,7 @@ function renderValue(value: any, depth = 0): any {
 
   // Handle Uint8Array
   if (value instanceof Uint8Array) {
-    return bytesToHex(value);
+    return <code className="select-all">{bytesToHex(value)}</code>;
   }
 
   // Handle Arrays
@@ -55,6 +56,11 @@ function renderValue(value: any, depth = 0): any {
     return `"${value}"`;
   }
 
+  if (typeof value === "number") {
+    // Return number as 0x hex string
+    return `0x${value.toString(16).padStart(4, "0")}`;
+  }
+
   return String(value);
 }
 
@@ -64,7 +70,7 @@ function renderValue(value: any, depth = 0): any {
  */
 export default function KeyPackageDataView(props: { keyPackage: KeyPackage }) {
   return (
-    <div className="font-mono text-xs bg-base-200 py-4 rounded">
+    <div className="font-mono text-xs rounded break-all">
       {renderValue(props.keyPackage)}
     </div>
   );

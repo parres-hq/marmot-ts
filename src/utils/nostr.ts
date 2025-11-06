@@ -1,13 +1,4 @@
-/** Generic nostr event type */
-export interface NostrEvent {
-  kind: number;
-  tags: string[][];
-  content: string;
-  created_at: number;
-  pubkey: string;
-  id: string;
-  sig: string;
-}
+import { NostrEvent } from "applesauce-core/helpers";
 
 /** Returns the value of a name / value tag */
 export function getTagValue(

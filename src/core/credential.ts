@@ -1,7 +1,7 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { CredentialBasic } from "ts-mls/credential.js";
 
-function isHexKey(str: string): boolean {
+export function isHexKey(str: string): boolean {
   return /^[0-9a-fA-F]{64}$/.test(str);
 }
 
