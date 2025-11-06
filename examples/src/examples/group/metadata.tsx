@@ -3,9 +3,9 @@ import { useState } from "react";
 import {
   createMarmotGroupData,
   decodeMarmotGroupData,
-  type MarmotGroupData,
 } from "../../../../src/core/marmot-group-data";
 import JsonBlock from "../../components/json-block";
+import { MarmotGroupData } from "../../../../src";
 
 // ============================================================================
 // Encode Tab Component
