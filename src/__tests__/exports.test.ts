@@ -21,7 +21,6 @@ describe("exports", () => {
         "createCredential",
         "createKeyPackageEvent",
         "createMarmotGroupData",
-        "createRequiredCapabilitiesExtension",
         "decodeMarmotGroupData",
         "defaultCapabilities",
         "encodeMarmotGroupData",
