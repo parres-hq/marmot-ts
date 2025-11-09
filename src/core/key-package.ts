@@ -19,7 +19,6 @@ import {
   MLS_VERSIONS,
   extendedExtensionTypes,
 } from "./protocol.js";
-import { createRequiredCapabilitiesExtension } from "./extensions.js";
 import { createMarmotGroupData } from "./marmot-group-data.js";
 import { NostrEvent } from "applesauce-core/helpers";
 
@@ -98,21 +97,15 @@ export function getKeyPackageClient(
 /**
  * Default extensions for Marmot key packages.
  *
- * According to MIP-01, key packages should support the Marmot Group Data Extension
- * and other standard MLS extensions that groups will require.
+ * According to MIP-00, key packages MUST include the Marmot Group Data Extension.
+ * Default MLS extensions (ratchet_tree, required_capabilities, etc.) are implicitly
+ * supported by all MLS implementations and MUST NOT be listed in capabilities.
  *
  * Key packages MUST include:
- * - required_capabilities (extension type 3) - Defines required MLS features
- * - ratchet_tree (extension type 2) - Manages cryptographic key tree structure
  * - marmot_group_data (extension type 0xF2EE) - Marmot-specific group data
  */
 export function keyPackageDefaultExtensions(): Extension[] {
   return [
-    createRequiredCapabilitiesExtension(),
-    {
-      extensionType: "ratchet_tree",
-      extensionData: new Uint8Array(),
-    },
     {
       extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
       extensionData: createMarmotGroupData({

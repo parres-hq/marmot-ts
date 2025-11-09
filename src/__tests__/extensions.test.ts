@@ -52,17 +52,22 @@ describe("Key Package Extensions", () => {
       .slice(1)
       .map((ext) => parseInt(ext, 16));
 
-    // Should include required_capabilities (0x0003), ratchet_tree (0x0002), and marmot_group_data (0xf2ee)
-    expect(extensionTypes).toContain(0x0003); // required_capabilities
-    expect(extensionTypes).toContain(0x0002); // ratchet_tree
-    expect(extensionTypes).toContain(0xf2ee); // marmot_group_data
+    // Should only include marmot_group_data (0xf2ee) - default extensions (0x0001-0x0005) are NOT listed
+    // Default extensions: application_id(0x0001), ratchet_tree(0x0002), required_capabilities(0x0003),
+    // external_pub(0x0004), external_senders(0x0005) are implicitly supported by all MLS implementations
+    expect(extensionTypes).not.toContain(0x0001); // application_id (default)
+    expect(extensionTypes).not.toContain(0x0002); // ratchet_tree (default)
+    expect(extensionTypes).not.toContain(0x0003); // required_capabilities (default)
+    expect(extensionTypes).not.toContain(0x0004); // external_pub (default)
+    expect(extensionTypes).not.toContain(0x0005); // external_senders (default)
+    expect(extensionTypes).toContain(0xf2ee); // marmot_group_data (custom)
 
     // Verify we can parse the extensions back using getKeyPackageExtensions
     const parsedExtensions = getKeyPackageExtensions(event as any);
     expect(parsedExtensions).toBeDefined();
-    expect(parsedExtensions!.length).toBe(3);
-    expect(parsedExtensions).toContain(0x0003);
-    expect(parsedExtensions).toContain(0x0002);
+    expect(parsedExtensions!.length).toBe(1); // Only marmot_group_data should be listed
+    expect(parsedExtensions).not.toContain(0x0003);
+    expect(parsedExtensions).not.toContain(0x0002);
     expect(parsedExtensions).toContain(0xf2ee);
   });
 
@@ -96,8 +101,12 @@ describe("Key Package Extensions", () => {
     expect(extensionsTag).toBeDefined();
 
     const extensionHexValues = extensionsTag!.slice(1);
-    expect(extensionHexValues).toContain("0x0003"); // required_capabilities
-    expect(extensionHexValues).toContain("0x0002"); // ratchet_tree
-    expect(extensionHexValues).toContain("0xf2ee"); // marmot_group_data
+    // Should only include marmot_group_data - default extensions are NOT listed
+    expect(extensionHexValues).not.toContain("0x0001"); // application_id (default)
+    expect(extensionHexValues).not.toContain("0x0002"); // ratchet_tree (default)
+    expect(extensionHexValues).not.toContain("0x0003"); // required_capabilities (default)
+    expect(extensionHexValues).not.toContain("0x0004"); // external_pub (default)
+    expect(extensionHexValues).not.toContain("0x0005"); // external_senders (default)
+    expect(extensionHexValues).toContain("0xf2ee"); // marmot_group_data (custom)
   });
 });
