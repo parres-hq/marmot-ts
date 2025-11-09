@@ -54,3 +54,65 @@ export function isValidKeyPackageRelayListEvent(event: NostrEvent): boolean {
     getKeyPackageRelayList(event).length > 0
   );
 }
+
+/**
+ * Options for creating a key package relay list event
+ */
+export type CreateKeyPackageRelayListEventOptions = {
+  /** The pubkey of the event author */
+  pubkey: string;
+  /** The relays where key packages should be published */
+  relays: string[];
+  /** Optional client identifier */
+  client?: string;
+};
+
+/**
+ * Creates an unsigned Nostr event (kind 10051) for a key package relay list.
+ * The event specifies where a user publishes their key packages.
+ *
+ * @param options - Configuration for creating the relay list event
+ * @returns An unsigned Nostr event ready to be signed and published
+ *
+ * @example
+ * ```typescript
+ * const event = createKeyPackageRelayListEvent({
+ *   pubkey: "02a1633cafe37eeebe2b39b4ec5f3d74c35e61fa7e7e6b7b8c5f7c4f3b2a1b2c3d",
+ *   relays: ["wss://inbox.nostr.wine", "wss://myrelay.nostr1.com"],
+ *   client: "marmot-examples"
+ * });
+ * ```
+ */
+export function createKeyPackageRelayListEvent(
+  options: CreateKeyPackageRelayListEventOptions,
+): Omit<NostrEvent, "id" | "sig"> {
+  const { pubkey, relays, client } = options;
+
+  // Validate relay URLs
+  const validRelays = relays
+    .filter((relay) => relay.trim().length > 0 && URL.canParse(relay))
+    .map(normalizeRelayUrl);
+
+  if (validRelays.length === 0) {
+    throw new Error("At least one valid relay URL is required");
+  }
+
+  // Build tags
+  const tags: string[][] = validRelays.map((relay) => [
+    KEY_PACKAGE_RELAY_LIST_RELAY_TAG,
+    relay,
+  ]);
+
+  // Add client tag if provided
+  if (client) {
+    tags.push(["client", client]);
+  }
+
+  return {
+    kind: KEY_PACKAGE_RELAY_LIST_KIND,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: "",
+    pubkey,
+  };
+}
