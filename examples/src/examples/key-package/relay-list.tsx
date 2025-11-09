@@ -8,6 +8,7 @@ import {
 } from "../../../../src/core/key-package-relay-list";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
 import JsonBlock from "../../components/json-block";
+import RelayAvatar from "../../components/relay-avatar";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
@@ -54,7 +55,7 @@ function RelayListForm({
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
         <h2 className="card-title">Relay List Configuration</h2>
-        <p className="text-base-content/70 mb-4">
+        <p className="mb-4">
           Configure the relays where your key packages will be published. Users
           can discover these relays from your kind 10051 relay list event.
         </p>
@@ -64,13 +65,13 @@ function RelayListForm({
           <label className="block mb-2">
             <span className="font-semibold">
               Current Relays
-              <span className="text-xs text-base-content/60 ml-2">
+              <span className="text-xs ml-2">
                 ({relays.length} relay{relays.length !== 1 ? "s" : ""})
               </span>
             </span>
           </label>
           {relays.length === 0 ? (
-            <div className="text-base-content/50 italic p-4 text-center border border-dashed border-base-300 rounded">
+            <div className="italic p-4 text-center border border-dashed border-base-300 rounded opacity-50">
               No relays configured. Add relays below to create your relay list.
             </div>
           ) : (
@@ -80,6 +81,7 @@ function RelayListForm({
                   key={index}
                   className="flex items-center gap-2 p-2 bg-base-200 rounded"
                 >
+                  <RelayAvatar relay={relay} size="md" />
                   <span className="flex-1 font-mono text-sm">{relay}</span>
                   <button
                     className="btn btn-sm btn-error"
@@ -118,7 +120,7 @@ function RelayListForm({
             </button>
           </div>
           <div className="mt-1">
-            <span className="text-sm text-base-content/60">
+            <span className="text-sm">
               Press Enter or click Add to include the relay
             </span>
           </div>
@@ -215,7 +217,7 @@ function DraftDisplay({
             <h3 className="font-semibold mb-2">
               Advertised Key Package Relays
             </h3>
-            <div className="text-sm text-base-content/70 mb-2">
+            <div className="text-sm mb-2">
               These relays will be listed in the event for others to discover
               your key packages:
             </div>
@@ -223,8 +225,9 @@ function DraftDisplay({
               {advertisedRelays.map((relay, index) => (
                 <div
                   key={index}
-                  className="font-mono text-sm p-2 bg-base-100 rounded"
+                  className="flex items-center gap-2 font-mono text-sm p-2 bg-base-100 rounded"
                 >
+                  <RelayAvatar relay={relay} size="sm" />
                   {relay}
                 </div>
               ))}
@@ -234,7 +237,7 @@ function DraftDisplay({
           {/* Publishing Relays */}
           <div className="mb-4">
             <h3 className="font-semibold mb-2">Publishing Relays</h3>
-            <div className="text-sm text-base-content/70 mb-2">
+            <div className="text-sm mb-2">
               This event will be published to these relays (outbox +
               advertised):
             </div>
@@ -242,8 +245,9 @@ function DraftDisplay({
               {publishingRelays.map((relay, index) => (
                 <div
                   key={index}
-                  className="font-mono text-sm p-2 bg-base-100 rounded"
+                  className="flex items-center gap-2 font-mono text-sm p-2 bg-base-100 rounded"
                 >
+                  <RelayAvatar relay={relay} size="sm" />
                   {relay}
                 </div>
               ))}
@@ -558,7 +562,7 @@ export default withSignIn(function KeyPackageRelays() {
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Key Package Relay List</h1>
-        <p className="text-base-content/70">
+        <p>
           Manage your key package relay list (kind 10051 event) to tell other
           users where to find your key packages for encrypted group messaging.
         </p>
@@ -619,9 +623,7 @@ export default withSignIn(function KeyPackageRelays() {
                   Set
                 </button>
               </div>
-              <div className="text-xs text-base-content/60">
-                Current: {manualRelay}
-              </div>
+              <div className="text-xs">Current: {manualRelay}</div>
             </div>
           </div>
         )}
