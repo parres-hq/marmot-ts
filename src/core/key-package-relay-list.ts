@@ -90,7 +90,7 @@ export function createKeyPackageRelayListEvent(
 
   // Validate relay URLs
   const validRelays = relays
-    .filter((relay) => relay.trim().length > 0)
+    .filter((relay) => relay.trim().length > 0 && URL.canParse(relay))
     .map(normalizeRelayUrl);
 
   if (validRelays.length === 0) {
