@@ -22,3 +22,8 @@ const eventLoader = createEventLoader(pool);
 eventStore.replaceableLoader = addressLoader;
 eventStore.addressableLoader = addressLoader;
 eventStore.eventLoader = eventLoader;
+
+if (import.meta.env.DEV) {
+  // @ts-ignore
+  window.eventStore = eventStore;
+}
