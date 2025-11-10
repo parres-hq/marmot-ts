@@ -13,7 +13,6 @@
     "lint": "prettier --check .",
     "format": "prettier --write .",
     "test": "vitest",
-    "prepare": "husky && node hacky-patch.js",
     "example:full": "tsx examples/full-workflow.ts",
     "example:chat": "tsx examples/simple-chat.ts"
   },
@@ -58,10 +57,10 @@
     "@noble/hashes": "^2.0.1",
     "applesauce-core": "^4.2.0",
     "applesauce-factory": "^4.0.0",
-    "ts-mls": "^1.3.2"
+    "ts-mls": "^1.4.0"
   },
   "devDependencies": {
-    "@types/node": "^24.9.1",
+    "@types/node": "^24.10.0",
     "husky": "^9.1.7",
     "prettier": "^3.6.2",
     "rimraf": "~6.0.1",

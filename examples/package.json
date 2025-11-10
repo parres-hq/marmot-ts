@@ -10,28 +10,28 @@
   },
   "dependencies": {
     "@noble/hashes": "^2.0.1",
-    "@tailwindcss/vite": "^4.1.16",
+    "@tailwindcss/vite": "^4.1.17",
     "applesauce-accounts": "^4.1.0",
-    "applesauce-core": "^4.1.0",
+    "applesauce-core": "^4.2.0",
     "applesauce-extra": "^4.1.0",
-    "applesauce-loaders": "^4.0.0",
-    "applesauce-relay": "^4.1.0",
-    "applesauce-signers": "^4.1.0",
-    "daisyui": "^5.3.8",
+    "applesauce-loaders": "^4.2.0",
+    "applesauce-relay": "^4.2.0",
+    "applesauce-signers": "^4.2.0",
+    "daisyui": "^5.4.7",
     "localforage": "^1.10.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-error-boundary": "^6.0.0",
     "rxjs": "^7.8.2",
-    "tailwindcss": "^4.1.16",
+    "tailwindcss": "^4.1.17",
     "unique-names-generator": "^4.7.1"
   },
   "devDependencies": {
-    "@types/node": "^24.6.0",
-    "@types/react": "^19.0.6",
-    "@types/react-dom": "^19.0.2",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.7.0",
     "typescript": "~5.9.3",
-    "vite": "^7.1.7"
+    "vite": "^7.2.2"
   }
 }
