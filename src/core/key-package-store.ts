@@ -3,20 +3,11 @@ import { KeyPackage, PrivateKeyPackage } from "ts-mls";
 import { Hash } from "ts-mls/crypto/hash.js";
 import { makeHashImpl } from "ts-mls/crypto/implementation/noble/makeHashImpl.js";
 import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
+import { KeyValueStoreBackend } from "../utils/key-value.js";
 
 /** A generic interface for a key-value store */
-export interface KeyPackageStoreBackend {
-  /** Get an item from the store */
-  getItem<T>(key: string): Promise<T | null>;
-  /** Set an item in the store */
-  setItem<T>(key: string, value: T): Promise<T>;
-  /** Remove an item from the store */
-  removeItem(key: string): Promise<void>;
-  /** Clear all items from the store */
-  clear(): Promise<void>;
-  /** Get all keys in the store */
-  keys(): Promise<string[]>;
-}
+export interface KeyPackageStoreBackend
+  extends KeyValueStoreBackend<CompleteKeyPackage> {}
 
 /**
  * A complete key package containing both public and private components.
@@ -132,7 +123,7 @@ export class KeyPackageStore {
     keyOrPackage: Uint8Array | string | KeyPackage,
   ): Promise<KeyPackage | null> {
     const key = await this.resolveStorageKey(keyOrPackage);
-    const stored = await this.backend.getItem<CompleteKeyPackage>(key);
+    const stored = await this.backend.getItem(key);
     return stored ? stored.publicPackage : null;
   }
 
@@ -148,7 +139,7 @@ export class KeyPackageStore {
     keyOrPackage: Uint8Array | string | KeyPackage,
   ): Promise<PrivateKeyPackage | null> {
     const key = await this.resolveStorageKey(keyOrPackage);
-    const stored = await this.backend.getItem<CompleteKeyPackage>(key);
+    const stored = await this.backend.getItem(key);
     return stored ? stored.privatePackage : null;
   }
 
@@ -169,7 +160,7 @@ export class KeyPackageStore {
     const keys = await this.backend.keys();
 
     const packages = await Promise.all(
-      keys.map((key) => this.backend.getItem<CompleteKeyPackage>(key)),
+      keys.map((key) => this.backend.getItem(key)),
     );
 
     // Filter out null values and validate that items are CompleteKeyPackages
@@ -206,7 +197,7 @@ export class KeyPackageStore {
    */
   async has(keyOrPackage: Uint8Array | string | KeyPackage): Promise<boolean> {
     const key = await this.resolveStorageKey(keyOrPackage);
-    const item = await this.backend.getItem<CompleteKeyPackage>(key);
+    const item = await this.backend.getItem(key);
     return item !== null;
   }
 }

@@ -1,4 +1,4 @@
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
+import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 
@@ -14,6 +14,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
+import { lookupRelays$ } from "../../lib/setting";
 
 // ============================================================================
 // Component: RelayListForm
@@ -341,10 +342,13 @@ function SuccessDisplay({ event, relayList }: SuccessDisplayProps) {
 // ============================================================================
 
 function useRelayListManagement() {
+  const lookupRelays = useObservable(lookupRelays$);
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<NostrEvent | null>(null);
-  const [draftEvent, setDraftEvent] = useState<UnsignedEvent | NostrEvent | null>(null);
+  const [draftEvent, setDraftEvent] = useState<
+    UnsignedEvent | NostrEvent | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   // Get account mailboxes for relay selection
@@ -404,9 +408,11 @@ function useRelayListManagement() {
 
       // Combine outbox relays with advertised relays, removing duplicates
       const outboxRelays = mailboxes?.outboxes || [];
-      const allPublishingRelays = [
-        ...new Set([...outboxRelays, ...advertisedRelays]),
-      ];
+      const allPublishingRelays = relaySet(
+        outboxRelays,
+        advertisedRelays,
+        lookupRelays,
+      );
 
       if (allPublishingRelays.length === 0) {
         throw new Error(
@@ -488,53 +494,12 @@ export default withSignIn(function KeyPackageRelays() {
   const mailboxes = useObservable(mailboxes$);
 
   const [relays, setRelays] = useState<string[]>([]);
-  const [manualRelayInput, setManualRelayInput] = useState(
-    "wss://relay.damus.io/",
-  );
-  const [manualRelay, setManualRelay] = useState("wss://relay.damus.io/");
-
-  const handleSetManualRelay = () => {
-    const newRelay = manualRelayInput.trim();
-    if (newRelay) {
-      setManualRelay(newRelay);
-    }
-  };
 
   // Update relays when existing relay list changes
   useEffect(() => {
-    if (currentRelayList && currentRelayList.length > 0) {
+    if (currentRelayList && currentRelayList.length > 0)
       setRelays(currentRelayList);
-    }
   }, [currentRelayList]);
-
-  // Also fetch from manual relay when it changes
-  useEffect(() => {
-    const account = accounts.active;
-    if (!account) return;
-
-    const subscription = eventStore
-      .replaceable({
-        kind: KEY_PACKAGE_RELAY_LIST_KIND,
-        pubkey: account.pubkey,
-        relays: [manualRelay],
-      })
-      .subscribe({
-        next: (event) => {
-          if (event && isValidKeyPackageRelayListEvent(event)) {
-            const relayList = getKeyPackageRelayList(event);
-            setRelays(relayList);
-          }
-        },
-        error: (error) => {
-          console.error(
-            `Error fetching from manual relay ${manualRelay}:`,
-            error,
-          );
-        },
-      });
-
-    return () => subscription.unsubscribe();
-  }, [manualRelay]);
 
   const {
     isCreating,
@@ -590,39 +555,6 @@ export default withSignIn(function KeyPackageRelays() {
               relay{currentRelayList.length !== 1 ? "s" : ""}. Modifying it will
               create a new version.
             </span>
-          </div>
-        )}
-
-      {/* Manual Relay Selection - Show when no relay list is found */}
-      {(!currentRelayList || currentRelayList.length === 0) &&
-        !draftEvent &&
-        !createdEvent && (
-          <div className="alert alert-info">
-            <div className="space-y-2">
-              <span>
-                No relay list found in your configured relays. You can try
-                fetching from a specific relay:
-              </span>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  className="input input-bordered input-sm flex-1"
-                  value={manualRelayInput}
-                  onChange={(e) => setManualRelayInput(e.target.value)}
-                  placeholder="wss://relay.example.com"
-                  disabled={isCreating}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={handleSetManualRelay}
-                  disabled={isCreating || !manualRelayInput.trim()}
-                >
-                  Set
-                </button>
-              </div>
-              <div className="text-xs">Current: {manualRelay}</div>
-            </div>
           </div>
         )}
 
