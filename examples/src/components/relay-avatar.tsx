@@ -26,7 +26,7 @@ export default function RelayAvatar({ relay, size = "md" }: RelayAvatarProps) {
   return (
     <div className="avatar">
       <div className={`${sizeClass} rounded`}>
-        <img src={url} />
+        <img src={url} alt={`${relay}-icon`} />
       </div>
     </div>
   );
