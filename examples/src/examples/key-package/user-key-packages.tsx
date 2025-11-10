@@ -25,6 +25,7 @@ import {
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
+import RelayPicker from "../../components/form/relay-picker";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
 import { UserAvatar, UserName } from "../../components/nostr-user";
@@ -237,17 +238,10 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 
 export default function UserKeyPackages() {
   const [pubkeyInput, setPubkeyInput] = useState("");
-  const [manualRelayInput, setManualRelayInput] = useState(
-    "wss://relay.damus.io/",
-  );
   const [manualRelay, setManualRelay] = useState("wss://relay.damus.io/");
   const allAccounts = useObservable(accounts.accounts$);
   const selectedPubkey = useObservable(selectedPubkey$);
   const keyPackageRelays = useObservable(keyPackageRelaysList$);
-
-  const handleSetRelay = () => {
-    setManualRelay(manualRelayInput);
-  };
 
   // Observable for account profiles with display names
   const accountProfiles = useObservableMemo(() => {
@@ -411,27 +405,19 @@ export default function UserKeyPackages() {
                   )}
                 </div>
               ) : (
-                <div className="alert alert-info">
+                <div className="space-y-2">
+                  <div className="alert alert-info">
+                    <span>
+                      No relay list found. Please select a relay to query:
+                    </span>
+                  </div>
                   <div className="space-y-2">
-                    <span>No relay list found. Using relay:</span>
-                    <div className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        className="input input-bordered input-sm flex-1"
-                        value={manualRelayInput}
-                        onChange={(e) => setManualRelayInput(e.target.value)}
-                        placeholder="wss://relay.example.com"
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={handleSetRelay}
-                      >
-                        Set
-                      </button>
-                    </div>
+                    <RelayPicker
+                      value={manualRelay}
+                      onChange={setManualRelay}
+                    />
                     <div className="text-xs text-base-content/60">
-                      Current: {manualRelay}
+                      Using relay: {manualRelay}
                     </div>
                   </div>
                 </div>

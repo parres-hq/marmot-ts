@@ -1,6 +1,7 @@
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
-import { NostrEvent } from "applesauce-core/helpers";
+
 import {
   createKeyPackageRelayListEvent,
   getKeyPackageRelayList,
@@ -180,7 +181,7 @@ function ErrorAlert({ error }: { error: string | null }) {
 // ============================================================================
 
 interface DraftDisplayProps {
-  event: Omit<NostrEvent, "id" | "sig"> | NostrEvent;
+  event: UnsignedEvent | NostrEvent;
   publishingRelays: string[];
   isPublishing: boolean;
   onPublish: () => void;
@@ -343,10 +344,7 @@ function useRelayListManagement() {
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<NostrEvent | null>(null);
-  const [draftEvent, setDraftEvent] = useState<Omit<
-    NostrEvent,
-    "id" | "sig"
-  > | null>(null);
+  const [draftEvent, setDraftEvent] = useState<UnsignedEvent | NostrEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Get account mailboxes for relay selection
