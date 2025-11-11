@@ -3,7 +3,7 @@ import { bytesToUtf8 } from "@noble/ciphers/utils.js";
 import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
-import { KeyPackageStoreBackend } from "../core/key-package-store.js";
+import { KeyValueStoreBackend } from "../utils/key-value.js";
 
 const TEST_KEY = "__test__";
 const TEST_VALUE = "decryption test value";
@@ -54,17 +54,17 @@ function unpad(bytes: Uint8Array): Uint8Array {
 }
 
 /**
- * Wrapper around a {@link KeyPackageStoreBackend} that encrypts and decrypts data using a password.
+ * Wrapper around a {@link KeyValueStoreBackend} that encrypts and decrypts data using a password.
  * WARNING: THIS IS NOT SECURE AND SHOULD NOT BE USED IN PRODUCTION. IT IS ONLY FOR DEMONSTRATION PURPOSES.
  */
-export class EncryptedKeyValueStore {
+export class EncryptedKeyValueStore implements KeyValueStoreBackend<string> {
   private key: Uint8Array | null = null;
   get unlocked() {
     return this.key !== null;
   }
 
   constructor(
-    private database: KeyPackageStoreBackend,
+    private database: KeyValueStoreBackend<Uint8Array>,
     private salt: Uint8Array,
   ) {}
 
@@ -83,35 +83,33 @@ export class EncryptedKeyValueStore {
     key: string,
     value: string,
     encryptionKey = this.key,
-  ): Promise<boolean> {
+  ): Promise<string> {
     if (!encryptionKey) throw new Error("Storage locked");
 
-    try {
-      // Convert value to UTF-8 bytes
-      const valueBytes = utf8ToBytes(value);
+    // Convert value to UTF-8 bytes
+    const valueBytes = utf8ToBytes(value);
 
-      // Apply PKCS#7 padding to make length a multiple of 16
-      const paddedBytes = pad(valueBytes);
+    // Apply PKCS#7 padding to make length a multiple of 16
+    const paddedBytes = pad(valueBytes);
 
-      // Generate a random IV for CBC mode
-      const iv = crypto.getRandomValues(new Uint8Array(16));
+    // Generate a random IV for CBC mode
+    const iv = crypto.getRandomValues(new Uint8Array(16));
 
-      // Create AES-CBC cipher
-      const cipher = cbc(encryptionKey, iv);
+    // Create AES-CBC cipher
+    const cipher = cbc(encryptionKey, iv);
 
-      // Encrypt the padded data
-      const encryptedData = cipher.encrypt(paddedBytes);
+    // Encrypt the padded data
+    const encryptedData = cipher.encrypt(paddedBytes);
 
-      // Store IV and encrypted data directly as binary
-      const dataToStore = { iv, data: encryptedData };
+    // Combine IV (first 16 bytes) and encrypted data into a single Uint8Array
+    const dataToStore = new Uint8Array(16 + encryptedData.length);
+    dataToStore.set(iv, 0);
+    dataToStore.set(encryptedData, 16);
 
-      // Store the encrypted data - LocalForage can handle this directly
-      await this.database.setItem(key, dataToStore);
-      return true;
-    } catch (error) {
-      console.error("Encryption error:", error);
-      return false;
-    }
+    // Store the combined data
+    await this.database.setItem(key, dataToStore);
+
+    return value;
   }
 
   // Retrieve and decrypt data
@@ -119,19 +117,25 @@ export class EncryptedKeyValueStore {
     if (!encryptionKey) throw new Error("Storage locked");
 
     // Get encrypted data
-    const encryptedPackage = (await this.database.getItem(key)) as {
-      iv: Uint8Array;
-      data: Uint8Array;
-    } | null;
-    if (!encryptedPackage) return null;
+    const storedData = (await this.database.getItem(key)) as Uint8Array | null;
+    if (!storedData) return null;
+
+    // Validate minimum length (IV + at least one block of encrypted data)
+    if (storedData.length < 32) {
+      throw new Error("Invalid encrypted data: too short");
+    }
+
+    // Extract IV (first 16 bytes) and encrypted data (remaining bytes)
+    const iv = storedData.slice(0, 16);
+    const encryptedData = storedData.slice(16);
 
     // Create AES-CBC decipher
-    const decipher = cbc(encryptionKey, encryptedPackage.iv);
+    const decipher = cbc(encryptionKey, iv);
 
     // Decrypt the data
     let decryptedBytes: Uint8Array;
     try {
-      decryptedBytes = decipher.decrypt(encryptedPackage.data);
+      decryptedBytes = decipher.decrypt(encryptedData);
     } catch (e) {
       throw new Error("Decryption failed, incorrect PIN");
     }
@@ -153,6 +157,10 @@ export class EncryptedKeyValueStore {
   // Remove an item
   async removeItem(key: string): Promise<void> {
     return this.database.removeItem(key);
+  }
+
+  async keys(): Promise<string[]> {
+    return this.database.keys();
   }
 
   // Clear all stored data

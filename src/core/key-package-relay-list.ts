@@ -1,4 +1,5 @@
-import { NostrEvent } from "applesauce-core/helpers";
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
+
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 import {
   KEY_PACKAGE_RELAY_LIST_KIND,
@@ -85,7 +86,7 @@ export type CreateKeyPackageRelayListEventOptions = {
  */
 export function createKeyPackageRelayListEvent(
   options: CreateKeyPackageRelayListEventOptions,
-): Omit<NostrEvent, "id" | "sig"> {
+): UnsignedEvent {
   const { pubkey, relays, client } = options;
 
   // Validate relay URLs

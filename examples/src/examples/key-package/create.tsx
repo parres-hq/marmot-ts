@@ -13,6 +13,7 @@ import {
   ciphersuites,
 } from "ts-mls/crypto/ciphersuite.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 
 import {
   CompleteKeyPackage,
@@ -36,7 +37,6 @@ import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
-import { NostrEvent } from "applesauce-core/helpers";
 
 /** Observable of current accounts key package relays */
 const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
@@ -166,7 +166,7 @@ function ErrorAlert({ error }: { error: string | null }) {
 // ============================================================================
 
 interface DraftDisplayProps {
-  event: Omit<NostrEvent, "id" | "sig">;
+  event: UnsignedEvent | NostrEvent;
   keyPackage: KeyPackage;
   isPublishing: boolean;
   onPublish: () => void;

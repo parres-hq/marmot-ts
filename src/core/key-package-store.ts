@@ -1,19 +1,13 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { KeyPackage, PrivateKeyPackage } from "ts-mls";
+import { Hash } from "ts-mls/crypto/hash.js";
+import { makeHashImpl } from "ts-mls/crypto/implementation/noble/makeHashImpl.js";
+import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
+import { KeyValueStoreBackend } from "../utils/key-value.js";
 
 /** A generic interface for a key-value store */
-export interface KeyPackageStoreBackend {
-  /** Get an item from the store */
-  getItem<T>(key: string): Promise<T | null>;
-  /** Set an item in the store */
-  setItem<T>(key: string, value: T): Promise<T>;
-  /** Remove an item from the store */
-  removeItem(key: string): Promise<void>;
-  /** Clear all items from the store */
-  clear(): Promise<void>;
-  /** Get all keys in the store */
-  keys(): Promise<string[]>;
-}
+export interface KeyPackageStoreBackend
+  extends KeyValueStoreBackend<CompleteKeyPackage> {}
 
 /**
  * A complete key package containing both public and private components.
@@ -51,33 +45,42 @@ export type CompleteKeyPackage = {
  */
 export class KeyPackageStore {
   private backend: KeyPackageStoreBackend;
+  private readonly hash: Hash;
 
   /**
    * Creates a new KeyPackageStore instance.
    * @param backend - The storage backend to use (e.g., localForage)
    */
-  constructor(backend: KeyPackageStoreBackend) {
+  constructor(
+    backend: KeyPackageStoreBackend,
+    hash: Hash = makeHashImpl("SHA-256"),
+  ) {
     this.backend = backend;
+    this.hash = hash;
   }
 
   /** Generates a unique key for storing a key package. */
-  private getStorageKey(publicPackage: KeyPackage): string {
-    return bytesToHex(publicPackage.initKey);
+  private async getStorageKey(publicPackage: KeyPackage): Promise<string> {
+    const key = await makeKeyPackageRef(publicPackage, this.hash);
+    return bytesToHex(key);
   }
 
-  /** Resolves the storage key from various input types. */
-  private resolveStorageKey(
-    keyOrPackage: Uint8Array | string | KeyPackage,
-  ): string {
-    if (typeof keyOrPackage === "string") {
+  /**
+   * Resolves the storage key from various input types.
+   * @param hashOrPackage - The hash or key package to resolve
+   */
+  private async resolveStorageKey(
+    hashOrPackage: Uint8Array | string | KeyPackage,
+  ): Promise<string> {
+    if (typeof hashOrPackage === "string") {
       // Already a hex string
-      return keyOrPackage;
-    } else if (keyOrPackage instanceof Uint8Array) {
+      return hashOrPackage;
+    } else if (hashOrPackage instanceof Uint8Array) {
       // Convert Uint8Array to hex
-      return bytesToHex(keyOrPackage);
+      return bytesToHex(hashOrPackage);
     } else {
       // It's a KeyPackage
-      return this.getStorageKey(keyOrPackage);
+      return await this.getStorageKey(hashOrPackage);
     }
   }
 
@@ -95,7 +98,7 @@ export class KeyPackageStore {
    * ```
    */
   async add(keyPackage: CompleteKeyPackage): Promise<string> {
-    const key = this.getStorageKey(keyPackage.publicPackage);
+    const key = await this.getStorageKey(keyPackage.publicPackage);
 
     // Serialize the key package for storage
     const serialized = {
@@ -119,8 +122,8 @@ export class KeyPackageStore {
   async getPublicKey(
     keyOrPackage: Uint8Array | string | KeyPackage,
   ): Promise<KeyPackage | null> {
-    const key = this.resolveStorageKey(keyOrPackage);
-    const stored = await this.backend.getItem<CompleteKeyPackage>(key);
+    const key = await this.resolveStorageKey(keyOrPackage);
+    const stored = await this.backend.getItem(key);
     return stored ? stored.publicPackage : null;
   }
 
@@ -135,8 +138,8 @@ export class KeyPackageStore {
   async getPrivateKey(
     keyOrPackage: Uint8Array | string | KeyPackage,
   ): Promise<PrivateKeyPackage | null> {
-    const key = this.resolveStorageKey(keyOrPackage);
-    const stored = await this.backend.getItem<CompleteKeyPackage>(key);
+    const key = await this.resolveStorageKey(keyOrPackage);
+    const stored = await this.backend.getItem(key);
     return stored ? stored.privatePackage : null;
   }
 
@@ -145,7 +148,7 @@ export class KeyPackageStore {
    * @param keyOrPackage - Either the initKey (as Uint8Array or hex string) or the full KeyPackage
    */
   async remove(keyOrPackage: Uint8Array | string | KeyPackage): Promise<void> {
-    const key = this.resolveStorageKey(keyOrPackage);
+    const key = await this.resolveStorageKey(keyOrPackage);
     await this.backend.removeItem(key);
   }
 
@@ -157,7 +160,7 @@ export class KeyPackageStore {
     const keys = await this.backend.keys();
 
     const packages = await Promise.all(
-      keys.map((key) => this.backend.getItem<CompleteKeyPackage>(key)),
+      keys.map((key) => this.backend.getItem(key)),
     );
 
     // Filter out null values and validate that items are CompleteKeyPackages
@@ -193,8 +196,8 @@ export class KeyPackageStore {
    * @param keyOrPackage - Either the initKey (as Uint8Array or hex string) or the full KeyPackage
    */
   async has(keyOrPackage: Uint8Array | string | KeyPackage): Promise<boolean> {
-    const key = this.resolveStorageKey(keyOrPackage);
-    const item = await this.backend.getItem<CompleteKeyPackage>(key);
+    const key = await this.resolveStorageKey(keyOrPackage);
+    const item = await this.backend.getItem(key);
     return item !== null;
   }
 }

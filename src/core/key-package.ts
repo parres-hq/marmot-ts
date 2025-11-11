@@ -1,4 +1,5 @@
 import { bytesToHex, hexToBytes } from "@noble/ciphers/utils.js";
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
 import { Extension, ExtensionType, KeyPackage } from "ts-mls";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { decodeKeyPackage, encodeKeyPackage } from "ts-mls/keyPackage.js";
@@ -7,6 +8,7 @@ import { protocolVersions } from "ts-mls/protocolVersion.js";
 import { getTagValue } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 import { getCredentialPubkey } from "./credential.js";
+import { createMarmotGroupData } from "./marmot-group-data.js";
 import {
   KEY_PACKAGE_CIPHER_SUITE_TAG,
   KEY_PACKAGE_CLIENT_TAG,
@@ -19,8 +21,6 @@ import {
   MLS_VERSIONS,
   extendedExtensionTypes,
 } from "./protocol.js";
-import { createMarmotGroupData } from "./marmot-group-data.js";
-import { NostrEvent } from "applesauce-core/helpers";
 
 /** Get the {@link KeyPackage} from a kind 443 event */
 export function getKeyPackage(event: NostrEvent): KeyPackage {
@@ -136,7 +136,7 @@ export type CreateKeyPackageEventOptions = {
  */
 export function createKeyPackageEvent(
   options: CreateKeyPackageEventOptions,
-): Omit<NostrEvent, "id" | "sig"> {
+): UnsignedEvent {
   const { keyPackage, pubkey, relays, client } = options;
 
   if (keyPackage.leafNode.credential.credentialType !== "basic")
@@ -198,6 +198,61 @@ export function createKeyPackageEvent(
     created_at: Math.floor(Date.now() / 1000),
     tags,
     content: contentHex,
+    pubkey,
+  };
+}
+
+export type CreateDeleteKeyPackageEventOptions = {
+  /** The pubkey of the event author (must match the author of the key packages being deleted) */
+  pubkey: string;
+  /** Array of event IDs or full events to delete (must all be kind 443) */
+  events: (string | NostrEvent)[];
+};
+
+/**
+ * Creates an unsigned Nostr event (kind 5) to delete multiple key package events.
+ * The event can be signed and published to request deletion of key packages.
+ *
+ * @param options - Configuration for creating the delete event
+ * @returns An unsigned Nostr event ready to be signed and published
+ * @throws Error if any of the events are not kind 443
+ */
+export function createDeleteKeyPackageEvent(
+  options: CreateDeleteKeyPackageEventOptions,
+): UnsignedEvent {
+  const { pubkey, events } = options;
+
+  if (events.length === 0)
+    throw new Error("At least one event must be provided for deletion");
+
+  // Extract event IDs and validate that all events are kind 443
+  const eventIds: string[] = [];
+  for (const event of events) {
+    if (typeof event === "string") {
+      // If it's just an ID, we can't validate the kind, so we trust the caller
+      eventIds.push(event);
+    } else {
+      // If it's a full event, validate it's kind 443
+      if (event.kind !== KEY_PACKAGE_KIND) {
+        throw new Error(
+          `Event ${event.id} is not a key package event (kind ${event.kind} instead of ${KEY_PACKAGE_KIND})`,
+        );
+      }
+      eventIds.push(event.id);
+    }
+  }
+
+  // Build tags with e tags for each event and a k tag for kind 443
+  const tags: string[][] = [
+    ["k", KEY_PACKAGE_KIND.toString()],
+    ...eventIds.map((id) => ["e", id]),
+  ];
+
+  return {
+    kind: 5,
+    created_at: Math.floor(Date.now() / 1000),
+    tags,
+    content: "",
     pubkey,
   };
 }
