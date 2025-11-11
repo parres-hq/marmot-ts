@@ -1,15 +1,6 @@
-import { relaySet } from "applesauce-core/helpers";
 import { useMemo, useState } from "react";
-
-// Common relay URLs that users might want to use
-const COMMON_RELAYS = relaySet([
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-  "wss://relay.primal.net",
-  "wss://relay.nostr.band",
-  "wss://nostr.wine",
-  "wss://relay.snort.social",
-]);
+import { useObservable } from "../../hooks/use-observable";
+import { relayConfig$ } from "../../lib/setting";
 
 function RelayPickerModal(props: {
   isOpen: boolean;
@@ -66,11 +57,13 @@ export default function RelayPicker(props: {
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const relayConfig = useObservable(relayConfig$);
+
   const allRelayOptions = useMemo(() => {
-    const common = props.common || COMMON_RELAYS;
+    const common = props.common || relayConfig?.commonRelays || [];
     if (!props.value || common.includes(props.value)) return common;
     else return [props.value, ...common];
-  }, [props.value, props.common]);
+  }, [props.value, props.common, relayConfig?.commonRelays]);
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     props.onChange(e.target.value);

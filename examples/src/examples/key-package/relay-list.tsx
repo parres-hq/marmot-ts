@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 import { NostrEvent } from "applesauce-core/helpers";
+import { relayConfig$ } from "../../lib/setting";
 import {
   createKeyPackageRelayListEvent,
   getKeyPackageRelayList,
@@ -490,10 +491,13 @@ export default withSignIn(function KeyPackageRelays() {
   const mailboxes = useObservable(mailboxes$);
 
   const [relays, setRelays] = useState<string[]>([]);
+  const relayConfig = useObservable(relayConfig$);
   const [manualRelayInput, setManualRelayInput] = useState(
-    "wss://relay.damus.io/",
+    relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
   );
-  const [manualRelay, setManualRelay] = useState("wss://relay.damus.io/");
+  const [manualRelay, setManualRelay] = useState(
+    relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
+  );
 
   const handleSetManualRelay = () => {
     const newRelay = manualRelayInput.trim();
@@ -537,6 +541,18 @@ export default withSignIn(function KeyPackageRelays() {
 
     return () => subscription.unsubscribe();
   }, [manualRelay]);
+
+  // Update manual relay input when config changes
+  useEffect(() => {
+    if (
+      relayConfig &&
+      Array.isArray(relayConfig.manualRelays) &&
+      relayConfig.manualRelays.length > 0
+    ) {
+      setManualRelayInput(relayConfig.manualRelays[0]);
+      setManualRelay(relayConfig.manualRelays[0]);
+    }
+  }, [relayConfig?.manualRelays]);
 
   const {
     isCreating,

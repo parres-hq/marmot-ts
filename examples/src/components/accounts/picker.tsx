@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { useObservable } from "../../hooks/use-observable";
 import accountManager from "../../lib/accounts";
 import { UserAvatar, UserName } from "../nostr-user";
+import RelayConfig from "../relay-config";
 
 export default function AccountSwitcher() {
   const activeAccount = useObservable(accountManager.active$);
   const accounts = useObservable(accountManager.accounts$);
+  const [showRelayConfig, setShowRelayConfig] = useState(false);
 
   const handleSignIn = () => {
     (document.getElementById("signin_modal") as HTMLDialogElement)?.showModal();
@@ -109,8 +112,35 @@ export default function AccountSwitcher() {
               </a>
             )}
           </li>
+
+          {/* Relay Configuration */}
+          <li className="border-t border-base-300 pt-2">
+            <a onClick={() => setShowRelayConfig(true)}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-4 h-4 inline mr-2"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"
+                />
+              </svg>
+              Configure Relays
+            </a>
+          </li>
         </ul>
       </div>
+
+      {/* Relay Configuration Modal */}
+      <RelayConfig
+        isOpen={showRelayConfig}
+        onClose={() => setShowRelayConfig(false)}
+      />
     </>
   );
 }

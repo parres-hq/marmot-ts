@@ -1,4 +1,5 @@
 import { BehaviorSubject } from "rxjs";
+import { relaySet } from "applesauce-core/helpers";
 
 export function parse<T>(value?: string | null): T | undefined {
   if (value === undefined || value === null) return;
@@ -8,16 +9,96 @@ export function parse<T>(value?: string | null): T | undefined {
   return;
 }
 
+// Default relay configurations
 const DEFAULT_LOOKUP_RELAYS = [
   "wss://purplepag.es/",
   "wss://index.hzrd149.com/",
   "wss://relay.damus.io/",
 ];
 
+const DEFAULT_COMMON_RELAYS = relaySet([
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.primal.net",
+  "wss://relay.nostr.band",
+  "wss://nostr.wine",
+  "wss://relay.snort.social",
+]);
+
+// Global relay configuration
+export interface RelayConfig {
+  lookupRelays: string[];
+  commonRelays: string[];
+  manualRelays: string[];
+}
+
+const DEFAULT_RELAY_CONFIG: RelayConfig = {
+  lookupRelays: DEFAULT_LOOKUP_RELAYS,
+  commonRelays: DEFAULT_COMMON_RELAYS,
+  manualRelays: ["wss://relay.damus.io/"],
+};
+
+// Load relay configuration from localStorage
+const storedConfig = parse<RelayConfig>(localStorage["relay-config"]);
+const initialConfig = storedConfig || DEFAULT_RELAY_CONFIG;
+
+// Observable for the global relay configuration
+export const relayConfig$ = new BehaviorSubject<RelayConfig>(initialConfig);
+
+// Subscribe to save changes to localStorage
+relayConfig$.subscribe((config) => {
+  localStorage["relay-config"] = JSON.stringify(config);
+});
+
+// Helper functions for updating specific parts of the configuration
+export function updateLookupRelays(relays: string[]) {
+  const current = relayConfig$.value;
+  relayConfig$.next({
+    ...current,
+    lookupRelays: relays,
+  });
+}
+
+export function updateCommonRelays(relays: string[]) {
+  const current = relayConfig$.value;
+  relayConfig$.next({
+    ...current,
+    commonRelays: relays,
+  });
+}
+
+export function updateManualRelays(relays: string[]) {
+  const current = relayConfig$.value;
+  relayConfig$.next({
+    ...current,
+    manualRelays: relays,
+  });
+}
+
+export function addManualRelay(relay: string) {
+  const current = relayConfig$.value;
+  const newManualRelays = [...new Set([...current.manualRelays, relay])];
+  relayConfig$.next({
+    ...current,
+    manualRelays: newManualRelays,
+  });
+}
+
+export function removeManualRelay(relay: string) {
+  const current = relayConfig$.value;
+  const newManualRelays = current.manualRelays.filter((r) => r !== relay);
+  relayConfig$.next({
+    ...current,
+    manualRelays: newManualRelays,
+  });
+}
+
+// Backward compatibility - keep lookupRelays$ for existing code
 export const lookupRelays$ = new BehaviorSubject<string[]>(
-  parse(localStorage["lookup-relays"]) || DEFAULT_LOOKUP_RELAYS,
+  initialConfig.lookupRelays,
 );
 
-lookupRelays$.subscribe((relays) => {
-  localStorage["lookup-relays"] = JSON.stringify(relays);
+// Subscribe to keep lookupRelays$ in sync with relayConfig$
+relayConfig$.subscribe((config) => {
+  lookupRelays$.next(config.lookupRelays);
 });

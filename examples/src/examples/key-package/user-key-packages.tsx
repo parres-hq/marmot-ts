@@ -5,10 +5,11 @@ import {
   normalizeToPubkey,
   NostrEvent,
 } from "applesauce-core/helpers";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
+import { relayConfig$ } from "../../lib/setting";
 
 import {
   getCredentialPubkey,
@@ -237,6 +238,7 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 
 export default function UserKeyPackages() {
   const [pubkeyInput, setPubkeyInput] = useState("");
+  const relayConfig = useObservable(relayConfig$);
   const [manualRelayInput, setManualRelayInput] = useState(
     "wss://relay.damus.io/",
   );
@@ -248,6 +250,18 @@ export default function UserKeyPackages() {
   const handleSetRelay = () => {
     setManualRelay(manualRelayInput);
   };
+
+  // Update manual relay input when config changes
+  useEffect(() => {
+    if (
+      relayConfig &&
+      Array.isArray(relayConfig.manualRelays) &&
+      relayConfig.manualRelays.length > 0
+    ) {
+      setManualRelayInput(relayConfig.manualRelays[0]);
+      setManualRelay(relayConfig.manualRelays[0]);
+    }
+  }, [relayConfig?.manualRelays]);
 
   // Observable for account profiles with display names
   const accountProfiles = useObservableMemo(() => {

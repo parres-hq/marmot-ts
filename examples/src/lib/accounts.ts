@@ -16,7 +16,7 @@ NostrConnectSigner.pool = pool;
 
 // first load all accounts from localStorage
 const json = parse<SerializedAccount[]>(localStorage.getItem("accounts"));
-if (json) await accounts.fromJSON(json, true);
+if (json) accounts.fromJSON(json, true);
 
 // next, subscribe to any accounts added or removed
 accounts.accounts$.subscribe(() => {
