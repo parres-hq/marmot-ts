@@ -1,29 +1,19 @@
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 import {
   defaultCryptoProvider,
-  defaultLifetime,
-  generateKeyPackage,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
-import {
-  CiphersuiteId,
-  CiphersuiteName,
-  ciphersuites,
-} from "ts-mls/crypto/ciphersuite.js";
+import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 
-import {
-  CompleteKeyPackage,
-  defaultCapabilities,
-  getKeyPackageRelayList,
-} from "../../../../src";
+import { CompleteKeyPackage, getKeyPackageRelayList } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
 import {
   createKeyPackageEvent,
-  keyPackageDefaultExtensions,
+  generateKeyPackage,
 } from "../../../../src/core/key-package";
 import {
   KEY_PACKAGE_RELAY_LIST_KIND,
@@ -323,17 +313,11 @@ function useKeyPackageCreation() {
 
       console.log("Generating key package with cipher suite:", cipherSuite);
 
-      // Get the cipher suite ID from the name
-      const cipherSuiteId: CiphersuiteId = ciphersuites[cipherSuite];
-
       // TODO: `defaultLifetime` defaults to notBefore: 0n, notAfter: 9223372036854775807n
-      const keyPackage = await generateKeyPackage(
+      const keyPackage = await generateKeyPackage({
         credential,
-        defaultCapabilities(cipherSuiteId),
-        defaultLifetime,
-        keyPackageDefaultExtensions(),
         ciphersuiteImpl,
-      );
+      });
 
       // Store the key package locally
       console.log("Storing key package locally...");

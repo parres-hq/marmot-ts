@@ -1,5 +1,8 @@
 import { defaultExtensionTypes } from "ts-mls";
 
+/** The extension id for the last_resort key package extension for key packages */
+export const LAST_RESORT_KEY_PACKAGE_EXTENSION_TYPE = 0x000a;
+
 /** Event kind for key package relay list events */
 export const KEY_PACKAGE_RELAY_LIST_KIND = 10051;
 
