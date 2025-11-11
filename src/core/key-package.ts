@@ -155,6 +155,7 @@ export function createKeyPackageEvent(
 
   // Get the cipher suite from the key package
   const ciphersuiteId = ciphersuites[keyPackage.cipherSuite];
+  const ciphersuiteHex = `0x${ciphersuiteId.toString(16).padStart(4, "0")}`;
 
   // Extract extension types from the key package
   const extensionTypes = keyPackage.extensions.map((ext: Extension) => {
@@ -182,7 +183,7 @@ export function createKeyPackageEvent(
   // Build tags
   const tags: string[][] = [
     [KEY_PACKAGE_MLS_VERSION_TAG, version],
-    [KEY_PACKAGE_CIPHER_SUITE_TAG, String(ciphersuiteId)],
+    [KEY_PACKAGE_CIPHER_SUITE_TAG, ciphersuiteHex],
     [KEY_PACKAGE_EXTENSIONS_TAG, ...extensionTypes],
   ];
 
