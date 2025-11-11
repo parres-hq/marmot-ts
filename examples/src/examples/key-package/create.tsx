@@ -7,7 +7,11 @@ import {
   getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
-import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
+import {
+  CiphersuiteId,
+  CiphersuiteName,
+  ciphersuites,
+} from "ts-mls/crypto/ciphersuite.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
 
 import {
@@ -318,9 +322,14 @@ function useKeyPackageCreation() {
       const credential = createCredential(pubkey);
 
       console.log("Generating key package with cipher suite:", cipherSuite);
+
+      // Get the cipher suite ID from the name
+      const cipherSuiteId: CiphersuiteId = ciphersuites[cipherSuite];
+
+      // TODO: `defaultLifetime` defaults to notBefore: 0n, notAfter: 9223372036854775807n
       const keyPackage = await generateKeyPackage(
         credential,
-        defaultCapabilities(),
+        defaultCapabilities(cipherSuiteId),
         defaultLifetime,
         keyPackageDefaultExtensions(),
         ciphersuiteImpl,

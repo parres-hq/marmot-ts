@@ -1,12 +1,10 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { BehaviorSubject, mapEventsToTimeline } from "applesauce-core";
 import { onlyEvents } from "applesauce-relay";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { map, switchMap } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import { CredentialBasic } from "ts-mls/credential.js";
-import { LeafNode } from "ts-mls/leafNode.js";
-import { protocolVersions } from "ts-mls/protocolVersion.js";
 
 import {
   getCredentialPubkey,
@@ -28,168 +26,17 @@ import ExtensionBadge from "../../components/extension-badge";
 import RelayPicker from "../../components/form/relay-picker";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
+import { LeafNodeCapabilitiesSection } from "../../components/key-package/leaf-node-capabilities";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { encodeKeyPackage } from "ts-mls/keyPackage.js";
 import { NostrEvent } from "applesauce-core/helpers";
+import { DetailsField } from "../../components/details-field";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
 };
 
 const relay = new BehaviorSubject<string>("wss://relay.damus.io/");
-
-function DetailsField(props: { label: string; children: ReactNode }) {
-  return (
-    <div className="overflow-hidden">
-      <div className="text-sm text-base-content/60 mb-1">{props.label}</div>
-      {props.children}
-    </div>
-  );
-}
-
-// ============================================================================
-// Leaf Node Info Component
-// ============================================================================
-
-function LeafNodeCapabilitiesSection(props: { leafNode: LeafNode }) {
-  // Check if this is a key package leaf node with lifetime
-  const hasLifetime = props.leafNode.leafNodeSource === "key_package";
-  const lifetime = hasLifetime ? (props.leafNode as any).lifetime : undefined;
-
-  // Format bigint timestamp to readable date
-  const formatLifetimeDate = (timestamp: bigint) => {
-    const date = new Date(Number(timestamp) * 1000);
-    return date.toLocaleString();
-  };
-
-  // Check if lifetime is currently valid
-  const isLifetimeValid =
-    lifetime &&
-    BigInt(Math.floor(Date.now() / 1000)) >= lifetime.notBefore &&
-    BigInt(Math.floor(Date.now() / 1000)) <= lifetime.notAfter;
-
-  return (
-    <div className="space-y-4">
-      {/* Section Header */}
-      <div>
-        <h3 className="text-lg font-semibold mb-1">Leaf Node Capabilities</h3>
-        <p className="text-sm text-base-content/60">
-          Supported protocol versions, cipher suites, extensions, and proposals
-        </p>
-      </div>
-
-      {/* Capabilities Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Versions */}
-        <DetailsField label="Protocol Versions">
-          <div className="flex flex-wrap gap-2">
-            {props.leafNode.capabilities.versions.map((version) => (
-              <span key={version} className="badge badge-primary badge-outline">
-                {version} ({protocolVersions[version]})
-              </span>
-            ))}
-          </div>
-        </DetailsField>
-
-        {/* Ciphersuites */}
-        <DetailsField label="Cipher Suites">
-          <div className="flex flex-wrap gap-2">
-            {props.leafNode.capabilities.ciphersuites.map((suite) => (
-              <CipherSuiteBadge key={suite} cipherSuite={suite} />
-            ))}
-          </div>
-        </DetailsField>
-
-        {/* Credentials */}
-        <DetailsField label="Credential Types">
-          <div className="flex flex-wrap gap-2">
-            {props.leafNode.capabilities.credentials.map((cred) => (
-              <CredentialTypeBadge key={cred} credentialType={cred} />
-            ))}
-          </div>
-        </DetailsField>
-
-        {/* Extensions */}
-        <DetailsField label="Extensions">
-          <div className="flex flex-wrap gap-2">
-            {props.leafNode.capabilities.extensions.length > 0 ? (
-              props.leafNode.capabilities.extensions.map((ext) => (
-                <ExtensionBadge key={ext} extensionType={ext} />
-              ))
-            ) : (
-              <span className="badge badge-error badge-outline">None</span>
-            )}
-          </div>
-        </DetailsField>
-
-        {/* Proposals */}
-        <DetailsField label="Proposal Types">
-          <div className="flex flex-wrap gap-2">
-            {props.leafNode.capabilities.proposals.length > 0 ? (
-              props.leafNode.capabilities.proposals.map((proposal) => (
-                <span key={proposal} className="badge badge-info badge-outline">
-                  {proposal}
-                </span>
-              ))
-            ) : (
-              <span className="text-base-content/40 italic">None</span>
-            )}
-          </div>
-        </DetailsField>
-      </div>
-
-      {/* Public Keys Section */}
-      <div>
-        <h4 className="text-base font-semibold mb-3">Public Keys</h4>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* HPKE Public Key */}
-          <DetailsField label="HPKE Public Key">
-            <p className="break-all select-all font-mono text-xs">
-              {bytesToHex(props.leafNode.hpkePublicKey)}
-            </p>
-          </DetailsField>
-
-          {/* Signature Public Key */}
-          <DetailsField label="Signature Public Key">
-            <p className="break-all select-all font-mono text-xs">
-              {bytesToHex(props.leafNode.signaturePublicKey)}
-            </p>
-          </DetailsField>
-        </div>
-      </div>
-
-      {/* Lifetime Information (if available) */}
-      {lifetime && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <h4 className="text-base font-semibold">Lifetime</h4>
-            {isLifetimeValid ? (
-              <span className="badge badge-success">Valid</span>
-            ) : (
-              <span className="badge badge-error">Expired/Not Yet Valid</span>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <DetailsField label="Not Before">
-              <p className="text-sm">
-                {formatLifetimeDate(lifetime.notBefore)}
-              </p>
-              <p className="text-xs text-base-content/60 font-mono">
-                Unix: {lifetime.notBefore.toString()}
-              </p>
-            </DetailsField>
-            <DetailsField label="Not After">
-              <p className="text-sm">{formatLifetimeDate(lifetime.notAfter)}</p>
-              <p className="text-xs text-base-content/60 font-mono">
-                Unix: {lifetime.notAfter.toString()}
-              </p>
-            </DetailsField>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ============================================================================
 // Key Package Card

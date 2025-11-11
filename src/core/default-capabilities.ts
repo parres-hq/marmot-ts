@@ -14,11 +14,15 @@ export function defaultCapabilities(): Capabilities {
   const capabilities = mlsDefaultCapabilities();
 
   // Add Marmot Group Data Extension to capabilities
-  // Note: ratchet_tree is already included in mlsDefaultCapabilities()
   capabilities.extensions = [
     ...capabilities.extensions,
     MARMOT_GROUP_DATA_EXTENSION_TYPE,
   ];
+
+  // Only include "basic" credential type (remove "x509" since we don't support it)
+  capabilities.credentials = capabilities.credentials.filter(
+    (c) => c !== "x509",
+  );
 
   return capabilities;
 }
