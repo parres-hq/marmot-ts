@@ -1,4 +1,4 @@
-import { getSeenRelays, NostrEvent } from "applesauce-core/helpers";
+import { getSeenRelays, NostrEvent, relaySet } from "applesauce-core/helpers";
 import { useEffect, useMemo, useState } from "react";
 import { combineLatest, map, of, startWith, switchMap } from "rxjs";
 import { KeyPackage } from "ts-mls";
@@ -25,6 +25,7 @@ import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
+import { lookupRelays$ } from "../../lib/setting";
 
 // ============================================================================
 // Observables
@@ -45,10 +46,27 @@ const keyPackageRelayList$ = combineLatest([accounts.active$, mailboxes$]).pipe(
   ),
 );
 
-/** Observable of current user's key packages from their relay list */
+/** Observable of all available relays (outbox + relay list + lookup relays) */
+const baseAvailableRelays$ = combineLatest([
+  accounts.active$,
+  mailboxes$,
+  keyPackageRelayList$,
+  lookupRelays$,
+]).pipe(
+  map(([account, mailboxes, relayList, lookupRelays]) => {
+    if (!account) return [];
+
+    const outboxRelays = mailboxes?.outboxes || [];
+
+    // Use relaySet to merge all relay sources and remove duplicates
+    return relaySet(outboxRelays, relayList, lookupRelays);
+  }),
+);
+
+/** Observable of current user's key packages from all available relays */
 const keyPackageSubscription$ = combineLatest([
   accounts.active$,
-  keyPackageRelayList$,
+  baseAvailableRelays$,
 ]).pipe(
   switchMap(([account, relays]) => {
     if (!account || relays.length === 0) return of([]);
@@ -549,7 +567,7 @@ function ConfirmationDialog({
 
 function KeyPackageManager() {
   // Observables
-  const relayList = useObservable(keyPackageRelayList$);
+  const baseRelays = useObservable(baseAvailableRelays$);
   const keyPackages = useObservable(keyPackageTimeline$);
 
   // Fetch key packages from relays
@@ -562,6 +580,14 @@ function KeyPackageManager() {
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [afterDate, setAfterDate] = useState<string>("");
   const [beforeDate, setBeforeDate] = useState<string>("");
+
+  // Manual relay state
+  const [manualRelay, setManualRelay] = useState<string>("");
+
+  const allRelays = useMemo(() => {
+    const manualRelays = manualRelay ? [manualRelay] : [];
+    return relaySet(baseRelays || [], manualRelays);
+  }, [baseRelays, manualRelay]);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -624,6 +650,12 @@ function KeyPackageManager() {
     return filtered;
   }, [keyPackages, cipherSuiteFilter, clientFilter, afterDate, beforeDate]);
 
+  const handleSetManualRelay = () => {
+    if (manualRelay.trim()) {
+      setManualRelay(manualRelay.trim());
+    }
+  };
+
   // Handlers
   const handleToggleSelect = (eventId: string) => {
     setSelectedIds((prev) => {
@@ -670,11 +702,13 @@ function KeyPackageManager() {
       setIsDeleting(true);
       setDeleteError(null);
 
-      // 3. Get relays for publishing (use relay list or fallback)
-      const relays = relayList && relayList.length > 0 ? relayList : [];
+      // 3. Get relays for publishing (use all available relays - relay list + manual relays)
+      const relays = allRelays && allRelays.length > 0 ? allRelays : [];
 
       if (relays.length === 0)
-        throw new Error("No relays available for publishing deletion event");
+        throw new Error(
+          "No relays available for publishing deletion event. Please configure your relay list or add manual relays.",
+        );
 
       const eventsToDelete = confirmDialog.events;
 
@@ -746,31 +780,89 @@ function KeyPackageManager() {
         </p>
       </div>
 
-      {/* Relay List Info */}
-      {relayList && relayList.length > 0 ? (
-        <div className="alert alert-info">
-          <div>
-            <div className="font-semibold">
-              Monitoring {relayList.length} relay
-              {relayList.length !== 1 ? "s" : ""}
-            </div>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {relayList.map((relay) => (
-                <span key={relay} className="badge">
-                  {relay.replace(/^wss?:\/\//, "").replace(/\/$/, "")}
-                </span>
-              ))}
+      {/* Relay Configuration */}
+      <div className="space-y-4">
+        {/* Relay List Info */}
+        {allRelays && allRelays.length > 0 ? (
+          <div className="alert alert-info">
+            <div>
+              <div className="font-semibold">
+                Monitoring {allRelays.length} relay
+                {allRelays.length !== 1 ? "s" : ""}
+                {manualRelay && " (includes manual relay)"}
+              </div>
+              <div className="flex flex-wrap gap-1 mt-2">
+                {allRelays.map((relay) => (
+                  <span
+                    key={relay}
+                    className={`badge ${relay === manualRelay ? "badge-warning" : ""}`}
+                  >
+                    {relay.replace(/^wss?:\/\//, "").replace(/\/$/, "")}
+                    {relay === manualRelay && " (manual)"}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
+        ) : (
+          <div className="alert alert-warning">
+            <span>
+              No key package relay list found. Please configure your relay list
+              (kind 10051) or add a manual relay to see your key packages.
+            </span>
+          </div>
+        )}
+
+        {/* Manual Relay Input */}
+        <div className="card bg-base-200">
+          <div className="card-body">
+            <h3 className="card-title">Manual Relay Configuration</h3>
+            <p className="text-sm opacity-70">
+              Add a relay manually to fetch and publish key packages when no
+              relay list is available.
+            </p>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Manual Relay URL</span>
+              </label>
+              <div className="join w-full">
+                <input
+                  type="text"
+                  placeholder="wss://relay.example.com"
+                  className="input input-bordered join-item flex-1"
+                  value={manualRelay}
+                  onChange={(e) => setManualRelay(e.target.value)}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && handleSetManualRelay()
+                  }
+                />
+                <button
+                  className="btn btn-primary join-item"
+                  onClick={handleSetManualRelay}
+                  disabled={!manualRelay.trim()}
+                >
+                  Set
+                </button>
+              </div>
+            </div>
+
+            {manualRelay && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between bg-base-100 p-3 rounded-lg">
+                  <span className="font-mono text-sm">{manualRelay}</span>
+                  <button
+                    className="btn btn-error btn-sm"
+                    onClick={() => setManualRelay("")}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      ) : (
-        <div className="alert alert-warning">
-          <span>
-            No key package relay list found. Please configure your relay list
-            (kind 10051) to see your key packages.
-          </span>
-        </div>
-      )}
+      </div>
 
       {/* Filter Controls */}
       {keyPackages && keyPackages.length > 0 && (
