@@ -4,7 +4,7 @@ import {
   MARMOT_GROUP_DATA_EXTENSION_TYPE,
 } from "./protocol.js";
 
-/** Modifies a {@link Capabilities} object to ensure it includes the Marmot Group Data Extension */
+/** Modifies a {@link Capabilities} object to ensure it includes the extensions required in MIP-00 */
 export function ensureMarmotCapabilities(
   capabilities: Capabilities,
 ): Capabilities {
