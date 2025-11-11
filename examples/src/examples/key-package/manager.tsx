@@ -23,7 +23,7 @@ import KeyPackageDataView from "../../components/key-package/data-view";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
-import { keyPackageStore } from "../../lib/key-package-store";
+import { keyPackageStore$ } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
 import { lookupRelays$ } from "../../lib/setting";
 
@@ -203,6 +203,7 @@ function KeyPackageCard({
   onToggleSelect,
   onDelete,
 }: KeyPackageCardProps) {
+  const keyPackageStore = useObservable(keyPackageStore$);
   // Subscribe to event updates so that seen relays are updated
   const seenRelays = useObservableMemo(
     () =>
@@ -223,6 +224,8 @@ function KeyPackageCard({
 
   // Check if private key exists in local storage
   useEffect(() => {
+    if (!keyPackageStore) return;
+
     const checkPrivateKey = async () => {
       try {
         const keyPackage = getKeyPackage(event);
@@ -236,7 +239,7 @@ function KeyPackageCard({
       }
     };
     checkPrivateKey();
-  }, [event]);
+  }, [event, keyPackageStore]);
 
   return (
     <div
@@ -569,6 +572,7 @@ function KeyPackageManager() {
   // Observables
   const baseRelays = useObservable(baseAvailableRelays$);
   const keyPackages = useObservable(keyPackageTimeline$);
+  const keyPackageStore = useObservable(keyPackageStore$);
 
   // Fetch key packages from relays
   useObservable(keyPackageSubscription$);
@@ -742,7 +746,7 @@ function KeyPackageManager() {
       for (const event of eventsToDelete) {
         try {
           const keyPackage = getKeyPackage(event);
-          await keyPackageStore.remove(keyPackage);
+          await keyPackageStore?.remove(keyPackage);
           console.log("Removed from local storage:", event.id);
         } catch (err) {
           console.error("Failed to remove from local storage:", event.id, err);

@@ -25,7 +25,7 @@ import KeyPackageDataView from "../../components/key-package/data-view";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
-import { keyPackageStore } from "../../lib/key-package-store";
+import { keyPackageStore$ } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
 
 /** Observable of current accounts key package relays */
@@ -274,6 +274,7 @@ interface CreateKeyPackageParams {
 }
 
 function useKeyPackageCreation() {
+  const keyPackageStore = useObservable(keyPackageStore$);
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<any>(null);
@@ -319,13 +320,7 @@ function useKeyPackageCreation() {
         ciphersuiteImpl,
       });
 
-      // Store the key package locally
-      console.log("Storing key package locally...");
-      const key = await keyPackageStore.add(keyPackage);
-      setStorageKey(key);
-      console.log("Stored with key:", key);
-
-      // Set the key package in the state
+      // Set the key package in the state (but don't store it yet)
       setKeyPackage(keyPackage);
 
       // Parse relay URLs
@@ -359,6 +354,11 @@ function useKeyPackageCreation() {
       return;
     }
 
+    if (!keyPackage) {
+      setError("No key package to store");
+      return;
+    }
+
     try {
       setIsPublishing(true);
       setError(null);
@@ -387,6 +387,14 @@ function useKeyPackageCreation() {
         } catch (err) {
           console.error("Failed to publish to", relay, err);
         }
+      }
+
+      // Store the key package locally only after successful publication
+      if (keyPackageStore) {
+        console.log("Storing key package locally...");
+        const key = await keyPackageStore.add(keyPackage);
+        setStorageKey(key);
+        console.log("Stored with key:", key);
       }
 
       setCreatedEvent(signedEvent);
@@ -487,7 +495,7 @@ export default withSignIn(function KeyPackageCreate() {
       <ErrorAlert error={error} />
 
       {/* Draft Display */}
-      {draftEvent && keyPackage && storageKey && !createdEvent && (
+      {draftEvent && keyPackage && !createdEvent && (
         <DraftDisplay
           event={draftEvent}
           keyPackage={keyPackage.publicPackage}
