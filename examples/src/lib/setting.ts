@@ -1,4 +1,4 @@
-import { BehaviorSubject } from "rxjs";
+import { BehaviorSubject, map } from "rxjs";
 import { relaySet } from "applesauce-core/helpers";
 
 export function parse<T>(value?: string | null): T | undefined {
@@ -34,7 +34,7 @@ export interface RelayConfig {
 const DEFAULT_RELAY_CONFIG: RelayConfig = {
   lookupRelays: DEFAULT_LOOKUP_RELAYS,
   commonRelays: DEFAULT_COMMON_RELAYS,
-  manualRelays: ["wss://relay.damus.io/"],
+  manualRelays: [],
 };
 
 // Load relay configuration from localStorage
@@ -92,12 +92,32 @@ export function removeManualRelay(relay: string) {
   });
 }
 
-// Backward compatibility - keep lookupRelays$ for existing code
-export const lookupRelays$ = relayConfig$.pipe(map(config => config.lookupRelays))
-  initialConfig.lookupRelays,
-);
+// Reset functions for each relay type
+export function resetLookupRelays() {
+  const current = relayConfig$.value;
+  relayConfig$.next({
+    ...current,
+    lookupRelays: DEFAULT_LOOKUP_RELAYS,
+  });
+}
 
-// Subscribe to keep lookupRelays$ in sync with relayConfig$
-relayConfig$.subscribe((config) => {
-  lookupRelays$.next(config.lookupRelays);
-});
+export function resetCommonRelays() {
+  const current = relayConfig$.value;
+  relayConfig$.next({
+    ...current,
+    commonRelays: DEFAULT_COMMON_RELAYS,
+  });
+}
+
+export function resetManualRelays() {
+  const current = relayConfig$.value;
+  relayConfig$.next({
+    ...current,
+    manualRelays: DEFAULT_RELAY_CONFIG.manualRelays,
+  });
+}
+
+// Backward compatibility - keep lookupRelays$ for existing code
+export const lookupRelays$ = relayConfig$.pipe(
+  map((config) => config.lookupRelays),
+);

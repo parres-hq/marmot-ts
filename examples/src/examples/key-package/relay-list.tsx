@@ -461,14 +461,14 @@ function useRelayListManagement() {
 // Observable: Load existing relay list
 // ============================================================================
 
-const currentRelayList$ = combineLatest([accounts.active$, mailboxes$]).pipe(
-  switchMap(([account, mailboxes]) =>
+const currentRelayList$ = combineLatest([accounts.active$, mailboxes$, relayConfig$]).pipe(
+  switchMap(([account, mailboxes, relayConfig]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: mailboxes?.outboxes,
+            relays: [...(mailboxes?.outboxes || []), ...relayConfig.lookupRelays],
           })
           .pipe(
             map((event) =>
@@ -513,16 +513,19 @@ export default withSignIn(function KeyPackageRelays() {
     }
   }, [currentRelayList]);
 
-  // Also fetch from manual relay when it changes
+  // Also fetch from manual relay and lookup relays when they change
   useEffect(() => {
     const account = accounts.active;
     if (!account) return;
+
+    const relayConfig = relayConfig$.value;
+    const allRelays = [...relayConfig.lookupRelays, manualRelay];
 
     const subscription = eventStore
       .replaceable({
         kind: KEY_PACKAGE_RELAY_LIST_KIND,
         pubkey: account.pubkey,
-        relays: [manualRelay],
+        relays: allRelays,
       })
       .subscribe({
         next: (event) => {
@@ -533,14 +536,14 @@ export default withSignIn(function KeyPackageRelays() {
         },
         error: (error) => {
           console.error(
-            `Error fetching from manual relay ${manualRelay}:`,
+            `Error fetching from relays ${allRelays.join(', ')}:`,
             error,
           );
         },
       });
 
     return () => subscription.unsubscribe();
-  }, [manualRelay]);
+  }, [manualRelay, relayConfig$.value.lookupRelays]);
 
   // Update manual relay input when config changes
   useEffect(() => {

@@ -6,6 +6,9 @@ import {
   updateCommonRelays,
   addManualRelay,
   removeManualRelay,
+  resetLookupRelays,
+  resetCommonRelays,
+  resetManualRelays,
 } from "../lib/setting";
 
 interface RelayConfigProps {
@@ -96,7 +99,16 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
           {/* Lookup Relays Section */}
           <div className="card bg-base-200">
             <div className="card-body p-4">
-              <h4 className="card-title text-sm">Lookup Relays</h4>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="card-title text-sm">Lookup Relays</h4>
+                <button
+                  className="btn btn-xs btn-outline"
+                  onClick={resetLookupRelays}
+                  title="Reset to default lookup relays"
+                >
+                  Reset
+                </button>
+              </div>
               <p className="text-xs text-base-content/60 mb-3">
                 Used for discovering user profiles and relay lists
               </p>
@@ -140,7 +152,16 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
           {/* Common Relays Section */}
           <div className="card bg-base-200">
             <div className="card-body p-4">
-              <h4 className="card-title text-sm">Common Relays</h4>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="card-title text-sm">Common Relays</h4>
+                <button
+                  className="btn btn-xs btn-outline"
+                  onClick={resetCommonRelays}
+                  title="Reset to default common relays"
+                >
+                  Reset
+                </button>
+              </div>
               <p className="text-xs text-base-content/60 mb-3">
                 Available in relay picker dropdowns across the app
               </p>
@@ -184,7 +205,16 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
           {/* Manual Relays Section */}
           <div className="card bg-base-200">
             <div className="card-body p-4">
-              <h4 className="card-title text-sm">Manual Relays</h4>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="card-title text-sm">Manual Relays</h4>
+                <button
+                  className="btn btn-xs btn-outline"
+                  onClick={resetManualRelays}
+                  title="Reset to default manual relays"
+                >
+                  Reset
+                </button>
+              </div>
               <p className="text-xs text-base-content/60 mb-3">
                 Used as fallback when no relay list is found
               </p>

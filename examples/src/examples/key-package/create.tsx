@@ -36,14 +36,14 @@ import { NostrEvent } from "applesauce-core/helpers";
 import { relayConfig$ } from "../../lib/setting";
 
 /** Observable of current accounts key package relays */
-const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
-  switchMap(([account, mailboxes]) =>
+const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$, relayConfig$]).pipe(
+  switchMap(([account, mailboxes, relayConfig]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: mailboxes?.outboxes,
+            relays: [...(mailboxes?.outboxes || []), ...relayConfig.lookupRelays],
           })
           .pipe(
             map((event) => (event ? getKeyPackageRelayList(event) : undefined)),
