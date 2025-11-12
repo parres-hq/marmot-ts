@@ -240,17 +240,10 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 export default function UserKeyPackages() {
   const [pubkeyInput, setPubkeyInput] = useState("");
   const relayConfig = useObservable(relayConfig$);
-  const [manualRelayInput, setManualRelayInput] = useState(
-    "wss://relay.damus.io/",
-  );
   const [manualRelay, setManualRelay] = useState("wss://relay.damus.io/");
   const allAccounts = useObservable(accounts.accounts$);
   const selectedPubkey = useObservable(selectedPubkey$);
   const keyPackageRelays = useObservable(keyPackageRelaysList$);
-
-  const handleSetRelay = () => {
-    setManualRelay(manualRelayInput);
-  };
 
   // Update manual relay input when config changes
   useEffect(() => {
@@ -259,7 +252,6 @@ export default function UserKeyPackages() {
       Array.isArray(relayConfig.manualRelays) &&
       relayConfig.manualRelays.length > 0
     ) {
-      setManualRelayInput(relayConfig.manualRelays[0]);
       setManualRelay(relayConfig.manualRelays[0]);
     }
   }, [relayConfig?.manualRelays]);
