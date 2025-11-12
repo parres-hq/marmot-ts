@@ -6,6 +6,8 @@ import {
 } from "../../../../src/core/marmot-group-data";
 import JsonBlock from "../../components/json-block";
 import { MarmotGroupData } from "../../../../src";
+import { relayConfig$ } from "../../lib/setting";
+import { useObservable } from "../../hooks/use-observable";
 
 // ============================================================================
 // Encode Tab Component
@@ -19,7 +21,11 @@ function EncodeTab() {
   const [adminPubkeys, setAdminPubkeys] = useState(
     "82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2",
   );
-  const [relays, setRelays] = useState("wss://relay.damus.io/\nwss://nos.lol/");
+  const relayConfig = useObservable(relayConfig$);
+  const [relays, setRelays] = useState(
+    relayConfig?.manualRelays.join("\n") ||
+      "wss://relay.damus.io/\nwss://nos.lol/",
+  );
   const [encoded, setEncoded] = useState<string>("");
   const [error, setError] = useState<string>("");
 

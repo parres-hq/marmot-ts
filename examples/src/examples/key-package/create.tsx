@@ -7,11 +7,7 @@ import {
   getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
-import {
-  CiphersuiteId,
-  CiphersuiteName,
-  ciphersuites,
-} from "ts-mls/crypto/ciphersuite.js";
+import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
 import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 
@@ -37,16 +33,17 @@ import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
+import { relayConfig$ } from "../../lib/setting";
 
 /** Observable of current accounts key package relays */
-const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$]).pipe(
-  switchMap(([account, mailboxes]) =>
+const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$, relayConfig$]).pipe(
+  switchMap(([account, mailboxes, relayConfig]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: mailboxes?.outboxes,
+            relays: [...(mailboxes?.outboxes || []), ...relayConfig.lookupRelays],
           })
           .pipe(
             map((event) => (event ? getKeyPackageRelayList(event) : undefined)),
@@ -324,12 +321,11 @@ function useKeyPackageCreation() {
       console.log("Generating key package with cipher suite:", cipherSuite);
 
       // Get the cipher suite ID from the name
-      const cipherSuiteId: CiphersuiteId = ciphersuites[cipherSuite];
 
       // TODO: `defaultLifetime` defaults to notBefore: 0n, notAfter: 9223372036854775807n
       const keyPackage = await generateKeyPackage(
         credential,
-        defaultCapabilities(cipherSuiteId),
+        defaultCapabilities(),
         defaultLifetime,
         keyPackageDefaultExtensions(),
         ciphersuiteImpl,
@@ -447,7 +443,10 @@ export default withSignIn(function KeyPackageCreate() {
   // Subscribe to the user's key package relays
   const keyPackageRelays = useObservable(keyPackageRelays$);
 
-  const [relays, setRelays] = useState<string>("wss://relay.damus.io");
+  const relayConfig = useObservable(relayConfig$);
+  const [relays, setRelays] = useState<string>(
+    relayConfig?.manualRelays[0] || "wss://relay.damus.io",
+  );
   const [cipherSuite, setCipherSuite] = useState<CiphersuiteName>(
     "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
   );

@@ -2,6 +2,7 @@ import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 
+import { relayConfig$ } from "../../lib/setting";
 import {
   createKeyPackageRelayListEvent,
   getKeyPackageRelayList,
@@ -464,14 +465,14 @@ function useRelayListManagement() {
 // Observable: Load existing relay list
 // ============================================================================
 
-const currentRelayList$ = combineLatest([accounts.active$, mailboxes$]).pipe(
-  switchMap(([account, mailboxes]) =>
+const currentRelayList$ = combineLatest([accounts.active$, mailboxes$, relayConfig$]).pipe(
+  switchMap(([account, mailboxes, relayConfig]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: mailboxes?.outboxes,
+            relays: [...(mailboxes?.outboxes || []), ...relayConfig.lookupRelays],
           })
           .pipe(
             map((event) =>
@@ -494,12 +495,70 @@ export default withSignIn(function KeyPackageRelays() {
   const mailboxes = useObservable(mailboxes$);
 
   const [relays, setRelays] = useState<string[]>([]);
+  const relayConfig = useObservable(relayConfig$);
+  const [manualRelayInput, setManualRelayInput] = useState(
+    relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
+  );
+  const [manualRelay, setManualRelay] = useState(
+    relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
+  );
+
+  const handleSetManualRelay = () => {
+    const newRelay = manualRelayInput.trim();
+    if (newRelay) {
+      setManualRelay(newRelay);
+    }
+  };
 
   // Update relays when existing relay list changes
   useEffect(() => {
     if (currentRelayList && currentRelayList.length > 0)
       setRelays(currentRelayList);
   }, [currentRelayList]);
+
+  // Also fetch from manual relay and lookup relays when they change
+  useEffect(() => {
+    const account = accounts.active;
+    if (!account) return;
+
+    const relayConfig = relayConfig$.value;
+    const allRelays = [...relayConfig.lookupRelays, manualRelay];
+
+    const subscription = eventStore
+      .replaceable({
+        kind: KEY_PACKAGE_RELAY_LIST_KIND,
+        pubkey: account.pubkey,
+        relays: allRelays,
+      })
+      .subscribe({
+        next: (event) => {
+          if (event && isValidKeyPackageRelayListEvent(event)) {
+            const relayList = getKeyPackageRelayList(event);
+            setRelays(relayList);
+          }
+        },
+        error: (error) => {
+          console.error(
+            `Error fetching from relays ${allRelays.join(', ')}:`,
+            error,
+          );
+        },
+      });
+
+    return () => subscription.unsubscribe();
+  }, [manualRelay, relayConfig$.value.lookupRelays]);
+
+  // Update manual relay input when config changes
+  useEffect(() => {
+    if (
+      relayConfig &&
+      Array.isArray(relayConfig.manualRelays) &&
+      relayConfig.manualRelays.length > 0
+    ) {
+      setManualRelayInput(relayConfig.manualRelays[0]);
+      setManualRelay(relayConfig.manualRelays[0]);
+    }
+  }, [relayConfig?.manualRelays]);
 
   const {
     isCreating,
