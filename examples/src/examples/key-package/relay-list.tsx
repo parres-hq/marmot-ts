@@ -503,19 +503,10 @@ export default withSignIn(function KeyPackageRelays() {
 
   const [relays, setRelays] = useState<string[]>([]);
   const relayConfig = useObservable(relayConfig$);
-  const [manualRelayInput, setManualRelayInput] = useState(
-    relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
-  );
+
   const [manualRelay, setManualRelay] = useState(
     relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
   );
-
-  const handleSetManualRelay = () => {
-    const newRelay = manualRelayInput.trim();
-    if (newRelay) {
-      setManualRelay(newRelay);
-    }
-  };
 
   // Update relays when existing relay list changes
   useEffect(() => {
@@ -562,7 +553,6 @@ export default withSignIn(function KeyPackageRelays() {
       Array.isArray(relayConfig.manualRelays) &&
       relayConfig.manualRelays.length > 0
     ) {
-      setManualRelayInput(relayConfig.manualRelays[0]);
       setManualRelay(relayConfig.manualRelays[0]);
     }
   }, [relayConfig?.manualRelays]);

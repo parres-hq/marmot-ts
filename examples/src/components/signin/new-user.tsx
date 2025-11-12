@@ -78,8 +78,7 @@ export default function NewUser({ onSuccess }: NewUserProps) {
         const profile = await account.signEvent(draft);
 
         // Publish to connected relays
-        const relays = lookupRelays$.value;
-        await pool.publish(relays, profile);
+        await pool.publish(lookupRelays$, profile);
 
         // Store locally in event store
         eventStore.add(profile);
