@@ -136,7 +136,7 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
                   className="input input-bordered input-sm join-item flex-1"
                   value={newLookupRelay}
                   onChange={(e) => setNewLookupRelay(e.target.value)}
-                  onKeyPress={(e) => handleKeyPress(e, "lookup")}
+                  onKeyDown={(e) => handleKeyPress(e, "lookup")}
                 />
                 <button
                   className="btn btn-primary btn-sm join-item"
@@ -189,7 +189,7 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
                   className="input input-bordered input-sm join-item flex-1"
                   value={newCommonRelay}
                   onChange={(e) => setNewCommonRelay(e.target.value)}
-                  onKeyPress={(e) => handleKeyPress(e, "common")}
+                  onKeyDown={(e) => handleKeyPress(e, "common")}
                 />
                 <button
                   className="btn btn-primary btn-sm join-item"
@@ -242,7 +242,7 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
                   className="input input-bordered input-sm join-item flex-1"
                   value={newManualRelay}
                   onChange={(e) => setNewManualRelay(e.target.value)}
-                  onKeyPress={(e) => handleKeyPress(e, "manual")}
+                  onKeyDown={(e) => handleKeyPress(e, "manual")}
                 />
                 <button
                   className="btn btn-primary btn-sm join-item"
