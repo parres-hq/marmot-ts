@@ -2,7 +2,6 @@ import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 
-import { relayConfig$ } from "../../lib/setting";
 import {
   createKeyPackageRelayListEvent,
   getKeyPackageRelayList,
@@ -15,7 +14,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { lookupRelays$ } from "../../lib/setting";
+import { lookupRelays$, relayConfig$ } from "../../lib/setting";
 
 // ============================================================================
 // Component: RelayListForm
@@ -465,14 +464,21 @@ function useRelayListManagement() {
 // Observable: Load existing relay list
 // ============================================================================
 
-const currentRelayList$ = combineLatest([accounts.active$, mailboxes$, relayConfig$]).pipe(
+const currentRelayList$ = combineLatest([
+  accounts.active$,
+  mailboxes$,
+  relayConfig$,
+]).pipe(
   switchMap(([account, mailboxes, relayConfig]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: [...(mailboxes?.outboxes || []), ...relayConfig.lookupRelays],
+            relays: [
+              ...(mailboxes?.outboxes || []),
+              ...relayConfig.lookupRelays,
+            ],
           })
           .pipe(
             map((event) =>
@@ -496,19 +502,9 @@ export default withSignIn(function KeyPackageRelays() {
 
   const [relays, setRelays] = useState<string[]>([]);
   const relayConfig = useObservable(relayConfig$);
-  const [manualRelayInput, setManualRelayInput] = useState(
-    relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
-  );
   const [manualRelay, setManualRelay] = useState(
     relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
   );
-
-  const handleSetManualRelay = () => {
-    const newRelay = manualRelayInput.trim();
-    if (newRelay) {
-      setManualRelay(newRelay);
-    }
-  };
 
   // Update relays when existing relay list changes
   useEffect(() => {
@@ -539,7 +535,7 @@ export default withSignIn(function KeyPackageRelays() {
         },
         error: (error) => {
           console.error(
-            `Error fetching from relays ${allRelays.join(', ')}:`,
+            `Error fetching from relays ${allRelays.join(", ")}:`,
             error,
           );
         },
@@ -555,7 +551,6 @@ export default withSignIn(function KeyPackageRelays() {
       Array.isArray(relayConfig.manualRelays) &&
       relayConfig.manualRelays.length > 0
     ) {
-      setManualRelayInput(relayConfig.manualRelays[0]);
       setManualRelay(relayConfig.manualRelays[0]);
     }
   }, [relayConfig?.manualRelays]);
