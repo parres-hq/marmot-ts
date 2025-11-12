@@ -93,7 +93,7 @@ export function removeManualRelay(relay: string) {
 }
 
 // Backward compatibility - keep lookupRelays$ for existing code
-export const lookupRelays$ = new BehaviorSubject<string[]>(
+export const lookupRelays$ = relayConfig$.pipe(map(config => config.lookupRelays))
   initialConfig.lookupRelays,
 );
 
