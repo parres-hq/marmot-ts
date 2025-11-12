@@ -2,7 +2,6 @@ import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 
-import { relayConfig$ } from "../../lib/setting";
 import {
   createKeyPackageRelayListEvent,
   getKeyPackageRelayList,
@@ -15,7 +14,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { lookupRelays$ } from "../../lib/setting";
+import { lookupRelays$, relayConfig$ } from "../../lib/setting";
 
 // ============================================================================
 // Component: RelayListForm
@@ -503,7 +502,6 @@ export default withSignIn(function KeyPackageRelays() {
 
   const [relays, setRelays] = useState<string[]>([]);
   const relayConfig = useObservable(relayConfig$);
-
   const [manualRelay, setManualRelay] = useState(
     relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
   );
