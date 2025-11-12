@@ -503,7 +503,7 @@ export default withSignIn(function KeyPackageRelays() {
   const [relays, setRelays] = useState<string[]>([]);
   const relayConfig = useObservable(relayConfig$);
   const [manualRelay, setManualRelay] = useState(
-    relayConfig?.manualRelays[0] || "wss://relay.damus.io/",
+    relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
   );
 
   // Update relays when existing relay list changes
