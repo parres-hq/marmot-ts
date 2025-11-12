@@ -4,7 +4,11 @@ import { KeyPackage, PrivateKeyPackage } from "ts-mls";
 import { makeHashImpl } from "ts-mls/crypto/implementation/noble/makeHashImpl.js";
 import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
 import { useObservable } from "../hooks/use-observable";
-import { keyPackageStore$ } from "../lib/key-package-store";
+import {
+  keyPackageCount$,
+  keyPackageStore$,
+  notifyStoreChange,
+} from "../lib/key-package-store";
 import JsonBlock from "./json-block";
 import KeyPackageDataView from "./key-package/data-view";
 
@@ -17,6 +21,7 @@ interface StoredKeyPackage {
 export default function KeyPackageStoreModal() {
   const ref = useRef<HTMLDialogElement>(null);
   const keyPackageStore = useObservable(keyPackageStore$);
+  const keyPackageCount = useObservable(keyPackageCount$);
 
   const [packages, setPackages] = useState<StoredKeyPackage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,7 +62,7 @@ export default function KeyPackageStoreModal() {
     };
 
     loadPackages();
-  }, [keyPackageStore]);
+  }, [keyPackageStore, keyPackageCount]);
 
   const handleClearAll = async () => {
     if (!keyPackageStore) return;
@@ -72,8 +77,8 @@ export default function KeyPackageStoreModal() {
     try {
       await keyPackageStore.clear();
       setPackages([]);
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new CustomEvent("keyPackageStoreChanged"));
+      // Notify that the store has changed
+      notifyStoreChange();
     } catch (error) {
       console.error("Failed to clear key packages:", error);
       alert("Failed to clear key packages. Check console for details.");

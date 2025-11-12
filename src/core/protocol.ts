@@ -46,6 +46,7 @@ export const MARMOT_GROUP_DATA_VERSION = 1;
 export const extendedExtensionTypes = {
   ...defaultExtensionTypes,
   marmot_group_data: MARMOT_GROUP_DATA_EXTENSION_TYPE,
+  last_resort: LAST_RESORT_KEY_PACKAGE_EXTENSION_TYPE,
 } as const;
 
 export type ExtendedExtensionTypeName = keyof typeof extendedExtensionTypes;

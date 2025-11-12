@@ -24,6 +24,7 @@ describe("exports", () => {
         "createKeyPackageEvent",
         "createKeyPackageRelayListEvent",
         "createMarmotGroupData",
+        "createThreeMonthLifetime",
         "decodeMarmotGroupData",
         "defaultCapabilities",
         "encodeMarmotGroupData",

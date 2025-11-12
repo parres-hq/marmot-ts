@@ -1,21 +1,14 @@
 import { useMemo, useState } from "react";
-import { of, switchMap } from "rxjs";
 import examples from "../examples";
 import useHash from "../hooks/use-hash";
-import { useObservableMemo } from "../hooks/use-observable";
-import { keyPackageStore$ } from "../lib/key-package-store";
+import { useObservable } from "../hooks/use-observable";
+import { keyPackageCount$ } from "../lib/key-package-store";
 import AccountSwitcher from "./accounts/picker";
 
 export default function SideNav() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const hash = useHash();
-  const localKeyPackages = useObservableMemo(
-    () =>
-      keyPackageStore$.pipe(
-        switchMap((store) => (store ? store.count() : of(0))),
-      ),
-    [],
-  );
+  const localKeyPackages = useObservable(keyPackageCount$);
 
   const filtered = useMemo(
     () =>

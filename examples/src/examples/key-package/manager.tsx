@@ -23,7 +23,10 @@ import KeyPackageDataView from "../../components/key-package/data-view";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
-import { keyPackageStore$ } from "../../lib/key-package-store";
+import {
+  keyPackageStore$,
+  notifyStoreChange,
+} from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
 import { lookupRelays$ } from "../../lib/setting";
 
@@ -752,6 +755,9 @@ function KeyPackageManager() {
           console.error("Failed to remove from local storage:", event.id, err);
         }
       }
+
+      // Notify that the store has changed
+      notifyStoreChange();
 
       // Clear selection
       setSelectedIds(new Set());

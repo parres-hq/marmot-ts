@@ -16,6 +16,14 @@ export function defaultCapabilities(): Capabilities {
   // Ensure capabilities include the Marmot Group Data Extension
   capabilities = ensureMarmotCapabilities(capabilities);
 
+  // Filter ciphersuites: keep the default one (MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519)
+  // and keep GREASE values (numeric IDs), but remove other MLS ciphersuites
+  capabilities.ciphersuites = capabilities.ciphersuites.filter(
+    (cipher) =>
+      cipher === "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519" ||
+      !cipher.startsWith("MLS_"), // Keep GREASE values (they don't start with "MLS_")
+  );
+
   // Only include "basic" credential type (remove "x509" since we don't support it)
   capabilities.credentials = capabilities.credentials.filter(
     (c) => c !== "x509",

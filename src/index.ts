@@ -35,7 +35,7 @@ import { MARMOT_GROUP_DATA_EXTENSION_TYPE } from "./core/protocol.js";
 export * from "./core/index.js";
 export * from "./utils/index.js";
 
-export const ciphersuite: Ciphersuite = getCiphersuiteFromId(0x0001);
+export const ciphersuite: Ciphersuite = getCiphersuiteFromId(1);
 
 /**
  * Main class providing MLS (Messaging Layer Security) functionality for the Marmot protocol.
