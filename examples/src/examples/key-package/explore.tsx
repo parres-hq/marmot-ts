@@ -18,6 +18,7 @@ import {
 } from "../../../../src";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { pool } from "../../lib/nostr";
+import { relayConfig$ } from "../../lib/setting";
 
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import CredentialTypeBadge from "../../components/credential-type-badge";
@@ -36,7 +37,14 @@ const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
 };
 
-const relay = new BehaviorSubject<string>("wss://relay.damus.io/");
+// Use first manual relay from global config as default
+const relay = new BehaviorSubject<string>("");
+// Initialize with first manual relay when config is available
+relayConfig$.subscribe((config) => {
+  if (config.manualRelays.length > 0 && !relay.value) {
+    relay.next(config.manualRelays[0]);
+  }
+});
 
 // ============================================================================
 // Key Package Card
