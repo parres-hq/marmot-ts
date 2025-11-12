@@ -33,14 +33,21 @@ import { eventStore, pool } from "../../lib/nostr";
 import { relayConfig$ } from "../../lib/setting";
 
 /** Observable of current accounts key package relays */
-const keyPackageRelays$ = combineLatest([accounts.active$, mailboxes$, relayConfig$]).pipe(
+const keyPackageRelays$ = combineLatest([
+  accounts.active$,
+  mailboxes$,
+  relayConfig$,
+]).pipe(
   switchMap(([account, mailboxes, relayConfig]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: [...(mailboxes?.outboxes || []), ...relayConfig.lookupRelays],
+            relays: [
+              ...(mailboxes?.outboxes || []),
+              ...relayConfig.lookupRelays,
+            ],
           })
           .pipe(
             map((event) => (event ? getKeyPackageRelayList(event) : undefined)),
@@ -447,7 +454,7 @@ export default withSignIn(function KeyPackageCreate() {
 
   const relayConfig = useObservable(relayConfig$);
   const [relays, setRelays] = useState<string>(
-    relayConfig?.manualRelays[0] || "wss://relay.damus.io",
+    relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
   );
   const [cipherSuite, setCipherSuite] = useState<CiphersuiteName>(
     "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",

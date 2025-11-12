@@ -46,7 +46,11 @@ export const relayConfig$ = new BehaviorSubject<RelayConfig>(initialConfig);
 
 // Subscribe to save changes to localStorage
 relayConfig$.subscribe((config) => {
-  localStorage["relay-config"] = JSON.stringify(config);
+  try {
+    localStorage["relay-config"] = JSON.stringify(config);
+  } catch (err) {
+    console.error("Failed to persist relay config:", err);
+  }
 });
 
 // Helper functions for updating specific parts of the configuration
