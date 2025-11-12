@@ -28,7 +28,6 @@ import {
   notifyStoreChange,
 } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
-import { lookupRelays$ } from "../../lib/setting";
 
 // ============================================================================
 // Observables
@@ -54,15 +53,11 @@ const baseAvailableRelays$ = combineLatest([
   accounts.active$,
   mailboxes$,
   keyPackageRelayList$,
-  lookupRelays$,
 ]).pipe(
-  map(([account, mailboxes, relayList, lookupRelays]) => {
+  map(([account, mailboxes, relayList]) => {
     if (!account) return [];
-
-    const outboxRelays = mailboxes?.outboxes || [];
-
     // Use relaySet to merge all relay sources and remove duplicates
-    return relaySet(outboxRelays, relayList, lookupRelays);
+    return relaySet(mailboxes?.outboxes, relayList);
   }),
 );
 
