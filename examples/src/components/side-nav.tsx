@@ -1,11 +1,14 @@
+import { useMemo, useState } from "react";
 import examples from "../examples";
-import { useState, useMemo } from "react";
 import useHash from "../hooks/use-hash";
+import { useObservable } from "../hooks/use-observable";
+import { keyPackageCount$ } from "../lib/key-package-store";
 import AccountSwitcher from "./accounts/picker";
 
 export default function SideNav() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const hash = useHash();
+  const localKeyPackages = useObservable(keyPackageCount$);
 
   const filtered = useMemo(
     () =>
@@ -46,6 +49,21 @@ export default function SideNav() {
             </li>
           ))}
         </ul>
+        <div className="flex-none p-2 border-t border-base-300">
+          <button
+            className="btn btn-ghost w-full justify-start gap-2"
+            onClick={() =>
+              (
+                document.getElementById(
+                  "key_package_store_modal",
+                ) as HTMLDialogElement
+              )?.showModal()
+            }
+          >
+            Key Packages{" "}
+            {localKeyPackages !== undefined && `(${localKeyPackages})`}
+          </button>
+        </div>
         <AccountSwitcher />
       </div>
     </div>

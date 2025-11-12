@@ -1,14 +1,31 @@
 import { bytesToHex, hexToBytes } from "@noble/ciphers/utils.js";
 import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
-import { Extension, ExtensionType, KeyPackage } from "ts-mls";
-import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
-import { decodeKeyPackage, encodeKeyPackage } from "ts-mls/keyPackage.js";
+import { Capabilities } from "ts-mls/capabilities.js";
+import { Credential } from "ts-mls/credential.js";
+import {
+  CiphersuiteId,
+  CiphersuiteImpl,
+  ciphersuites,
+} from "ts-mls/crypto/ciphersuite.js";
+import { Extension, ExtensionType } from "ts-mls/extension.js";
+import { greaseValues } from "ts-mls/grease.js";
+import {
+  KeyPackage,
+  generateKeyPackage as MLSGenerateKeyPackage,
+  decodeKeyPackage,
+  encodeKeyPackage,
+} from "ts-mls/keyPackage.js";
+import { Lifetime } from "ts-mls/lifetime.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
 
 import { getTagValue } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
+import { createThreeMonthLifetime } from "../utils/timestamp.js";
+import { ensureMarmotCapabilities } from "./capabilities.js";
 import { getCredentialPubkey } from "./credential.js";
-import { createMarmotGroupData } from "./marmot-group-data.js";
+import { defaultCapabilities } from "./default-capabilities.js";
+import { ensureLastResortExtension } from "./extensions.js";
+import { CompleteKeyPackage } from "./key-package-store.js";
 import {
   KEY_PACKAGE_CIPHER_SUITE_TAG,
   KEY_PACKAGE_CLIENT_TAG,
@@ -17,7 +34,6 @@ import {
   KEY_PACKAGE_MLS_VERSION_TAG,
   KEY_PACKAGE_RELAYS_TAG,
   KeyPackageClient,
-  MARMOT_GROUP_DATA_EXTENSION_TYPE,
   MLS_VERSIONS,
   extendedExtensionTypes,
 } from "./protocol.js";
@@ -94,26 +110,45 @@ export function getKeyPackageClient(
   };
 }
 
-/**
- * Default extensions for Marmot key packages.
- *
- * According to MIP-00, key packages MUST include the Marmot Group Data Extension.
- * Default MLS extensions (ratchet_tree, required_capabilities, etc.) are implicitly
- * supported by all MLS implementations and MUST NOT be listed in capabilities.
- *
- * Key packages MUST include:
- * - marmot_group_data (extension type 0xF2EE) - Marmot-specific group data
- */
+/** Create default extensions for a key package */
 export function keyPackageDefaultExtensions(): Extension[] {
-  return [
-    {
-      extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
-      extensionData: createMarmotGroupData({
-        // Empty group id for key packages
-        nostrGroupId: new Uint8Array(32),
-      }),
-    },
-  ];
+  return ensureLastResortExtension([]);
+}
+
+/** Options for generating a marmot key package */
+export type GenerateKeyPackageOptions = {
+  credential: Credential;
+  capabilities?: Capabilities;
+  lifetime?: Lifetime;
+  extensions?: Extension[];
+  ciphersuiteImpl: CiphersuiteImpl;
+};
+
+/** Generate a marmot key package that is compliant with MIP-00 */
+export async function generateKeyPackage({
+  credential,
+  capabilities,
+  lifetime,
+  extensions,
+  ciphersuiteImpl,
+}: GenerateKeyPackageOptions): Promise<CompleteKeyPackage> {
+  if (credential.credentialType !== "basic")
+    throw new Error("Marmot key packages must use a basic credential");
+
+  // Ensure the credential has a valid pubkey
+  getCredentialPubkey(credential);
+
+  return await MLSGenerateKeyPackage(
+    credential,
+    capabilities
+      ? ensureMarmotCapabilities(capabilities)
+      : defaultCapabilities(),
+    lifetime ?? createThreeMonthLifetime(),
+    extensions
+      ? ensureLastResortExtension(extensions)
+      : keyPackageDefaultExtensions(),
+    ciphersuiteImpl,
+  );
 }
 
 export type CreateKeyPackageEventOptions = {
@@ -157,7 +192,7 @@ export function createKeyPackageEvent(
   const ciphersuiteId = ciphersuites[keyPackage.cipherSuite];
   const ciphersuiteHex = `0x${ciphersuiteId.toString(16).padStart(4, "0")}`;
 
-  // Extract extension types from the key package
+  // Extract extension types from the key package extensions
   const extensionTypes = keyPackage.extensions.map((ext: Extension) => {
     let extType: number;
 
@@ -178,13 +213,33 @@ export function createKeyPackageEvent(
     return `0x${extType.toString(16).padStart(4, "0")}`;
   });
 
+  // Also include extensions from leaf node capabilities to signal support
+  // This ensures Marmot Group Data Extension (0xf2ee) is included in the event
+  if (keyPackage.leafNode.capabilities?.extensions) {
+    for (const extType of keyPackage.leafNode.capabilities.extensions) {
+      // Only add if not already present (avoid duplicates)
+      const hexValue = `0x${extType.toString(16).padStart(4, "0")}`;
+      if (!extensionTypes.includes(hexValue)) {
+        extensionTypes.push(hexValue);
+      }
+    }
+  }
+
+  // Filter out GREASE values from the extension types
+  // We only want to include actual extensions (last_resort and Marmot Group Data Extension)
+  const filteredExtensionTypes = extensionTypes.filter((hexValue) => {
+    // Parse the hex value back to number to check if it's a GREASE value
+    const extType = parseInt(hexValue);
+    return !greaseValues.includes(extType);
+  });
+
   const version = protocolVersions[keyPackage.version].toFixed(1);
 
   // Build tags
   const tags: string[][] = [
     [KEY_PACKAGE_MLS_VERSION_TAG, version],
     [KEY_PACKAGE_CIPHER_SUITE_TAG, ciphersuiteHex],
-    [KEY_PACKAGE_EXTENSIONS_TAG, ...extensionTypes],
+    [KEY_PACKAGE_EXTENSIONS_TAG, ...filteredExtensionTypes],
   ];
 
   // Add client tag if provided

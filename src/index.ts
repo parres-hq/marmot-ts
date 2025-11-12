@@ -10,10 +10,7 @@ import {
   Credential,
   CryptoProvider,
   defaultCryptoProvider,
-  defaultLifetime,
   emptyPskIndex,
-  generateKeyPackage,
-  getCiphersuiteFromName,
   getCiphersuiteImpl,
   joinGroup,
   makePskIndex,
@@ -27,18 +24,18 @@ import {
   RatchetTree,
   Welcome,
 } from "ts-mls";
+import { getCiphersuiteFromId } from "ts-mls/crypto/ciphersuite.js";
 import { createCredential } from "./core/credential.js";
-import { defaultCapabilities } from "./core/default-capabilities.js";
 import { CompleteKeyPackage } from "./core/key-package-store.js";
-import { keyPackageDefaultExtensions } from "./core/key-package.js";
+import { generateKeyPackage } from "./core/key-package.js";
+import { createMarmotGroupData } from "./core/marmot-group-data.js";
+import { MARMOT_GROUP_DATA_EXTENSION_TYPE } from "./core/protocol.js";
 
 // export all helpers
 export * from "./core/index.js";
 export * from "./utils/index.js";
 
-export const ciphersuite: Ciphersuite = getCiphersuiteFromName(
-  "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
-);
+export const ciphersuite: Ciphersuite = getCiphersuiteFromId(1);
 
 /**
  * Main class providing MLS (Messaging Layer Security) functionality for the Marmot protocol.
@@ -100,13 +97,10 @@ export class Marmot {
    * ```
    */
   async createKeyPackage(credential: Credential): Promise<CompleteKeyPackage> {
-    return generateKeyPackage(
+    return await generateKeyPackage({
       credential,
-      defaultCapabilities(),
-      defaultLifetime,
-      keyPackageDefaultExtensions(),
-      await this.ciphersuiteImpl,
-    );
+      ciphersuiteImpl: await this.ciphersuiteImpl,
+    });
   }
 
   /**
@@ -135,7 +129,12 @@ export class Marmot {
       actualGroupId,
       keyPackage.publicPackage,
       keyPackage.privatePackage,
-      keyPackageDefaultExtensions(),
+      [
+        {
+          extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
+          extensionData: createMarmotGroupData(),
+        },
+      ],
       ciphersuiteImpl,
     );
   }

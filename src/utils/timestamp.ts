@@ -58,3 +58,27 @@ export function isLifetimeValid(lifetime: Lifetime): boolean {
       currentTime <= lifetime.notAfter)
   );
 }
+
+/**
+ * Creates a lifetime with a 3-month expiration from the current time.
+ *
+ * @returns A lifetime object with notBefore set to current time and notAfter set to 3 months from now
+ *
+ * @example
+ * ```typescript
+ * const lifetime = createThreeMonthLifetime();
+ * // Returns: { notBefore: currentTime, notAfter: currentTime + 3 months }
+ * ```
+ */
+export function createThreeMonthLifetime(): Lifetime {
+  const currentTime = BigInt(Math.floor(Date.now() / 1000));
+
+  // Calculate 3 months in seconds (approximately 90 days)
+  const threeMonthsInSeconds = 90n * 24n * 60n * 60n;
+  const notAfter = currentTime + threeMonthsInSeconds;
+
+  return {
+    notBefore: currentTime,
+    notAfter,
+  };
+}
