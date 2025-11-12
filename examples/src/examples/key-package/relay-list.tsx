@@ -1,6 +1,7 @@
+import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
-import { NostrEvent } from "applesauce-core/helpers";
+
 import { relayConfig$ } from "../../lib/setting";
 import {
   createKeyPackageRelayListEvent,
@@ -14,6 +15,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
+import { lookupRelays$ } from "../../lib/setting";
 
 // ============================================================================
 // Component: RelayListForm
@@ -181,7 +183,7 @@ function ErrorAlert({ error }: { error: string | null }) {
 // ============================================================================
 
 interface DraftDisplayProps {
-  event: Omit<NostrEvent, "id" | "sig"> | NostrEvent;
+  event: UnsignedEvent | NostrEvent;
   publishingRelays: string[];
   isPublishing: boolean;
   onPublish: () => void;
@@ -341,13 +343,13 @@ function SuccessDisplay({ event, relayList }: SuccessDisplayProps) {
 // ============================================================================
 
 function useRelayListManagement() {
+  const lookupRelays = useObservable(lookupRelays$);
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<NostrEvent | null>(null);
-  const [draftEvent, setDraftEvent] = useState<Omit<
-    NostrEvent,
-    "id" | "sig"
-  > | null>(null);
+  const [draftEvent, setDraftEvent] = useState<
+    UnsignedEvent | NostrEvent | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   // Get account mailboxes for relay selection
@@ -407,9 +409,11 @@ function useRelayListManagement() {
 
       // Combine outbox relays with advertised relays, removing duplicates
       const outboxRelays = mailboxes?.outboxes || [];
-      const allPublishingRelays = [
-        ...new Set([...outboxRelays, ...advertisedRelays]),
-      ];
+      const allPublishingRelays = relaySet(
+        outboxRelays,
+        advertisedRelays,
+        lookupRelays,
+      );
 
       if (allPublishingRelays.length === 0) {
         throw new Error(
@@ -508,9 +512,8 @@ export default withSignIn(function KeyPackageRelays() {
 
   // Update relays when existing relay list changes
   useEffect(() => {
-    if (currentRelayList && currentRelayList.length > 0) {
+    if (currentRelayList && currentRelayList.length > 0)
       setRelays(currentRelayList);
-    }
   }, [currentRelayList]);
 
   // Also fetch from manual relay and lookup relays when they change
@@ -611,39 +614,6 @@ export default withSignIn(function KeyPackageRelays() {
               relay{currentRelayList.length !== 1 ? "s" : ""}. Modifying it will
               create a new version.
             </span>
-          </div>
-        )}
-
-      {/* Manual Relay Selection - Show when no relay list is found */}
-      {(!currentRelayList || currentRelayList.length === 0) &&
-        !draftEvent &&
-        !createdEvent && (
-          <div className="alert alert-info">
-            <div className="space-y-2">
-              <span>
-                No relay list found in your configured relays. You can try
-                fetching from a specific relay:
-              </span>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  className="input input-bordered input-sm flex-1"
-                  value={manualRelayInput}
-                  onChange={(e) => setManualRelayInput(e.target.value)}
-                  placeholder="wss://relay.example.com"
-                  disabled={isCreating}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={handleSetManualRelay}
-                  disabled={isCreating || !manualRelayInput.trim()}
-                >
-                  Set
-                </button>
-              </div>
-              <div className="text-xs">Current: {manualRelay}</div>
-            </div>
           </div>
         )}
 

@@ -19,6 +19,7 @@ describe("exports", () => {
         "Marmot",
         "ciphersuite",
         "createCredential",
+        "createDeleteKeyPackageEvent",
         "createKeyPackageEvent",
         "createKeyPackageRelayListEvent",
         "createMarmotGroupData",
