@@ -19,7 +19,7 @@ export const keyPackageStore$ = accounts.active$.pipe(
       localforage.createInstance({
         name: "marmot-key-package-store",
       }),
-      { prefix: account?.pubkey },
+      { prefix: account?.pubkey ?? "anon" },
     );
   }),
   // Remit the store when the store changes

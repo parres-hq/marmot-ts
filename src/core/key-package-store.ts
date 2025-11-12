@@ -88,7 +88,7 @@ export class KeyPackageStore {
       key = bytesToHex(await makeKeyPackageRef(hashOrPackage, this.hash));
     }
 
-    return this.prefix + key;
+    return (this.prefix ?? "") + key;
   }
 
   /**
