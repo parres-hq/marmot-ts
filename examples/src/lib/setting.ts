@@ -13,7 +13,6 @@ export function parse<T>(value?: string | null): T | undefined {
 const DEFAULT_LOOKUP_RELAYS = [
   "wss://purplepag.es/",
   "wss://index.hzrd149.com/",
-  "wss://relay.damus.io/",
 ];
 
 const DEFAULT_COMMON_RELAYS = relaySet([
