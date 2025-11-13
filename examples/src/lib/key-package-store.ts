@@ -1,12 +1,40 @@
 import localforage from "localforage";
+import {
+  BehaviorSubject,
+  combineLatestWith,
+  map,
+  shareReplay,
+  switchMap,
+} from "rxjs";
 import { KeyPackageStore } from "../../../src/core/key-package-store";
+import accounts from "./accounts";
 
-// Create a localforage instance for key packages
-const localForageInstance = localforage.createInstance({
-  name: "marmot-ts",
-  storeName: "keyPackages",
-  description: "Storage for MLS key packages",
-});
+// Observable that triggers whenever the store changes
+const storeChanges$ = new BehaviorSubject<number>(0);
 
 // Create and export a shared KeyPackageStore instance
-export const keyPackageStore = new KeyPackageStore(localForageInstance);
+export const keyPackageStore$ = accounts.active$.pipe(
+  map((account) => {
+    return new KeyPackageStore(
+      localforage.createInstance({
+        name: "marmot-key-package-store",
+      }),
+      { prefix: account?.pubkey ?? "anon" },
+    );
+  }),
+  // Remit the store when the store changes
+  combineLatestWith(storeChanges$),
+  map(([store, _]) => store),
+  shareReplay(1),
+);
+
+// Helper function to notify about store changes
+export function notifyStoreChange() {
+  storeChanges$.next(storeChanges$.value + 1);
+}
+
+// Observable for the count of key packages in the store
+// This will automatically update when the store changes
+export const keyPackageCount$ = keyPackageStore$.pipe(
+  switchMap((store) => store.count()),
+);

@@ -6,6 +6,7 @@ import { CodeIcon } from "./components/icons.tsx";
 import examples, { type Example } from "./examples";
 import useHash from "./hooks/use-hash";
 import SignInModal from "./components/signin/modal.tsx";
+import KeyPackageStoreModal from "./components/key-package-store-modal.tsx";
 
 function ExampleView(props: { example?: Example }) {
   const [path, setPath] = useState("");
@@ -109,6 +110,7 @@ function ExampleView(props: { example?: Example }) {
       <SideNav />
 
       <SignInModal />
+      <KeyPackageStoreModal />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { ReactNode } from "react";
-import { KeyPackage } from "ts-mls";
+import { KeyPackage, PrivateKeyPackage } from "ts-mls";
 
 // ============================================================================
 // Key Package Data Renderer (handles BigInt and Uint8Array)
@@ -68,7 +68,9 @@ function renderValue(value: any, depth = 0): ReactNode {
  * A component that displays the raw MLS key package data structure
  * with proper formatting for BigInt and Uint8Array values
  */
-export default function KeyPackageDataView(props: { keyPackage: KeyPackage }) {
+export default function KeyPackageDataView(props: {
+  keyPackage: KeyPackage | PrivateKeyPackage;
+}) {
   return (
     <div className="font-mono text-xs rounded break-all">
       {renderValue(props.keyPackage)}

@@ -22,6 +22,12 @@ export type CompleteKeyPackage = {
   privatePackage: PrivateKeyPackage;
 };
 
+/** Options for creating a {@link KeyPackageStore} instance */
+export type KeyPackageStoreOptions = {
+  prefix?: string;
+  hash?: Hash;
+};
+
 /**
  * Stores {@link CompleteKeyPackage}s in a {@link KeyPackageStoreBackend}.
  *
@@ -46,23 +52,21 @@ export type CompleteKeyPackage = {
 export class KeyPackageStore {
   private backend: KeyPackageStoreBackend;
   private readonly hash: Hash;
+  private readonly prefix?: string;
 
   /**
    * Creates a new KeyPackageStore instance.
    * @param backend - The storage backend to use (e.g., localForage)
+   * @param hash - The hash implementation to use (defaults to SHA-256)
+   * @param prefix - Optional prefix to add to all storage keys (useful for namespacing)
    */
   constructor(
     backend: KeyPackageStoreBackend,
-    hash: Hash = makeHashImpl("SHA-256"),
+    { prefix, hash = makeHashImpl("SHA-256") }: KeyPackageStoreOptions = {},
   ) {
     this.backend = backend;
     this.hash = hash;
-  }
-
-  /** Generates a unique key for storing a key package. */
-  private async getStorageKey(publicPackage: KeyPackage): Promise<string> {
-    const key = await makeKeyPackageRef(publicPackage, this.hash);
-    return bytesToHex(key);
+    this.prefix = prefix;
   }
 
   /**
@@ -72,16 +76,19 @@ export class KeyPackageStore {
   private async resolveStorageKey(
     hashOrPackage: Uint8Array | string | KeyPackage,
   ): Promise<string> {
+    let key: string;
     if (typeof hashOrPackage === "string") {
-      // Already a hex string
-      return hashOrPackage;
+      // Already a hex string, add prefix
+      key = hashOrPackage;
     } else if (hashOrPackage instanceof Uint8Array) {
-      // Convert Uint8Array to hex
-      return bytesToHex(hashOrPackage);
+      // Convert Uint8Array to hex and add prefix
+      key = bytesToHex(hashOrPackage);
     } else {
       // It's a KeyPackage
-      return await this.getStorageKey(hashOrPackage);
+      key = bytesToHex(await makeKeyPackageRef(hashOrPackage, this.hash));
     }
+
+    return (this.prefix ?? "") + key;
   }
 
   /**
@@ -98,7 +105,7 @@ export class KeyPackageStore {
    * ```
    */
   async add(keyPackage: CompleteKeyPackage): Promise<string> {
-    const key = await this.getStorageKey(keyPackage.publicPackage);
+    const key = await this.resolveStorageKey(keyPackage.publicPackage);
 
     // Serialize the key package for storage
     const serialized = {
@@ -144,6 +151,22 @@ export class KeyPackageStore {
   }
 
   /**
+   * Retrieves the complete key package (both public and private) from the store.
+   *
+   * This is more efficient than calling `getPublicKey()` and `getPrivateKey()` separately,
+   * as it only makes a single storage lookup.
+   *
+   * @param keyOrPackage - Either the initKey (as Uint8Array or hex string) or the full KeyPackage
+   * @returns A promise that resolves to the complete key package, or null if not found
+   */
+  async getCompletePackage(
+    keyOrPackage: Uint8Array | string | KeyPackage,
+  ): Promise<CompleteKeyPackage | null> {
+    const key = await this.resolveStorageKey(keyOrPackage);
+    return await this.backend.getItem(key);
+  }
+
+  /**
    * Removes a key package from the store.
    * @param keyOrPackage - Either the initKey (as Uint8Array or hex string) or the full KeyPackage
    */
@@ -157,7 +180,12 @@ export class KeyPackageStore {
    * @returns An array of public key packages
    */
   async list(): Promise<KeyPackage[]> {
-    const keys = await this.backend.keys();
+    const allKeys = await this.backend.keys();
+
+    // Filter keys by prefix
+    const keys = this.prefix
+      ? allKeys.filter((key) => key.startsWith(this.prefix!))
+      : allKeys;
 
     const packages = await Promise.all(
       keys.map((key) => this.backend.getItem(key)),
@@ -186,9 +214,21 @@ export class KeyPackageStore {
     return packages.length;
   }
 
-  /** Clears all key packages from the store. */
+  /** Clears all key packages from the store (only those matching the prefix if one is set). */
   async clear(): Promise<void> {
-    await this.backend.clear();
+    if (this.prefix) {
+      // Only clear keys with this prefix
+      const allKeys = await this.backend.keys();
+      const keysToRemove = allKeys.filter((key) =>
+        key.startsWith(this.prefix!),
+      );
+      await Promise.all(
+        keysToRemove.map((key) => this.backend.removeItem(key)),
+      );
+    } else {
+      // Clear all keys
+      await this.backend.clear();
+    }
   }
 
   /**

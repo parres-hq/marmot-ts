@@ -1,25 +1,19 @@
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 import {
   defaultCryptoProvider,
-  defaultLifetime,
-  generateKeyPackage,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
 import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 
-import {
-  CompleteKeyPackage,
-  defaultCapabilities,
-  getKeyPackageRelayList,
-} from "../../../../src";
+import { CompleteKeyPackage, getKeyPackageRelayList } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
 import {
   createKeyPackageEvent,
-  keyPackageDefaultExtensions,
+  generateKeyPackage,
 } from "../../../../src/core/key-package";
 import {
   KEY_PACKAGE_RELAY_LIST_KIND,
@@ -31,7 +25,10 @@ import KeyPackageDataView from "../../components/key-package/data-view";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
-import { keyPackageStore } from "../../lib/key-package-store";
+import {
+  keyPackageStore$,
+  notifyStoreChange,
+} from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
 import { relayConfig$ } from "../../lib/setting";
 
@@ -288,6 +285,7 @@ interface CreateKeyPackageParams {
 }
 
 function useKeyPackageCreation() {
+  const keyPackageStore = useObservable(keyPackageStore$);
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<any>(null);
@@ -327,24 +325,13 @@ function useKeyPackageCreation() {
 
       console.log("Generating key package with cipher suite:", cipherSuite);
 
-      // Get the cipher suite ID from the name
-
       // TODO: `defaultLifetime` defaults to notBefore: 0n, notAfter: 9223372036854775807n
-      const keyPackage = await generateKeyPackage(
+      const keyPackage = await generateKeyPackage({
         credential,
-        defaultCapabilities(),
-        defaultLifetime,
-        keyPackageDefaultExtensions(),
         ciphersuiteImpl,
-      );
+      });
 
-      // Store the key package locally
-      console.log("Storing key package locally...");
-      const key = await keyPackageStore.add(keyPackage);
-      setStorageKey(key);
-      console.log("Stored with key:", key);
-
-      // Set the key package in the state
+      // Set the key package in the state (but don't store it yet)
       setKeyPackage(keyPackage);
 
       // Parse relay URLs
@@ -378,6 +365,11 @@ function useKeyPackageCreation() {
       return;
     }
 
+    if (!keyPackage) {
+      setError("No key package to store");
+      return;
+    }
+
     try {
       setIsPublishing(true);
       setError(null);
@@ -406,6 +398,16 @@ function useKeyPackageCreation() {
         } catch (err) {
           console.error("Failed to publish to", relay, err);
         }
+      }
+
+      // Store the key package locally only after successful publication
+      if (keyPackageStore) {
+        console.log("Storing key package locally...");
+        const key = await keyPackageStore.add(keyPackage);
+        setStorageKey(key);
+        console.log("Stored with key:", key);
+        // Notify that the store has changed
+        notifyStoreChange();
       }
 
       setCreatedEvent(signedEvent);
@@ -509,7 +511,7 @@ export default withSignIn(function KeyPackageCreate() {
       <ErrorAlert error={error} />
 
       {/* Draft Display */}
-      {draftEvent && keyPackage && storageKey && !createdEvent && (
+      {draftEvent && keyPackage && !createdEvent && (
         <DraftDisplay
           event={draftEvent}
           keyPackage={keyPackage.publicPackage}

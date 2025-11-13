@@ -2,7 +2,7 @@ import {
   Capabilities,
   defaultCapabilities as mlsDefaultCapabilities,
 } from "ts-mls";
-import { MARMOT_GROUP_DATA_EXTENSION_TYPE } from "./protocol.js";
+import { ensureMarmotCapabilities } from "./capabilities.js";
 
 /**
  * Default capabilities for Marmot key packages.
@@ -11,13 +11,18 @@ import { MARMOT_GROUP_DATA_EXTENSION_TYPE } from "./protocol.js";
  * and ratchet_tree in their capabilities to pass validation when being added to groups.
  */
 export function defaultCapabilities(): Capabilities {
-  const capabilities = mlsDefaultCapabilities();
+  let capabilities = mlsDefaultCapabilities();
 
-  // Add Marmot Group Data Extension to capabilities
-  capabilities.extensions = [
-    ...capabilities.extensions,
-    MARMOT_GROUP_DATA_EXTENSION_TYPE,
-  ];
+  // Ensure capabilities include the Marmot Group Data Extension
+  capabilities = ensureMarmotCapabilities(capabilities);
+
+  // Filter ciphersuites: keep the default one (MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519)
+  // and keep GREASE values (numeric IDs), but remove other MLS ciphersuites
+  capabilities.ciphersuites = capabilities.ciphersuites.filter(
+    (cipher) =>
+      cipher === "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519" ||
+      !cipher.startsWith("MLS_"), // Keep GREASE values (they don't start with "MLS_")
+  );
 
   // Only include "basic" credential type (remove "x509" since we don't support it)
   capabilities.credentials = capabilities.credentials.filter(

@@ -1,3 +1,4 @@
+export * from "./capabilities.js";
 export * from "./credential.js";
 export * from "./default-capabilities.js";
 export * from "./extensions.js";
