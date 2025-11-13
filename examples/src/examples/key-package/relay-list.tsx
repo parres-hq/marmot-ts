@@ -476,8 +476,9 @@ const currentRelayList$ = combineLatest([
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
             relays: relaySet(
-              mailboxes?.outboxes,
-              relayConfig.lookupRelays,
+              mailboxes?.outboxes
+                ? mailboxes.outboxes
+                : relayConfig.lookupRelays,
               relayConfig.manualRelays,
             ),
           })

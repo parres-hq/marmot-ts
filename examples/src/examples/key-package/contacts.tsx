@@ -195,8 +195,8 @@ export default withSignIn(() => {
               kind: KEY_PACKAGE_RELAY_LIST_KIND,
               pubkey: user.pubkey,
               relays: relaySet(
+                relayConfig.lookupRelays,
                 relayConfig.manualRelays,
-                relayConfig.commonRelays,
               ),
             })
             .pipe(

@@ -47,8 +47,9 @@ const keyPackageRelayList$ = combineLatest([
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
             relays: relaySet(
-              mailboxes?.outboxes,
-              relayConfig.lookupRelays,
+              mailboxes?.outboxes
+                ? mailboxes.outboxes
+                : relayConfig.lookupRelays,
               relayConfig.manualRelays,
             ),
           })
@@ -57,7 +58,7 @@ const keyPackageRelayList$ = combineLatest([
   ),
 );
 
-/** Observable of all available relays (outbox + relay list + lookup relays + manual relays) */
+/** Observable of all available relays */
 const baseAvailableRelays$ = combineLatest([
   accounts.active$,
   mailboxes$,
@@ -68,10 +69,9 @@ const baseAvailableRelays$ = combineLatest([
     if (!account) return [];
 
     return relaySet(
-      mailboxes?.outboxes,
+      mailboxes?.outboxes ? mailboxes.outboxes : relayConfig.lookupRelays,
       relayList,
       relayConfig.manualRelays,
-      relayConfig.lookupRelays,
     );
   }),
 );
