@@ -1,4 +1,4 @@
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
+import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
 import {
@@ -44,10 +44,12 @@ const keyPackageRelays$ = combineLatest([
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: [
-              ...(mailboxes?.outboxes || []),
-              ...relayConfig.lookupRelays,
-            ],
+            relays: relaySet(
+              mailboxes?.outboxes
+                ? mailboxes.outboxes
+                : relayConfig.lookupRelays,
+              relayConfig.manualRelays,
+            ),
           })
           .pipe(
             map((event) => (event ? getKeyPackageRelayList(event) : undefined)),
@@ -61,10 +63,10 @@ const keyPackageRelays$ = combineLatest([
 // ============================================================================
 
 interface ConfigurationFormProps {
-  relays: string;
+  relays: string[];
   cipherSuite: CiphersuiteName;
   isCreating: boolean;
-  onRelaysChange: (relays: string) => void;
+  onRelaysChange: (relays: string[]) => void;
   onCipherSuiteChange: (suite: CiphersuiteName) => void;
   onSubmit: () => void;
 }
@@ -77,6 +79,26 @@ function ConfigurationForm({
   onCipherSuiteChange,
   onSubmit,
 }: ConfigurationFormProps) {
+  const [newRelay, setNewRelay] = useState("");
+
+  const handleAddRelay = () => {
+    if (newRelay.trim() && !relays.includes(newRelay.trim())) {
+      onRelaysChange([...relays, newRelay.trim()]);
+      setNewRelay("");
+    }
+  };
+
+  const handleRemoveRelay = (relayToRemove: string) => {
+    onRelaysChange(relays.filter((r) => r !== relayToRemove));
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddRelay();
+    }
+  };
+
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
@@ -89,26 +111,60 @@ function ConfigurationForm({
           disabled={isCreating}
         />
 
-        {/* Relays Input */}
+        {/* Relays Configuration */}
         <div className="w-full">
           <label className="block mb-2">
-            <span className="font-semibold">
-              Relays
-              <span className="text-xs text-base-content/60 ml-2">
-                (one per line)
-              </span>
-            </span>
+            <span className="font-semibold">Relays ({relays.length})</span>
           </label>
-          <textarea
-            className="textarea textarea-bordered w-full h-24"
-            placeholder="wss://relay.damus.io&#10;wss://relay.nostr.band"
-            value={relays}
-            onChange={(e) => onRelaysChange(e.target.value)}
-            disabled={isCreating}
-          />
+
+          {/* Current Relays Display */}
+          {relays.length === 0 ? (
+            <div className="italic p-4 text-center border border-dashed border-base-300 rounded opacity-50">
+              No relays configured. Add relays below to publish your key
+              package.
+            </div>
+          ) : (
+            <div className="space-y-2 mb-4">
+              {relays.map((relay, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-2 bg-base-200 rounded"
+                >
+                  <span className="flex-1 font-mono text-sm">{relay}</span>
+                  <button
+                    className="btn btn-sm btn-error"
+                    onClick={() => handleRemoveRelay(relay)}
+                    disabled={isCreating}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add New Relay */}
+          <div className="join w-full">
+            <input
+              type="text"
+              placeholder="wss://relay.example.com"
+              className="input input-bordered join-item flex-1"
+              value={newRelay}
+              onChange={(e) => setNewRelay(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isCreating}
+            />
+            <button
+              className="btn btn-primary join-item"
+              onClick={handleAddRelay}
+              disabled={isCreating || !newRelay.trim()}
+            >
+              Add
+            </button>
+          </div>
           <div className="mt-1">
             <span className="text-sm text-base-content/60">
-              Where to publish the key package (kind 443 event)
+              Press Enter or click Add to include the relay
             </span>
           </div>
         </div>
@@ -118,7 +174,7 @@ function ConfigurationForm({
           <button
             className="btn btn-primary"
             onClick={onSubmit}
-            disabled={isCreating || !relays}
+            disabled={isCreating || relays.length === 0}
           >
             {isCreating ? (
               <>
@@ -280,7 +336,7 @@ function SuccessDisplay({ event, storageKey }: SuccessDisplayProps) {
 // ============================================================================
 
 interface CreateKeyPackageParams {
-  relays: string;
+  relays: string[];
   cipherSuite: CiphersuiteName;
 }
 
@@ -334,18 +390,12 @@ function useKeyPackageCreation() {
       // Set the key package in the state (but don't store it yet)
       setKeyPackage(keyPackage);
 
-      // Parse relay URLs
-      const relayList = relays
-        .split("\n")
-        .map((r) => r.trim())
-        .filter((r) => r.length > 0);
-
       // Create the unsigned event using the library function
       console.log("Creating key package event...");
       const unsignedEvent = createKeyPackageEvent({
         keyPackage: keyPackage.publicPackage,
         pubkey,
-        relays: relayList,
+        relays,
         client: "marmot-examples",
       });
 
@@ -451,11 +501,9 @@ function useKeyPackageCreation() {
 export default withSignIn(function KeyPackageCreate() {
   // Subscribe to the user's key package relays
   const keyPackageRelays = useObservable(keyPackageRelays$);
-
   const relayConfig = useObservable(relayConfig$);
-  const [relays, setRelays] = useState<string>(
-    relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
-  );
+
+  const [relays, setRelays] = useState<string[]>([]);
   const [cipherSuite, setCipherSuite] = useState<CiphersuiteName>(
     "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
   );
@@ -463,9 +511,17 @@ export default withSignIn(function KeyPackageCreate() {
   // Update relays when saved relays change
   useEffect(() => {
     if (keyPackageRelays && keyPackageRelays.length > 0) {
-      setRelays(keyPackageRelays.join("\n"));
+      setRelays(keyPackageRelays);
+    } else if (relayConfig) {
+      // Fall back to config-based relays if no saved relay list
+      const defaultRelays = relaySet(
+        relayConfig.manualRelays,
+        relayConfig.commonRelays,
+        relayConfig.lookupRelays,
+      );
+      setRelays(defaultRelays);
     }
-  }, [keyPackageRelays]);
+  }, [keyPackageRelays, relayConfig]);
 
   const {
     isCreating,
