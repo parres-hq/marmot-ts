@@ -14,7 +14,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { lookupRelays$, relayConfig$ } from "../../lib/setting";
+import { relayConfig$ } from "../../lib/setting";
 
 // ============================================================================
 // Component: RelayListForm
@@ -342,7 +342,6 @@ function SuccessDisplay({ event, relayList }: SuccessDisplayProps) {
 // ============================================================================
 
 function useRelayListManagement() {
-  const lookupRelays = useObservable(lookupRelays$);
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<NostrEvent | null>(null);
@@ -406,12 +405,13 @@ function useRelayListManagement() {
       // Parse relay URLs from the signed event (these are the advertised relays)
       const advertisedRelays = getKeyPackageRelayList(signedEvent);
 
-      // Combine outbox relays with advertised relays, removing duplicates
+      // Combine outbox relays with advertised relays and config-based relays, removing duplicates
       const outboxRelays = mailboxes?.outboxes || [];
       const allPublishingRelays = relaySet(
         outboxRelays,
         advertisedRelays,
-        lookupRelays,
+        relayConfig$.value.manualRelays,
+        relayConfig$.value.lookupRelays,
       );
 
       if (allPublishingRelays.length === 0) {
@@ -475,10 +475,11 @@ const currentRelayList$ = combineLatest([
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: [
-              ...(mailboxes?.outboxes || []),
-              ...relayConfig.lookupRelays,
-            ],
+            relays: relaySet(
+              mailboxes?.outboxes,
+              relayConfig.lookupRelays,
+              relayConfig.manualRelays,
+            ),
           })
           .pipe(
             map((event) =>
@@ -501,10 +502,6 @@ export default withSignIn(function KeyPackageRelays() {
   const mailboxes = useObservable(mailboxes$);
 
   const [relays, setRelays] = useState<string[]>([]);
-  const relayConfig = useObservable(relayConfig$);
-  const [manualRelay, setManualRelay] = useState(
-    relayConfig?.manualRelays?.[0] ?? "wss://relay.damus.io/",
-  );
 
   // Update relays when existing relay list changes
   useEffect(() => {
@@ -512,13 +509,16 @@ export default withSignIn(function KeyPackageRelays() {
       setRelays(currentRelayList);
   }, [currentRelayList]);
 
-  // Also fetch from manual relay and lookup relays when they change
+  // Also fetch from config-based relays when they change
   useEffect(() => {
     const account = accounts.active;
     if (!account) return;
 
     const relayConfig = relayConfig$.value;
-    const allRelays = [...relayConfig.lookupRelays, manualRelay];
+    const allRelays = relaySet(
+      relayConfig.lookupRelays,
+      relayConfig.manualRelays,
+    );
 
     const subscription = eventStore
       .replaceable({
@@ -542,18 +542,7 @@ export default withSignIn(function KeyPackageRelays() {
       });
 
     return () => subscription.unsubscribe();
-  }, [manualRelay, relayConfig$.value.lookupRelays]);
-
-  // Update manual relay input when config changes
-  useEffect(() => {
-    if (
-      relayConfig &&
-      Array.isArray(relayConfig.manualRelays) &&
-      relayConfig.manualRelays.length > 0
-    ) {
-      setManualRelay(relayConfig.manualRelays[0]);
-    }
-  }, [relayConfig?.manualRelays]);
+  }, [relayConfig$.value.lookupRelays, relayConfig$.value.manualRelays]);
 
   const {
     isCreating,

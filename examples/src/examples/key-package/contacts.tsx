@@ -1,5 +1,10 @@
 import { mapEventsToStore, mapEventsToTimeline } from "applesauce-core";
-import { NostrEvent, getSeenRelays, kinds } from "applesauce-core/helpers";
+import {
+  NostrEvent,
+  getSeenRelays,
+  kinds,
+  relaySet,
+} from "applesauce-core/helpers";
 import {
   BehaviorSubject,
   EMPTY,
@@ -16,9 +21,10 @@ import {
 } from "../../../../src";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { withSignIn } from "../../components/with-signIn";
-import { useObservableMemo } from "../../hooks/use-observable";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
+import { relayConfig$ } from "../../lib/setting";
 
 const contacts$ = accounts.active$.pipe(
   switchMap((account) =>
@@ -177,20 +183,30 @@ function JsonPreviewModal() {
 
 export default withSignIn(() => {
   const contacts = useObservableMemo(() => contacts$, []);
+  const relayConfig = useObservable(relayConfig$);
 
   // Subscribe to all contact relay lists
   const contactsWithRelays = useObservableMemo(() => {
     return contacts$.pipe(
       switchMap((contacts) => {
         const relayLists$ = contacts.map((user) =>
-          eventStore.replaceable(KEY_PACKAGE_RELAY_LIST_KIND, user.pubkey).pipe(
-            map((event) => {
-              if (!event) return null;
-              const relays = getKeyPackageRelayList(event);
-              if (relays.length === 0) return null;
-              return { pubkey: user.pubkey, relays };
-            }),
-          ),
+          eventStore
+            .replaceable({
+              kind: KEY_PACKAGE_RELAY_LIST_KIND,
+              pubkey: user.pubkey,
+              relays: relaySet(
+                relayConfig.manualRelays,
+                relayConfig.commonRelays,
+              ),
+            })
+            .pipe(
+              map((event) => {
+                if (!event) return null;
+                const relays = getKeyPackageRelayList(event);
+                if (relays.length === 0) return null;
+                return { pubkey: user.pubkey, relays };
+              }),
+            ),
         );
 
         return combineLatest(relayLists$).pipe(
@@ -198,7 +214,7 @@ export default withSignIn(() => {
         );
       }),
     );
-  }, []);
+  }, [relayConfig]);
 
   return (
     <>

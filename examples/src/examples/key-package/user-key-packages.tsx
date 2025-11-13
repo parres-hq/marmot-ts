@@ -4,6 +4,7 @@ import {
   getDisplayName,
   normalizeToPubkey,
   NostrEvent,
+  relaySet,
 } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
@@ -26,7 +27,6 @@ import {
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
-import RelayPicker from "../../components/form/relay-picker";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
 import { UserAvatar, UserName } from "../../components/nostr-user";
@@ -48,6 +48,7 @@ const keyPackageRelaysList$ = selectedPubkey$.pipe(
       ? eventStore.replaceable({
           kind: KEY_PACKAGE_RELAY_LIST_KIND,
           pubkey,
+          relays: relaySet(relayConfig$.value.lookupRelays),
         })
       : NEVER,
   ),
@@ -240,21 +241,22 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 export default function UserKeyPackages() {
   const [pubkeyInput, setPubkeyInput] = useState("");
   const relayConfig = useObservable(relayConfig$);
-  const [manualRelay, setManualRelay] = useState("wss://relay.damus.io/");
   const allAccounts = useObservable(accounts.accounts$);
+  const activeAccount = useObservable(accounts.active$);
   const selectedPubkey = useObservable(selectedPubkey$);
   const keyPackageRelays = useObservable(keyPackageRelaysList$);
 
-  // Update manual relay input when config changes
   useEffect(() => {
-    if (
-      relayConfig &&
-      Array.isArray(relayConfig.manualRelays) &&
-      relayConfig.manualRelays.length > 0
-    ) {
-      setManualRelay(relayConfig.manualRelays[0]);
+    if (activeAccount?.pubkey && !selectedPubkey) {
+      selectedPubkey$.next(activeAccount.pubkey);
     }
-  }, [relayConfig?.manualRelays]);
+  }, [activeAccount?.pubkey, selectedPubkey]);
+
+  // Get fallback relays from config
+  const fallbackRelays = relaySet(
+    relayConfig?.manualRelays,
+    relayConfig?.lookupRelays,
+  );
 
   // Observable for account profiles with display names
   const accountProfiles = useObservableMemo(() => {
@@ -286,16 +288,16 @@ export default function UserKeyPackages() {
     selectedPubkey$.next(null);
   };
 
-  // Step 2: Fetch key packages from those relays (or manual relay if none found)
+  // Step 2: Fetch key packages from those relays (or fallback relays if none found)
   const keyPackages = useObservableMemo(
     () =>
       combineLatest([selectedPubkey$, keyPackageRelaysList$]).pipe(
         switchMap(([pubkey, relays]) => {
           if (!pubkey) return of([]);
 
-          // Use the user's specified relays, or fall back to manual relay
+          // Use the user's specified relays, or fall back to config-based relays
           const relaysToUse =
-            relays && relays.length > 0 ? relays : [manualRelay];
+            relays && relays.length > 0 ? relays : fallbackRelays;
 
           return pool
             .request(relaysToUse, {
@@ -309,7 +311,7 @@ export default function UserKeyPackages() {
             );
         }),
       ),
-    [manualRelay],
+    [fallbackRelays],
   );
 
   return (
@@ -425,12 +427,8 @@ export default function UserKeyPackages() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    <RelayPicker
-                      value={manualRelay}
-                      onChange={setManualRelay}
-                    />
                     <div className="text-xs text-base-content/60">
-                      Using relay: {manualRelay}
+                      Using fallback relays: {fallbackRelays.join(", ")}
                     </div>
                   </div>
                 </div>

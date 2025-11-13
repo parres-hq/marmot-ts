@@ -1,8 +1,8 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { BehaviorSubject, mapEventsToTimeline } from "applesauce-core";
+import { mapEventsToTimeline } from "applesauce-core";
 import { onlyEvents } from "applesauce-relay";
 import { useMemo, useState } from "react";
-import { map, switchMap } from "rxjs/operators";
+import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import { CredentialBasic } from "ts-mls/credential.js";
 
@@ -36,15 +36,6 @@ import { DetailsField } from "../../components/details-field";
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
 };
-
-// Use first manual relay from global config as default
-const relay = new BehaviorSubject<string>("");
-// Initialize with first manual relay when config is available
-relayConfig$.subscribe((config) => {
-  if (config.manualRelays.length > 0 && !relay.value) {
-    relay.next(config.manualRelays[0]);
-  }
-});
 
 // ============================================================================
 // Key Package Card
@@ -314,24 +305,26 @@ function KeyPackageCard(props: { event: NostrEvent }) {
 // ============================================================================
 
 export default function KeyPackageExplorer() {
-  const relayUrl = useObservable(relay);
+  const relayConfig = useObservable(relayConfig$);
+  const [selectedRelay, setSelectedRelay] = useState<string>(
+    relayConfig.commonRelays[0],
+  );
   const [selectedUser, setSelectedUser] = useState<string>("all");
 
   // Subscribe to key package events from relay
   const events = useObservableMemo(
     () =>
-      relay.pipe(
-        switchMap((url) =>
-          pool
-            .subscription([url], { kinds: [KEY_PACKAGE_KIND], limit: 100 })
-            .pipe(
-              onlyEvents(),
-              mapEventsToTimeline(),
-              map((arr) => [...arr]),
-            ),
+      pool
+        .subscription([selectedRelay], {
+          kinds: [KEY_PACKAGE_KIND],
+          limit: 100,
+        })
+        .pipe(
+          onlyEvents(),
+          mapEventsToTimeline(),
+          map((arr) => [...arr]),
         ),
-      ),
-    [],
+    [selectedRelay],
   );
 
   // Get unique users from events with their counts
@@ -366,7 +359,7 @@ export default function KeyPackageExplorer() {
       </div>
 
       {/* Relay Picker */}
-      <RelayPicker value={relayUrl ?? ""} onChange={(v) => relay.next(v)} />
+      <RelayPicker value={selectedRelay} onChange={setSelectedRelay} />
 
       {/* User Filter */}
       <div className="form-control w-full max-w-xs">
