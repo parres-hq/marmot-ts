@@ -2,6 +2,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
 import { onlyEvents } from "applesauce-relay";
 import { useMemo, useState } from "react";
+import { of } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import { CredentialBasic } from "ts-mls/credential.js";
@@ -312,20 +313,23 @@ export default function KeyPackageExplorer() {
   const [selectedUser, setSelectedUser] = useState<string>("all");
 
   // Subscribe to key package events from relay
-  const events = useObservableMemo(
-    () =>
-      pool
-        .subscription([selectedRelay], {
-          kinds: [KEY_PACKAGE_KIND],
-          limit: 100,
-        })
-        .pipe(
-          onlyEvents(),
-          mapEventsToTimeline(),
-          map((arr) => [...arr]),
-        ),
-    [selectedRelay],
-  );
+  const events = useObservableMemo(() => {
+    // Return empty observable if selectedRelay is empty to avoid invalid relay requests
+    if (!selectedRelay) {
+      return of([]);
+    }
+
+    return pool
+      .subscription([selectedRelay], {
+        kinds: [KEY_PACKAGE_KIND],
+        limit: 100,
+      })
+      .pipe(
+        onlyEvents(),
+        mapEventsToTimeline(),
+        map((arr) => [...arr]),
+      );
+  }, [selectedRelay]);
 
   // Get unique users from events with their counts
   const users = useMemo(() => {
