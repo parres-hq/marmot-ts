@@ -8,7 +8,7 @@ export function UserName(props: { pubkey: string }) {
     [props.pubkey],
   );
 
-  return <span>{getDisplayName(profile, props.pubkey.slice(0, 16))}</span>;
+  return <>{getDisplayName(profile, props.pubkey.slice(0, 16))}</>;
 }
 
 export function UserAvatar({ pubkey }: { pubkey: string }) {

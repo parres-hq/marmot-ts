@@ -6,7 +6,7 @@ import {
   NostrEvent,
   relaySet,
 } from "applesauce-core/helpers";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
@@ -252,10 +252,10 @@ export default function UserKeyPackages() {
     }
   }, [activeAccount?.pubkey, selectedPubkey]);
 
-  // Get fallback relays from config
-  const fallbackRelays = relaySet(
-    relayConfig?.manualRelays,
-    relayConfig?.lookupRelays,
+  // Get fallback relays from config - memoize to prevent infinite re-renders
+  const fallbackRelays = useMemo(
+    () => relaySet(relayConfig?.manualRelays, relayConfig?.lookupRelays),
+    [relayConfig?.manualRelays, relayConfig?.lookupRelays],
   );
 
   // Observable for account profiles with display names
