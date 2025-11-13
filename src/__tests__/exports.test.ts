@@ -17,8 +17,6 @@ describe("exports", () => {
         "LAST_RESORT_KEY_PACKAGE_EXTENSION_TYPE",
         "MARMOT_GROUP_DATA_EXTENSION_TYPE",
         "MARMOT_GROUP_DATA_VERSION",
-        "Marmot",
-        "ciphersuite",
         "createCredential",
         "createDeleteKeyPackageEvent",
         "createKeyPackageEvent",
