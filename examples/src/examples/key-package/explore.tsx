@@ -307,7 +307,7 @@ function KeyPackageCard(props: { event: NostrEvent }) {
 export default function KeyPackageExplorer() {
   const relayConfig = useObservable(relayConfig$);
   const [selectedRelay, setSelectedRelay] = useState<string>(
-    relayConfig.commonRelays[0],
+    relayConfig?.commonRelays?.[0] || "",
   );
   const [selectedUser, setSelectedUser] = useState<string>("all");
 

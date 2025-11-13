@@ -601,12 +601,8 @@ function KeyPackageManager() {
   const relayConfig = useObservable(relayConfig$);
 
   const allRelays = useMemo(() => {
-    return relaySet(
-      baseRelays || [],
-      relayConfig?.manualRelays || [],
-      relayConfig?.lookupRelays || [],
-    );
-  }, [baseRelays, relayConfig]);
+    return relaySet(baseRelays || []);
+  }, [baseRelays]);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
