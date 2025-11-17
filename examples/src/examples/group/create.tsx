@@ -391,7 +391,6 @@ function SuccessDisplay({ result, storageKey }: SuccessDisplayProps) {
 // ============================================================================
 
 function useGroupCreation() {
-  const keyPackageStore = useObservable(keyPackageStore$);
   const groupStore = useObservable(groupStore$);
   const [isCreating, setIsCreating] = useState(false);
   const [isStoring, setIsStoring] = useState(false);
