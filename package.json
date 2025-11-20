@@ -51,13 +51,13 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@hpke/core": "^1.7.4",
+    "@hpke/core": "^1.7.5",
     "@noble/ciphers": "^2.0.1",
     "@noble/curves": "^2.0.1",
     "@noble/hashes": "^2.0.1",
-    "applesauce-core": "^4.2.0",
+    "applesauce-core": "^4.4.2",
     "applesauce-factory": "^4.0.0",
-    "ts-mls": "^1.4.0"
+    "ts-mls": "^1.4.2"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

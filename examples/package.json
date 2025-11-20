@@ -12,12 +12,12 @@
     "@noble/hashes": "^2.0.1",
     "@tailwindcss/vite": "^4.1.17",
     "applesauce-accounts": "^4.1.0",
-    "applesauce-core": "^4.2.0",
+    "applesauce-core": "^4.4.2",
     "applesauce-extra": "^4.1.0",
     "applesauce-loaders": "^4.2.0",
-    "applesauce-relay": "^4.2.0",
+    "applesauce-relay": "^4.4.2",
     "applesauce-signers": "^4.2.0",
-    "daisyui": "^5.4.7",
+    "daisyui": "^5.5.5",
     "localforage": "^1.10.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -27,11 +27,11 @@
     "unique-names-generator": "^4.7.1"
   },
   "devDependencies": {
-    "@types/node": "^24.10.0",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "typescript": "~5.9.3",
-    "vite": "^7.2.2"
+    "vite": "^7.2.4"
   }
 }
