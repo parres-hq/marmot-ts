@@ -1,7 +1,10 @@
 import { CiphersuiteImpl, Extension } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
-import { MarmotGroupData } from "./protocol.js";
+import {
+  MARMOT_GROUP_DATA_EXTENSION_TYPE,
+  MarmotGroupData,
+} from "./protocol.js";
 import { CompleteKeyPackage } from "./key-package-store.js";
 import { randomBytes } from "@noble/hashes/utils.js";
 import { createGroup as MLSCreateGroup } from "ts-mls";
@@ -175,7 +178,8 @@ export function validateKeyPackageForGroup(
   // Check if Marmot Group Data Extension is supported
   const supportsMarmot = extensions.some(
     (ext) =>
-      typeof ext.extensionType === "number" && ext.extensionType === 0xf2ee, // MARMOT_GROUP_DATA_EXTENSION_TYPE
+      typeof ext.extensionType === "number" &&
+      ext.extensionType === MARMOT_GROUP_DATA_EXTENSION_TYPE,
   );
 
   return supportsMarmot;

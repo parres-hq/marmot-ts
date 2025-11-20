@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { useObservable } from "../../hooks/use-observable";
+import { useState } from "react";
+import { switchMap } from "rxjs";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { keyPackageStore$ } from "../../lib/key-package-store";
 import { groupStore$, notifyStoreChange } from "../../lib/group-store";
 import {
@@ -505,7 +506,11 @@ function useGroupCreation() {
 export default withSignIn(function GroupCreation() {
   const keyPackageStore = useObservable(keyPackageStore$);
   const relayConfig = useObservable(relayConfig$);
-  const [keyPackages, setKeyPackages] = useState<KeyPackage[]>([]);
+  const keyPackages =
+    useObservableMemo(
+      () => keyPackageStore$.pipe(switchMap((store) => store.list())),
+      [],
+    ) ?? [];
   const [selectedKeyPackageId, setSelectedKeyPackageId] = useState("");
   const [selectedKeyPackage, setSelectedKeyPackage] =
     useState<CompleteKeyPackage | null>(null);
@@ -523,22 +528,6 @@ export default withSignIn(function GroupCreation() {
     storeGroup,
     reset,
   } = useGroupCreation();
-
-  // Load available key packages
-  useEffect(() => {
-    if (!keyPackageStore) return;
-
-    const loadKeyPackages = async () => {
-      try {
-        const packages = await keyPackageStore.list();
-        setKeyPackages(packages);
-      } catch (err) {
-        console.error("Failed to load key packages:", err);
-      }
-    };
-
-    loadKeyPackages();
-  }, [keyPackageStore]);
 
   const handleKeyPackageSelect = async (keyPackageId: string) => {
     if (!keyPackageStore || !keyPackageId) {
