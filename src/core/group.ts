@@ -40,12 +40,6 @@ export interface Group {
   extensions: Extension[];
   /** Marmot-specific group metadata */
   marmotGroupData: MarmotGroupData;
-  /** Ratchet tree representing the current group state */
-  ratchetTree: Uint8Array;
-  /** Confirmed transcript hash for the current epoch */
-  confirmedTranscriptHash: Uint8Array;
-  /** Interim transcript hash for pending commits */
-  interimTranscriptHash: Uint8Array;
 }
 
 /**
@@ -139,9 +133,6 @@ export async function createGroup(
     ],
     extensions: groupExtensions,
     marmotGroupData,
-    ratchetTree: new Uint8Array(), // Ratchet tree is stored in clientState, not needed for display
-    confirmedTranscriptHash: clientState.groupContext.confirmedTranscriptHash,
-    interimTranscriptHash: new Uint8Array(), // Interim hash is computed during commit operations
   };
 
   // Create the complete group package (ClientState + metadata)
