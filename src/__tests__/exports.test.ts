@@ -28,6 +28,8 @@ describe("exports", () => {
         "createThreeMonthLifetime",
         "decodeMarmotGroupData",
         "defaultCapabilities",
+        "defaultMarmotClientConfig",
+        "deserializeClientState",
         "encodeMarmotGroupData",
         "ensureLastResortExtension",
         "ensureMarmotCapabilities",
@@ -51,6 +53,8 @@ describe("exports", () => {
         "keyPackageDefaultExtensions",
         "marmotGroupDataToExtension",
         "normalizeRelayUrl",
+        "rehydrateClientState",
+        "serializeClientState",
         "supportsMarmotExtensions",
         "validateKeyPackageForGroup",
       ]

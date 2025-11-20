@@ -5,15 +5,30 @@ import { switchMap } from "rxjs";
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
 import { groupStore$, notifyStoreChange } from "../lib/group-store";
 import JsonBlock from "./json-block";
-import type { Group } from "../../../src/core";
+import { rehydrateClientState, type StoredGroupEntry } from "../../../src/core";
 
 interface StoredGroupDetailsProps {
-  group: Group;
+  entry: StoredGroupEntry;
   index: number;
 }
 
-function StoredGroupDetails({ group, index }: StoredGroupDetailsProps) {
+function StoredGroupDetails({ entry, index }: StoredGroupDetailsProps) {
+  const { group, clientState } = entry;
   const groupIdHex = bytesToHex(group.groupId);
+
+  const handleActivate = () => {
+    try {
+      // Rehydrate the client state using the Marmot Authentication Service
+      const state = rehydrateClientState(clientState);
+      console.log("✅ Group activated (rehydrated) successfully!", state);
+      alert(
+        `Group "${group.marmotGroupData.name}" activated successfully! Check console for ClientState object.`,
+      );
+    } catch (e) {
+      console.error("Failed to activate group", e);
+      alert("Failed to activate group. Check console for details.");
+    }
+  };
 
   return (
     <details className="collapse bg-base-100 border-base-300 border">
@@ -91,24 +106,34 @@ function StoredGroupDetails({ group, index }: StoredGroupDetailsProps) {
             <div className="bg-base-300 p-4 rounded-lg overflow-auto max-h-96">
               <JsonBlock
                 value={{
-                  groupId: groupIdHex,
-                  epoch: group.epoch,
-                  members: group.members.length,
-                  extensions: group.extensions.length,
-                  marmotGroupData: {
-                    ...group.marmotGroupData,
-                    nostrGroupId: bytesToHex(
-                      group.marmotGroupData.nostrGroupId,
-                    ),
-                    imageHash: bytesToHex(group.marmotGroupData.imageHash),
-                    imageKey: bytesToHex(group.marmotGroupData.imageKey),
-                    imageNonce: bytesToHex(group.marmotGroupData.imageNonce),
+                  group: {
+                    groupId: groupIdHex,
+                    epoch: group.epoch,
+                    members: group.members.length,
+                    extensions: group.extensions.length,
+                    marmotGroupData: {
+                      ...group.marmotGroupData,
+                      nostrGroupId: bytesToHex(
+                        group.marmotGroupData.nostrGroupId,
+                      ),
+                      imageHash: bytesToHex(group.marmotGroupData.imageHash),
+                      imageKey: bytesToHex(group.marmotGroupData.imageKey),
+                      imageNonce: bytesToHex(group.marmotGroupData.imageNonce),
+                    },
                   },
+                  clientState,
                 }}
               />
             </div>
           </div>
         </details>
+
+        {/* Activate Button */}
+        <div className="flex justify-end pt-2">
+          <button className="btn btn-primary btn-sm" onClick={handleActivate}>
+            Activate Group (Test clientState Rehydration)
+          </button>
+        </div>
       </div>
     </details>
   );
@@ -118,7 +143,7 @@ export default function GroupStoreModal() {
   const ref = useRef<HTMLDialogElement>(null);
   const groupStore = useObservable(groupStore$);
 
-  const groups = useObservableMemo(
+  const entries = useObservableMemo(
     () => groupStore$.pipe(switchMap((store) => store.list())),
     [],
   );
@@ -128,7 +153,7 @@ export default function GroupStoreModal() {
     if (!groupStore) return;
 
     const confirmed = window.confirm(
-      `Are you sure you want to clear all ${groups?.length ?? 0} group${groups?.length !== 1 ? "s" : ""}? This action cannot be undone.`,
+      `Are you sure you want to clear all ${entries?.length ?? 0} group${entries?.length !== 1 ? "s" : ""}? This action cannot be undone.`,
     );
 
     if (!confirmed) return;
@@ -157,7 +182,7 @@ export default function GroupStoreModal() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg">Local Group Store</h3>
-          {groups && groups.length > 0 && (
+          {entries && entries.length > 0 && (
             <button
               className="btn btn-error btn-sm"
               onClick={handleClearAll}
@@ -182,11 +207,11 @@ export default function GroupStoreModal() {
 
         {/* Content */}
         <div className="space-y-3">
-          {groups === undefined ? (
+          {entries === undefined ? (
             <div className="flex justify-center p-8">
               <span className="loading loading-spinner loading-lg"></span>
             </div>
-          ) : groups.length === 0 ? (
+          ) : entries.length === 0 ? (
             <div className="alert alert-info">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -206,13 +231,13 @@ export default function GroupStoreModal() {
           ) : (
             <>
               <div className="text-sm opacity-70 mb-2">
-                {groups.length} group{groups.length !== 1 ? "s" : ""} stored
+                {entries.length} group{entries.length !== 1 ? "s" : ""} stored
               </div>
 
-              {groups.map((group, index) => (
+              {entries.map((entry, index) => (
                 <StoredGroupDetails
-                  key={bytesToHex(group.groupId)}
-                  group={group}
+                  key={bytesToHex(entry.group.groupId)}
+                  entry={entry}
                   index={index}
                 />
               ))}

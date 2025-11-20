@@ -458,9 +458,9 @@ function useGroupCreation() {
       setIsStoring(true);
       setError(null);
 
-      // Store the group locally (only serializable data)
+      // Store the group locally (including serialized client state)
       console.log("Storing group locally...");
-      const key = await groupStore.add(draftResult.group);
+      const key = await groupStore.add(draftResult.completeGroup);
       setStorageKey(key);
       console.log("Stored with key:", key);
 

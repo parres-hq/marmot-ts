@@ -1,9 +1,25 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { KeyValueStoreBackend } from "../utils/key-value.js";
-import { Group } from "./group.js";
+import { Group, CompleteGroup } from "./group.js";
+import { ClientConfig } from "ts-mls/clientConfig.js";
+import {
+  serializeClientState,
+  deserializeClientState,
+  StoredClientState,
+} from "./client-state-storage.js";
+
+/**
+ * The data structure actually stored in the backend.
+ * Contains both the public group metadata and the serialized private client state.
+ */
+export interface StoredGroupEntry {
+  group: Group;
+  clientState: StoredClientState;
+}
 
 /** A generic interface for a group store backend */
-export interface GroupStoreBackend extends KeyValueStoreBackend<Group> {}
+export interface GroupStoreBackend
+  extends KeyValueStoreBackend<StoredGroupEntry> {}
 
 /** Options for creating a {@link GroupStore} instance */
 export type GroupStoreOptions = {
@@ -11,26 +27,10 @@ export type GroupStoreOptions = {
 };
 
 /**
- * Stores {@link Group}s in a {@link GroupStoreBackend}.
+ * Stores {@link Group}s and their {@link ClientState} in a {@link GroupStoreBackend}.
  *
- * This class provides a simple interface for managing groups with their Marmot metadata.
- * It's designed to work with any backend that implements the {@link GroupStoreBackend} interface.
- *
- * Note: Only stores serializable Group data, not the MLS ClientState (which contains functions).
- *
- * @example
- * ```typescript
- * const store = new GroupStore(backend);
- *
- * // Add a group
- * await store.add(group);
- * // List all groups
- * const groups = await store.list();
- * // Get a specific group by its groupId
- * const group = await store.get(groupId);
- * // Remove a group
- * await store.remove(groupId);
- * ```
+ * This class manages the persistence of MLS groups, including the sensitive
+ * ClientState which is serialized and stored alongside the group metadata.
  */
 export class GroupStore {
   private backend: GroupStoreBackend;
@@ -56,34 +56,57 @@ export class GroupStore {
   }
 
   /**
-   * Adds a group to the store.
+   * Adds a complete group (metadata + client state) to the store.
    *
-   * @param group - The group containing Marmot metadata
+   * @param completeGroup - The complete group package
    * @returns A promise that resolves to the storage key used
-   *
-   * @example
-   * ```typescript
-   * const result = await createGroup(params);
-   * const key = await store.add(result.group);
-   * console.log(`Stored group with key: ${key}`);
-   * ```
    */
-  async add(group: Group): Promise<string> {
+  async add(completeGroup: CompleteGroup): Promise<string> {
+    const { group, clientState } = completeGroup;
     const key = this.resolveStorageKey(group.groupId);
 
-    await this.backend.setItem(key, group);
+    const entry: StoredGroupEntry = {
+      group,
+      clientState: serializeClientState(clientState),
+    };
+
+    await this.backend.setItem(key, entry);
     return key;
   }
 
   /**
-   * Retrieves a group from the store.
+   * Retrieves the stored group entry (metadata + serialized client state).
    *
    * @param groupId - The group ID (as Uint8Array or hex string)
-   * @returns A promise that resolves to the group, or null if not found
+   * @returns A promise that resolves to the stored entry, or null if not found
    */
-  async get(groupId: Uint8Array | string): Promise<Group | null> {
+  async get(groupId: Uint8Array | string): Promise<StoredGroupEntry | null> {
     const key = this.resolveStorageKey(groupId);
     return await this.backend.getItem(key);
+  }
+
+  /**
+   * Retrieves the complete group package (metadata + client state).
+   *
+   * @param groupId - The group ID (as Uint8Array or hex string)
+   * @param config - The ClientConfig required to reconstruct the ClientState
+   * @returns A promise that resolves to the complete group, or null if not found
+   */
+  async getComplete(
+    groupId: Uint8Array | string,
+    config: ClientConfig,
+  ): Promise<CompleteGroup | null> {
+    const key = this.resolveStorageKey(groupId);
+    const entry = await this.backend.getItem(key);
+
+    if (!entry) return null;
+
+    const clientState = deserializeClientState(entry.clientState, config);
+
+    return {
+      group: entry.group,
+      clientState,
+    };
   }
 
   /**
@@ -96,30 +119,22 @@ export class GroupStore {
   }
 
   /**
-   * Lists all groups stored in the store.
-   * @returns An array of groups
+   * Lists all stored group entries (metadata + serialized client state).
+   * @returns An array of stored group entries
    */
-  async list(): Promise<Group[]> {
+  async list(): Promise<StoredGroupEntry[]> {
     const allKeys = await this.backend.keys();
 
-    // Filter keys by prefix
     const keys = this.prefix
       ? allKeys.filter((key) => key.startsWith(this.prefix!))
       : allKeys;
 
-    const groups = await Promise.all(
+    const entries = await Promise.all(
       keys.map((key) => this.backend.getItem(key)),
     );
 
-    // Filter out null values and validate that items are Groups
-    return groups.filter((group): group is Group => {
-      if (!group) return false;
-      // Basic validation: check if it has the expected structure
-      return (
-        typeof group === "object" &&
-        "groupId" in group &&
-        "marmotGroupData" in group
-      );
+    return entries.filter((entry): entry is StoredGroupEntry => {
+      return entry !== null && "group" in entry && "clientState" in entry;
     });
   }
 
