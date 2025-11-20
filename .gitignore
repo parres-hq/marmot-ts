@@ -5,3 +5,7 @@ dist
 .vscode
 .fdignore
 docs
+lancedb
+models 
+docs
+mcp.json

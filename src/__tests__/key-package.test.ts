@@ -185,6 +185,8 @@ describe("generateKeyPackage", () => {
     expect(keyPackage.publicPackage).toBeDefined();
     expect(keyPackage.privatePackage).toBeDefined();
     expect(keyPackage.publicPackage.leafNode.credential).toEqual(credential);
+    expect(keyPackage.publicPackage.extensions).toHaveLength(1);
+    expect(keyPackage.publicPackage.leafNode.extensions).toHaveLength(0);
   });
 
   it("should include Marmot Group Data Extension in capabilities", async () => {
