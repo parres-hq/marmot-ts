@@ -15,10 +15,11 @@ import {
 } from "ts-mls";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { KeyPackage } from "ts-mls";
-import { relayConfig$ } from "../../lib/setting";
 import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
 import accounts from "../../lib/accounts";
+import { RelayListCreator } from "../../components/form/relay-list-creator";
+import { PubkeyListCreator } from "../../components/form/pubkey-list-creator";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -56,10 +57,14 @@ interface ConfigurationFormProps {
   selectedKeyPackageId: string;
   groupName: string;
   groupDescription: string;
+  adminPubkeys: string[];
+  relays: string[];
   isCreating: boolean;
   onKeyPackageSelect: (id: string) => void;
   onGroupNameChange: (name: string) => void;
   onGroupDescriptionChange: (desc: string) => void;
+  onAdminPubkeysChange: (pubkeys: string[]) => void;
+  onRelaysChange: (relays: string[]) => void;
   onSubmit: () => void;
 }
 
@@ -68,109 +73,148 @@ function ConfigurationForm({
   selectedKeyPackageId,
   groupName,
   groupDescription,
+  adminPubkeys,
+  relays,
   isCreating,
   onKeyPackageSelect,
   onGroupNameChange,
   onGroupDescriptionChange,
+  onAdminPubkeysChange,
+  onRelaysChange,
   onSubmit,
 }: ConfigurationFormProps) {
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
         <h2 className="card-title">Configuration</h2>
+        <p className="text-base-content/70 mb-4">
+          Configure your new MLS group with Marmot Group Data Extension
+        </p>
 
-        {/* Key Package Selection */}
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text font-semibold">Select Key Package</span>
-          </label>
-          {keyPackages.length === 0 ? (
-            <div className="alert alert-warning">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-6 w-6 shrink-0 stroke-current"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
-              </svg>
-              <span>
-                No key packages available. Create a key package first.
+        <div className="space-y-4">
+          {/* Key Package Selection */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-semibold">
+                Select Key Package
               </span>
-            </div>
-          ) : (
-            <select
-              className="select select-bordered"
-              value={selectedKeyPackageId}
-              onChange={(e) => onKeyPackageSelect(e.target.value)}
-              disabled={isCreating}
-            >
-              <option value="">Select a key package...</option>
-              {keyPackages.map((kp) => (
-                <option
-                  key={bytesToHex(kp.initKey)}
-                  value={bytesToHex(kp.initKey)}
+            </label>
+            {keyPackages.length === 0 ? (
+              <div className="alert alert-warning">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-6 w-6 shrink-0 stroke-current"
+                  fill="none"
+                  viewBox="0 0 24 24"
                 >
-                  Key Package ({bytesToHex(kp.initKey).slice(0, 16)}...)
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Group Name */}
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text font-semibold">Group Name</span>
-          </label>
-          <input
-            type="text"
-            placeholder="Enter group name"
-            className="input input-bordered"
-            value={groupName}
-            onChange={(e) => onGroupNameChange(e.target.value)}
-            disabled={isCreating}
-          />
-        </div>
-
-        {/* Group Description */}
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text font-semibold">
-              Description (Optional)
-            </span>
-          </label>
-          <textarea
-            placeholder="Enter group description"
-            className="textarea textarea-bordered"
-            value={groupDescription}
-            onChange={(e) => onGroupDescriptionChange(e.target.value)}
-            rows={3}
-            disabled={isCreating}
-          />
-        </div>
-
-        {/* Create Button */}
-        <div className="card-actions justify-end mt-4">
-          <button
-            className="btn btn-primary"
-            onClick={onSubmit}
-            disabled={isCreating || !selectedKeyPackageId || !groupName.trim()}
-          >
-            {isCreating ? (
-              <>
-                <span className="loading loading-spinner"></span>
-                Creating...
-              </>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <span>
+                  No key packages available. Create a key package first.
+                </span>
+              </div>
             ) : (
-              "Show Group Details"
+              <select
+                className="select select-bordered w-full"
+                value={selectedKeyPackageId}
+                onChange={(e) => onKeyPackageSelect(e.target.value)}
+                disabled={isCreating}
+              >
+                <option value="">Select a key package...</option>
+                {keyPackages.map((kp) => (
+                  <option
+                    key={bytesToHex(kp.initKey)}
+                    value={bytesToHex(kp.initKey)}
+                  >
+                    Key Package ({bytesToHex(kp.initKey).slice(0, 16)}...)
+                  </option>
+                ))}
+              </select>
             )}
-          </button>
+          </div>
+
+          {/* Group Name and Description */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">Group Name</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter group name"
+                className="input input-bordered w-full"
+                value={groupName}
+                onChange={(e) => onGroupNameChange(e.target.value)}
+                disabled={isCreating}
+              />
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">
+                  Description (Optional)
+                </span>
+              </label>
+              <textarea
+                placeholder="Enter group description"
+                className="textarea textarea-bordered w-full"
+                value={groupDescription}
+                onChange={(e) => onGroupDescriptionChange(e.target.value)}
+                rows={2}
+                disabled={isCreating}
+              />
+            </div>
+          </div>
+
+          {/* Admin Pubkeys and Relays */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="form-control">
+              <PubkeyListCreator
+                pubkeys={adminPubkeys}
+                label="Admin Public Keys (Optional)"
+                placeholder="Enter hex-encoded public key"
+                disabled={isCreating}
+                emptyMessage="No admin keys configured. The group creator will be the only admin."
+                onPubkeysChange={onAdminPubkeysChange}
+              />
+            </div>
+
+            <div className="form-control">
+              <RelayListCreator
+                relays={relays}
+                label="Relays (Optional)"
+                placeholder="wss://relay.example.com"
+                disabled={isCreating}
+                emptyMessage="No relays configured. Add relays to publish group events."
+                onRelaysChange={onRelaysChange}
+              />
+            </div>
+          </div>
+
+          {/* Create Button */}
+          <div className="card-actions justify-end mt-6">
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={onSubmit}
+              disabled={
+                isCreating || !selectedKeyPackageId || !groupName.trim()
+              }
+            >
+              {isCreating ? (
+                <>
+                  <span className="loading loading-spinner"></span>
+                  Creating...
+                </>
+              ) : (
+                "Show Group Details"
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -408,7 +452,7 @@ function useGroupCreation() {
     selectedKeyPackage: CompleteKeyPackage,
     groupName: string,
     groupDescription: string,
-    adminPubkey: string,
+    adminPubkeys: string[],
     relays: string[],
   ) => {
     try {
@@ -434,7 +478,7 @@ function useGroupCreation() {
         groupName,
         {
           description: groupDescription,
-          adminPubkeys: [adminPubkey],
+          adminPubkeys: adminPubkeys,
           relays: relays,
         },
       );
@@ -505,7 +549,6 @@ function useGroupCreation() {
 
 export default withSignIn(function GroupCreation() {
   const keyPackageStore = useObservable(keyPackageStore$);
-  const relayConfig = useObservable(relayConfig$);
   const keyPackages =
     useObservableMemo(
       () => keyPackageStore$.pipe(switchMap((store) => store.list())),
@@ -516,6 +559,8 @@ export default withSignIn(function GroupCreation() {
     useState<CompleteKeyPackage | null>(null);
   const [groupName, setGroupName] = useState("My Group");
   const [groupDescription, setGroupDescription] = useState("");
+  const [adminPubkeys, setAdminPubkeys] = useState<string[]>([]);
+  const [relays, setRelays] = useState<string[]>([]);
 
   const {
     isCreating,
@@ -572,15 +617,17 @@ export default withSignIn(function GroupCreation() {
       return;
     }
 
-    // Get relays from config
-    const relays = relayConfig?.commonRelays || [];
+    // Include current user as admin + any additional ones from the picker
+    const adminPubkeysList = [account.pubkey, ...adminPubkeys];
+
+    const allRelays = [...relays];
 
     createDraft(
       selectedKeyPackage,
       groupName,
       groupDescription,
-      account.pubkey,
-      relays,
+      adminPubkeysList,
+      allRelays,
     );
   };
 
@@ -601,10 +648,14 @@ export default withSignIn(function GroupCreation() {
           selectedKeyPackageId={selectedKeyPackageId}
           groupName={groupName}
           groupDescription={groupDescription}
+          adminPubkeys={adminPubkeys}
+          relays={relays}
           isCreating={isCreating}
           onKeyPackageSelect={handleKeyPackageSelect}
           onGroupNameChange={setGroupName}
           onGroupDescriptionChange={setGroupDescription}
+          onAdminPubkeysChange={setAdminPubkeys}
+          onRelaysChange={setRelays}
           onSubmit={handleCreateDraft}
         />
       )}

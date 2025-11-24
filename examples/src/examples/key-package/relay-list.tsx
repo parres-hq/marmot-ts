@@ -9,6 +9,7 @@ import {
 } from "../../../../src/core/key-package-relay-list";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
 import JsonBlock from "../../components/json-block";
+import { RelayListCreator } from "../../components/form/relay-list-creator";
 import RelayAvatar from "../../components/relay-avatar";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
@@ -33,26 +34,6 @@ function RelayListForm({
   onRelaysChange,
   onSubmit,
 }: RelayListFormProps) {
-  const [newRelay, setNewRelay] = useState("");
-
-  const handleAddRelay = () => {
-    if (newRelay.trim() && !relays.includes(newRelay.trim())) {
-      onRelaysChange([...relays, newRelay.trim()]);
-      setNewRelay("");
-    }
-  };
-
-  const handleRemoveRelay = (relayToRemove: string) => {
-    onRelaysChange(relays.filter((r) => r !== relayToRemove));
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAddRelay();
-    }
-  };
-
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
@@ -62,70 +43,16 @@ function RelayListForm({
           can discover these relays from your kind 10051 relay list event.
         </p>
 
-        {/* Current Relays Display */}
-        <div className="mb-4">
-          <label className="block mb-2">
-            <span className="font-semibold">
-              Current Relays
-              <span className="text-xs ml-2">
-                ({relays.length} relay{relays.length !== 1 ? "s" : ""})
-              </span>
-            </span>
-          </label>
-          {relays.length === 0 ? (
-            <div className="italic p-4 text-center border border-dashed border-base-300 rounded opacity-50">
-              No relays configured. Add relays below to create your relay list.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {relays.map((relay, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 p-2 bg-base-200 rounded"
-                >
-                  <RelayAvatar relay={relay} size="md" />
-                  <span className="flex-1 font-mono text-sm">{relay}</span>
-                  <button
-                    className="btn btn-sm btn-error"
-                    onClick={() => handleRemoveRelay(relay)}
-                    disabled={isCreating}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Add New Relay */}
-        <div className="mb-4">
-          <label className="block mb-2">
-            <span className="font-semibold">Add Relay</span>
-          </label>
-          <div className="join w-full">
-            <input
-              type="text"
-              placeholder="wss://relay.example.com"
-              className="input input-bordered join-item flex-1"
-              value={newRelay}
-              onChange={(e) => setNewRelay(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isCreating}
-            />
-            <button
-              className="btn btn-primary join-item"
-              onClick={handleAddRelay}
-              disabled={isCreating || !newRelay.trim()}
-            >
-              Add
-            </button>
-          </div>
-          <div className="mt-1">
-            <span className="text-sm">
-              Press Enter or click Add to include the relay
-            </span>
-          </div>
+        {/* Relays Configuration */}
+        <div className="form-control">
+          <RelayListCreator
+            relays={relays}
+            label="Relays"
+            placeholder="wss://relay.example.com"
+            disabled={isCreating}
+            emptyMessage="No relays configured. Add relays below to create your relay list."
+            onRelaysChange={onRelaysChange}
+          />
         </div>
 
         {/* Create Button */}

@@ -20,6 +20,7 @@ import {
   KEY_PACKAGE_RELAYS_TAG,
 } from "../../../../src/core/protocol";
 import { CipherSuitePicker } from "../../components/form/cipher-suite-picker";
+import { RelayListCreator } from "../../components/form/relay-list-creator";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/key-package/data-view";
 import { withSignIn } from "../../components/with-signIn";
@@ -79,26 +80,6 @@ function ConfigurationForm({
   onCipherSuiteChange,
   onSubmit,
 }: ConfigurationFormProps) {
-  const [newRelay, setNewRelay] = useState("");
-
-  const handleAddRelay = () => {
-    if (newRelay.trim() && !relays.includes(newRelay.trim())) {
-      onRelaysChange([...relays, newRelay.trim()]);
-      setNewRelay("");
-    }
-  };
-
-  const handleRemoveRelay = (relayToRemove: string) => {
-    onRelaysChange(relays.filter((r) => r !== relayToRemove));
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAddRelay();
-    }
-  };
-
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
@@ -112,61 +93,15 @@ function ConfigurationForm({
         />
 
         {/* Relays Configuration */}
-        <div className="w-full">
-          <label className="block mb-2">
-            <span className="font-semibold">Relays ({relays.length})</span>
-          </label>
-
-          {/* Current Relays Display */}
-          {relays.length === 0 ? (
-            <div className="italic p-4 text-center border border-dashed border-base-300 rounded opacity-50">
-              No relays configured. Add relays below to publish your key
-              package.
-            </div>
-          ) : (
-            <div className="space-y-2 mb-4">
-              {relays.map((relay, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 p-2 bg-base-200 rounded"
-                >
-                  <span className="flex-1 font-mono text-sm">{relay}</span>
-                  <button
-                    className="btn btn-sm btn-error"
-                    onClick={() => handleRemoveRelay(relay)}
-                    disabled={isCreating}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Add New Relay */}
-          <div className="join w-full">
-            <input
-              type="text"
-              placeholder="wss://relay.example.com"
-              className="input input-bordered join-item flex-1"
-              value={newRelay}
-              onChange={(e) => setNewRelay(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isCreating}
-            />
-            <button
-              className="btn btn-primary join-item"
-              onClick={handleAddRelay}
-              disabled={isCreating || !newRelay.trim()}
-            >
-              Add
-            </button>
-          </div>
-          <div className="mt-1">
-            <span className="text-sm text-base-content/60">
-              Press Enter or click Add to include the relay
-            </span>
-          </div>
+        <div className="form-control">
+          <RelayListCreator
+            relays={relays}
+            label="Relays"
+            placeholder="wss://relay.example.com"
+            disabled={isCreating}
+            emptyMessage="No relays configured. Add relays below to publish your key package."
+            onRelaysChange={onRelaysChange}
+          />
         </div>
 
         {/* Create Button */}
