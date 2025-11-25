@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { isHexKey } from "applesauce-core/helpers";
 
 interface PubkeyListCreatorProps {
@@ -45,7 +45,7 @@ export function PubkeyListCreator({
     onPubkeysChange(pubkeys.filter((p) => p !== pubkeyToRemove));
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyPress = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddPubkey();

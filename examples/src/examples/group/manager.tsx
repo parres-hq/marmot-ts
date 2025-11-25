@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 import { useObservable } from "../../hooks/use-observable";
-import { groupStore$, notifyStoreChange } from "../../lib/group-store";
+import {
+  groupStore$,
+  notifyStoreChange,
+  groupCount$,
+} from "../../lib/group-store";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { StoredGroupEntry } from "../../../../src/core/group-store";
 import JsonBlock from "../../components/json-block";
@@ -12,7 +16,7 @@ import { withSignIn } from "../../components/with-signIn";
 
 interface GroupCardProps {
   entry: StoredGroupEntry;
-  onDelete: (groupId: Uint8Array) => void;
+  onDelete: (groupId: Uint8Array) => Promise<void>;
 }
 
 function GroupCard({ entry, onDelete }: GroupCardProps) {
@@ -275,11 +279,11 @@ function LoadingState() {
 
 function GroupManager() {
   const groupStore = useObservable(groupStore$);
+  const groupCount = useObservable(groupCount$);
   const [groups, setGroups] = useState<StoredGroupEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load groups when groupStore changes
   useEffect(() => {
     if (!groupStore) {
       setIsLoading(false);
@@ -301,20 +305,14 @@ function GroupManager() {
     };
 
     loadGroups();
-  }, [groupStore]);
+  }, [groupStore, groupCount]);
 
   const handleDelete = async (groupId: Uint8Array) => {
     if (!groupStore) return;
 
     try {
       await groupStore.remove(groupId);
-      // Update the local state by filtering out the deleted group
-      setGroups(
-        groups.filter(
-          (entry) => bytesToHex(entry.group.groupId) !== bytesToHex(groupId),
-        ),
-      );
-      // Notify other components that the store has changed
+      setError(null);
       notifyStoreChange();
     } catch (err) {
       console.error("Failed to delete group:", err);

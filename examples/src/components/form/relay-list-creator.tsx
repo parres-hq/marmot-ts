@@ -78,7 +78,7 @@ export function RelayListCreator({
           className="input input-bordered join-item flex-1"
           value={newRelay}
           onChange={(e) => setNewRelay(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyPress}
           disabled={disabled}
         />
         <button
