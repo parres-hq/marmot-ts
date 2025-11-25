@@ -1,4 +1,6 @@
 import { defaultExtensionTypes } from "ts-mls";
+import { defaultClientConfig } from "ts-mls/clientConfig.js";
+import { marmotAuthService } from "./auth-service.js";
 
 /** The extension id for the last_resort key package extension for key packages */
 export const LAST_RESORT_KEY_PACKAGE_EXTENSION_TYPE = 0x000a;
@@ -52,6 +54,12 @@ export const extendedExtensionTypes = {
 export type ExtendedExtensionTypeName = keyof typeof extendedExtensionTypes;
 export type ExtendedExtensionTypeValue =
   (typeof extendedExtensionTypes)[ExtendedExtensionTypeName];
+
+/** Default ClientConfig for Marmot */
+export const defaultMarmotClientConfig = {
+  ...defaultClientConfig,
+  auth_service: marmotAuthService,
+};
 
 /**
  * Represents the decoded Marmot Group Data Extension structure.

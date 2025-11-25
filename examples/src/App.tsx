@@ -7,6 +7,7 @@ import examples, { type Example } from "./examples";
 import useHash from "./hooks/use-hash";
 import SignInModal from "./components/signin/modal.tsx";
 import KeyPackageStoreModal from "./components/key-package-store-modal.tsx";
+import GroupStoreModal from "./components/group-store-modal.tsx";
 
 function ExampleView(props: { example?: Example }) {
   const [path, setPath] = useState("");
@@ -111,6 +112,7 @@ function ExampleView(props: { example?: Example }) {
 
       <SignInModal />
       <KeyPackageStoreModal />
+      <GroupStoreModal />
     </div>
   );
 }

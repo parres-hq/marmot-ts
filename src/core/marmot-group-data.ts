@@ -1,5 +1,10 @@
 import { randomBytes } from "@noble/hashes/utils.js";
-import { MARMOT_GROUP_DATA_VERSION, MarmotGroupData } from "./protocol.js";
+import { Extension } from "ts-mls";
+import {
+  MARMOT_GROUP_DATA_VERSION,
+  MARMOT_GROUP_DATA_EXTENSION_TYPE,
+  MarmotGroupData,
+} from "./protocol.js";
 import { isHexKey } from "./credential.js";
 
 /**
@@ -382,4 +387,17 @@ function validateMarmotGroupData(data: MarmotGroupData): void {
   if (data.imageNonce.length !== 12) {
     throw new Error("image_nonce must be exactly 12 bytes");
   }
+}
+
+/**
+ * Converts MarmotGroupData to an Extension object for use in MLS groups.
+ *
+ * @param data - The Marmot group data to convert
+ * @returns Extension object with Marmot Group Data Extension type and encoded data
+ */
+export function marmotGroupDataToExtension(data: MarmotGroupData): Extension {
+  return {
+    extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
+    extensionData: encodeMarmotGroupData(data),
+  };
 }

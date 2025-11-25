@@ -5,6 +5,7 @@ describe("exports", () => {
   it("should export the expected members", () => {
     expect(Object.keys(exports).sort()).toMatchInlineSnapshot(`
       [
+        "GroupStore",
         "KEY_PACKAGE_CIPHER_SUITE_TAG",
         "KEY_PACKAGE_CLIENT_TAG",
         "KEY_PACKAGE_EXTENSIONS_TAG",
@@ -19,12 +20,16 @@ describe("exports", () => {
         "MARMOT_GROUP_DATA_VERSION",
         "createCredential",
         "createDeleteKeyPackageEvent",
+        "createGroup",
         "createKeyPackageEvent",
         "createKeyPackageRelayListEvent",
         "createMarmotGroupData",
+        "createSimpleGroup",
         "createThreeMonthLifetime",
         "decodeMarmotGroupData",
         "defaultCapabilities",
+        "defaultMarmotClientConfig",
+        "deserializeClientState",
         "encodeMarmotGroupData",
         "ensureLastResortExtension",
         "ensureMarmotCapabilities",
@@ -46,8 +51,12 @@ describe("exports", () => {
         "isValidKeyPackageRelayListEvent",
         "isValidRelayUrl",
         "keyPackageDefaultExtensions",
+        "marmotGroupDataToExtension",
         "normalizeRelayUrl",
+        "rehydrateClientState",
+        "serializeClientState",
         "supportsMarmotExtensions",
+        "validateKeyPackageForGroup",
       ]
     `);
   });

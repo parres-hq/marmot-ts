@@ -3,12 +3,14 @@ import examples from "../examples";
 import useHash from "../hooks/use-hash";
 import { useObservable } from "../hooks/use-observable";
 import { keyPackageCount$ } from "../lib/key-package-store";
+import { groupCount$ } from "../lib/group-store";
 import AccountSwitcher from "./accounts/picker";
 
 export default function SideNav() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const hash = useHash();
   const localKeyPackages = useObservable(keyPackageCount$);
+  const localGroups = useObservable(groupCount$);
 
   const filtered = useMemo(
     () =>
@@ -49,7 +51,7 @@ export default function SideNav() {
             </li>
           ))}
         </ul>
-        <div className="flex-none p-2 border-t border-base-300">
+        <div className="flex-none p-2 border-t border-base-300 space-y-1">
           <button
             className="btn btn-ghost w-full justify-start gap-2"
             onClick={() =>
@@ -62,6 +64,18 @@ export default function SideNav() {
           >
             Key Packages{" "}
             {localKeyPackages !== undefined && `(${localKeyPackages})`}
+          </button>
+          <button
+            className="btn btn-ghost w-full justify-start gap-2"
+            onClick={() =>
+              (
+                document.getElementById(
+                  "group_store_modal",
+                ) as HTMLDialogElement
+              )?.showModal()
+            }
+          >
+            Groups {localGroups !== undefined && `(${localGroups})`}
           </button>
         </div>
         <AccountSwitcher />
