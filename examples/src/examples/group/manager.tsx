@@ -6,7 +6,7 @@ import {
   getGroupIdHex,
   getMemberCount,
 } from "../../../../src/core";
-import JsonBlock from "../../components/json-block";
+import ClientStateDataView from "../../components/data-view/client-state";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import {
@@ -114,21 +114,10 @@ function GroupCard({ clientState, onDelete }: GroupCardProps) {
           </button>
         </div>
 
-        {/* JSON Details */}
+        {/* Client State Details */}
         {showDetails && (
-          <div className="mt-4">
-            <JsonBlock
-              value={{
-                metadata: {
-                  groupId: groupIdHex,
-                  nostrGroupId: nostrGroupIdHex,
-                  epoch: epoch,
-                  memberCount: memberCount,
-                  name: name,
-                },
-                clientState: clientState,
-              }}
-            />
+          <div className="mt-4 bg-base-200 p-4 rounded-lg overflow-auto max-h-96">
+            <ClientStateDataView clientState={clientState} />
           </div>
         )}
       </div>

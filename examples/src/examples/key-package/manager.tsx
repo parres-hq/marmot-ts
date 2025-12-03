@@ -19,7 +19,7 @@ import {
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/key-package/data-view";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";

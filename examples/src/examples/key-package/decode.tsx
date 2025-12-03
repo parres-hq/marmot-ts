@@ -10,7 +10,7 @@ import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import CredentialTypeBadge from "../../components/credential-type-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
-import KeyPackageDataView from "../../components/key-package/data-view";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import { LeafNodeCapabilitiesSection } from "../../components/key-package/leaf-node-capabilities";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { getCredentialPubkey } from "../../../../src";

@@ -5,7 +5,7 @@ import { ClientState } from "ts-mls/clientState.js";
 
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
 import { groupStore$, notifyStoreChange } from "../lib/group-store";
-import JsonBlock from "./json-block";
+import ClientStateDataView from "./data-view/client-state";
 import {
   extractMarmotGroupData,
   getMemberCount,
@@ -99,11 +99,11 @@ function StoredGroupDetails({ clientState, index }: StoredGroupDetailsProps) {
         {/* Full Group Data */}
         <details className="collapse bg-base-200 border-base-300 border">
           <summary className="collapse-title font-semibold">
-            Full Group Data (JSON)
+            Full Client State Data
           </summary>
           <div className="collapse-content">
             <div className="bg-base-300 p-4 rounded-lg overflow-auto max-h-96">
-              <JsonBlock value={clientState} />
+              <ClientStateDataView clientState={clientState} />
             </div>
           </div>
         </details>

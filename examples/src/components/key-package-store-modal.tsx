@@ -5,7 +5,7 @@ import { KeyPackage, PrivateKeyPackage } from "ts-mls";
 
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
 import { keyPackageStore$, notifyStoreChange } from "../lib/key-package-store";
-import KeyPackageDataView from "./key-package/data-view";
+import KeyPackageDataView from "./data-view/key-package";
 
 interface StoredPackageDetailsProps {
   publicPackage: KeyPackage;

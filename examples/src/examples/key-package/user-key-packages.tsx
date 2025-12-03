@@ -28,7 +28,7 @@ import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/key-package/data-view";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
