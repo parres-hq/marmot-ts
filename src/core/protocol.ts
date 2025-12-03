@@ -1,6 +1,5 @@
+// Constants for the Marmot protocol
 import { defaultExtensionTypes } from "ts-mls";
-import { defaultClientConfig } from "ts-mls/clientConfig.js";
-import { marmotAuthService } from "./auth-service.js";
 
 /** The extension id for the last_resort key package extension for key packages */
 export const LAST_RESORT_KEY_PACKAGE_EXTENSION_TYPE = 0x000a;
@@ -55,12 +54,6 @@ export type ExtendedExtensionTypeName = keyof typeof extendedExtensionTypes;
 export type ExtendedExtensionTypeValue =
   (typeof extendedExtensionTypes)[ExtendedExtensionTypeName];
 
-/** Default ClientConfig for Marmot */
-export const defaultMarmotClientConfig = {
-  ...defaultClientConfig,
-  auth_service: marmotAuthService,
-};
-
 /**
  * Represents the decoded Marmot Group Data Extension structure.
  */
@@ -84,3 +77,9 @@ export interface MarmotGroupData {
   /** ChaCha20-Poly1305 nonce for group image encryption (all zeros if no image) */
   imageNonce: Uint8Array;
 }
+
+/** Event kind for group events (commits, proposals, application messages) */
+export const GROUP_EVENT_KIND = 445;
+
+/** Event kind for welcome events */
+export const WELCOME_EVENT_KIND = 444;

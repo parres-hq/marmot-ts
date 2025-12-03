@@ -4,7 +4,6 @@ dist
 *.tsbuildinfo
 .vscode
 .fdignore
-docs
 lancedb
 models 
 docs

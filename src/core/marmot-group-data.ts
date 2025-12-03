@@ -17,30 +17,8 @@ import { isHexKey } from "./credential.js";
  *
  * Note: Image encryption/decryption functions will be added in MIP-04 implementation.
  *
- * @see https://github.com/parres-hq/marmot/blob/master/01.md#marmot-group-data-extension
+ * @see https://github.com/marmot-protocol/marmot/blob/master/01.md#marmot-group-data-extension
  */
-
-/**
- * Parameters for creating a new Marmot Group Data Extension.
- */
-export interface CreateMarmotGroupDataParams {
-  /** 32-byte Nostr group identifier (generated randomly if not provided) */
-  nostrGroupId?: Uint8Array;
-  /** Group name (empty string if not provided) */
-  name?: string;
-  /** Group description (empty string if not provided) */
-  description?: string;
-  /** Array of admin public keys (hex-encoded) */
-  adminPubkeys?: string[];
-  /** Array of relay WebSocket URLs */
-  relays?: string[];
-  /** Encrypted image hash (all zeros if not provided) */
-  imageHash?: Uint8Array;
-  /** Image encryption key (all zeros if not provided) */
-  imageKey?: Uint8Array;
-  /** Image encryption nonce (all zeros if not provided) */
-  imageNonce?: Uint8Array;
-}
 
 /**
  * Encodes a Marmot Group Data Extension according to TLS presentation language.
@@ -248,11 +226,11 @@ export function decodeMarmotGroupData(
 /**
  * Creates a new Marmot Group Data Extension with the provided parameters.
  *
- * @param params - Parameters for the group data
+ * @param params - Partial MarmotGroupData with optional fields
  * @returns Encoded extension data ready for use in MLS
  */
 export function createMarmotGroupData(
-  params: CreateMarmotGroupDataParams = {},
+  params: Partial<MarmotGroupData> = {},
 ): Uint8Array {
   const data: MarmotGroupData = {
     version: MARMOT_GROUP_DATA_VERSION,

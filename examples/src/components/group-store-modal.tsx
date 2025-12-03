@@ -1,28 +1,35 @@
-import { bytesToHex } from "@noble/hashes/utils.js";
 import { useRef, useState } from "react";
 import { switchMap } from "rxjs";
+import { bytesToHex } from "@noble/hashes/utils.js";
+import { ClientState } from "ts-mls/clientState.js";
 
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
 import { groupStore$, notifyStoreChange } from "../lib/group-store";
-import JsonBlock from "./json-block";
-import { rehydrateClientState, type StoredGroupEntry } from "../../../src/core";
+import ClientStateDataView from "./data-view/client-state";
+import {
+  extractMarmotGroupData,
+  getMemberCount,
+  replacer,
+} from "../../../src/core";
 
 interface StoredGroupDetailsProps {
-  entry: StoredGroupEntry;
+  clientState: ClientState;
   index: number;
 }
 
-function StoredGroupDetails({ entry, index }: StoredGroupDetailsProps) {
-  const { group, clientState } = entry;
-  const groupIdHex = bytesToHex(group.groupId);
+function StoredGroupDetails({ clientState, index }: StoredGroupDetailsProps) {
+  // Extract metadata from the ClientState
+  const marmotData = extractMarmotGroupData(clientState);
+  const groupIdHex = bytesToHex(clientState.groupContext.groupId);
+  const epoch = Number(clientState.groupContext.epoch);
+  const memberCount = getMemberCount(clientState);
+  const name = marmotData?.name || `Group #${index + 1}`;
 
   const handleActivate = () => {
     try {
-      // Rehydrate the client state using the Marmot Authentication Service
-      const state = rehydrateClientState(clientState);
-      console.log("✅ Group activated (rehydrated) successfully!", state);
+      console.log("✅ Group activated (rehydrated) successfully!", clientState);
       alert(
-        `Group "${group.marmotGroupData.name}" activated successfully! Check console for ClientState object.`,
+        `Group "${name}" activated successfully! Check console for ClientState object.`,
       );
     } catch (e) {
       console.error("Failed to activate group", e);
@@ -30,13 +37,21 @@ function StoredGroupDetails({ entry, index }: StoredGroupDetailsProps) {
     }
   };
 
+  // Helper function to format MarmotGroupData values for display using the existing replacer
+  const formatMarmotDataValue = (value: any): string => {
+    const serialized = JSON.stringify(value, replacer);
+    // Remove the prefixes added by the replacer for display
+    return serialized
+      .replace(/"hex:/g, '"')
+      .replace(/"bigint:/g, '"')
+      .replace(/"/g, "");
+  };
+
   return (
     <details className="collapse bg-base-100 border-base-300 border">
       <summary className="collapse-title font-semibold">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-sm">
-            {group.marmotGroupData.name || `Group #${index + 1}`}
-          </span>
+          <span className="font-mono text-sm">{name}</span>
           <span className="font-mono text-xs opacity-60 truncate ml-2">
             {groupIdHex.slice(0, 16)}...
           </span>
@@ -56,74 +71,39 @@ function StoredGroupDetails({ entry, index }: StoredGroupDetailsProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <div className="font-semibold mb-1">Epoch</div>
-            <div className="bg-base-200 p-2 rounded">{group.epoch}</div>
+            <div className="bg-base-200 p-2 rounded">{epoch}</div>
           </div>
           <div>
             <div className="font-semibold mb-1">Members</div>
-            <div className="bg-base-200 p-2 rounded">
-              {group.members.length}
-            </div>
+            <div className="bg-base-200 p-2 rounded">{memberCount}</div>
           </div>
         </div>
 
         {/* Marmot Group Data */}
-        <div>
-          <div className="font-semibold mb-2">Marmot Group Data</div>
-          <div className="bg-base-200 p-4 rounded-lg space-y-2">
-            <div>
-              <span className="font-semibold">Name:</span>{" "}
-              {group.marmotGroupData.name}
-            </div>
-            {group.marmotGroupData.description && (
-              <div>
-                <span className="font-semibold">Description:</span>{" "}
-                {group.marmotGroupData.description}
-              </div>
-            )}
-            <div>
-              <span className="font-semibold">Admins:</span>{" "}
-              {group.marmotGroupData.adminPubkeys.length}
-            </div>
-            <div>
-              <span className="font-semibold">Relays:</span>{" "}
-              {group.marmotGroupData.relays.length}
-            </div>
-            <div>
-              <span className="font-semibold">Nostr Group ID:</span>
-              <code className="text-xs ml-2">
-                {bytesToHex(group.marmotGroupData.nostrGroupId).slice(0, 16)}...
-              </code>
+        {marmotData && (
+          <div>
+            <div className="font-semibold mb-2">Marmot Group Data</div>
+            <div className="bg-base-200 p-4 rounded-lg space-y-2">
+              {Object.entries(marmotData).map(([key, value]) => (
+                <div key={key}>
+                  <span className="font-semibold capitalize">{key}:</span>
+                  <code className="text-xs ml-2 break-all">
+                    {formatMarmotDataValue(value)}
+                  </code>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Full Group Data */}
         <details className="collapse bg-base-200 border-base-300 border">
           <summary className="collapse-title font-semibold">
-            Full Group Data (JSON)
+            Full Client State Data
           </summary>
           <div className="collapse-content">
             <div className="bg-base-300 p-4 rounded-lg overflow-auto max-h-96">
-              <JsonBlock
-                value={{
-                  group: {
-                    groupId: groupIdHex,
-                    epoch: group.epoch,
-                    members: group.members.length,
-                    extensions: group.extensions.length,
-                    marmotGroupData: {
-                      ...group.marmotGroupData,
-                      nostrGroupId: bytesToHex(
-                        group.marmotGroupData.nostrGroupId,
-                      ),
-                      imageHash: bytesToHex(group.marmotGroupData.imageHash),
-                      imageKey: bytesToHex(group.marmotGroupData.imageKey),
-                      imageNonce: bytesToHex(group.marmotGroupData.imageNonce),
-                    },
-                  },
-                  clientState,
-                }}
-              />
+              <ClientStateDataView clientState={clientState} />
             </div>
           </div>
         </details>
@@ -234,12 +214,8 @@ export default function GroupStoreModal() {
                 {entries.length} group{entries.length !== 1 ? "s" : ""} stored
               </div>
 
-              {entries.map((entry, index) => (
-                <StoredGroupDetails
-                  key={bytesToHex(entry.group.groupId)}
-                  entry={entry}
-                  index={index}
-                />
+              {entries.map((clientState, index) => (
+                <StoredGroupDetails key={index} clientState={clientState} index={index} />
               ))}
             </>
           )}

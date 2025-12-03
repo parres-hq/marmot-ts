@@ -1,31 +1,40 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ClientState } from "ts-mls/clientState.js";
+import {
+  extractMarmotGroupData,
+  getEpoch,
+  getGroupIdHex,
+  getMemberCount,
+} from "../../../../src/core";
+import ClientStateDataView from "../../components/data-view/client-state";
+import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import {
+  groupCount$,
   groupStore$,
   notifyStoreChange,
-  groupCount$,
 } from "../../lib/group-store";
-import { bytesToHex } from "@noble/hashes/utils.js";
-import type { StoredGroupEntry } from "../../../../src/core/group-store";
-import JsonBlock from "../../components/json-block";
-import { withSignIn } from "../../components/with-signIn";
 
 // ============================================================================
 // Component: GroupCard
 // ============================================================================
 
 interface GroupCardProps {
-  entry: StoredGroupEntry;
-  onDelete: (groupId: Uint8Array) => Promise<void>;
+  clientState: ClientState;
+  onDelete: (groupId: string) => Promise<void>;
 }
 
-function GroupCard({ entry, onDelete }: GroupCardProps) {
+function GroupCard({ clientState, onDelete }: GroupCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { group } = entry;
-  const groupIdHex = bytesToHex(group.groupId);
-  const nostrGroupIdHex = bytesToHex(group.marmotGroupData.nostrGroupId);
+  // Extract metadata from the client state
+  const marmotData = extractMarmotGroupData(clientState);
+  const groupIdHex = getGroupIdHex(clientState);
+  const epoch = getEpoch(clientState);
+  const memberCount = getMemberCount(clientState);
+  const name = marmotData?.name || "Unnamed Group";
+  const nostrGroupIdHex = marmotData?.nostrGroupId || groupIdHex;
 
   const handleDelete = async () => {
     if (
@@ -38,7 +47,7 @@ function GroupCard({ entry, onDelete }: GroupCardProps) {
 
     setIsDeleting(true);
     try {
-      await onDelete(group.groupId);
+      await onDelete(groupIdHex);
     } finally {
       setIsDeleting(false);
     }
@@ -50,14 +59,7 @@ function GroupCard({ entry, onDelete }: GroupCardProps) {
         {/* Header */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
-            <h3 className="card-title text-lg mb-1">
-              {group.marmotGroupData.name}
-            </h3>
-            {group.marmotGroupData.description && (
-              <p className="text-base-content/70 text-sm mb-2">
-                {group.marmotGroupData.description}
-              </p>
-            )}
+            <h3 className="card-title text-lg mb-1">{name}</h3>
           </div>
           <button
             className="btn btn-sm btn-outline btn-error"
@@ -76,118 +78,28 @@ function GroupCard({ entry, onDelete }: GroupCardProps) {
         </div>
 
         {/* Group Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
           <div className="stat p-2 bg-base-200 rounded">
             <div className="stat-title text-xs">Epoch</div>
-            <div className="stat-value text-lg">{group.epoch}</div>
+            <div className="stat-value text-lg">{epoch}</div>
           </div>
 
           <div className="stat p-2 bg-base-200 rounded">
             <div className="stat-title text-xs">Members</div>
-            <div className="stat-value text-lg">{group.members.length}</div>
+            <div className="stat-value text-lg">{memberCount}</div>
           </div>
 
           <div className="stat p-2 bg-base-200 rounded">
-            <div className="stat-title text-xs">Extensions</div>
-            <div className="stat-value text-lg">{group.extensions.length}</div>
-          </div>
-
-          <div className="stat p-2 bg-base-200 rounded">
-            <div className="stat-title text-xs">Admins</div>
-            <div className="stat-value text-lg">
-              {group.marmotGroupData.adminPubkeys.length}
+            <div className="stat-title text-xs">Group ID</div>
+            <div className="stat-value text-xs font-mono">
+              {groupIdHex.slice(0, 16)}...
             </div>
           </div>
 
           <div className="stat p-2 bg-base-200 rounded">
-            <div className="stat-title text-xs">Relays</div>
-            <div className="stat-value text-lg">
-              {group.marmotGroupData.relays.length}
-            </div>
-          </div>
-
-          <div className="stat p-2 bg-base-200 rounded">
-            <div className="stat-title text-xs">Version</div>
-            <div className="stat-value text-lg">
-              v{group.marmotGroupData.version}
-            </div>
-          </div>
-        </div>
-
-        {/* Marmot Group Data Details */}
-        <div className="bg-base-200 p-4 rounded-lg mb-4">
-          <h4 className="font-semibold mb-2">Marmot Group Data</h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <span className="font-semibold text-sm">Group ID:</span>
-              <div className="font-mono text-xs bg-base-100 p-1 rounded break-all">
-                {groupIdHex.slice(0, 32)}...
-              </div>
-            </div>
-
-            <div>
-              <span className="font-semibold text-sm">Nostr Group ID:</span>
-              <div className="font-mono text-xs bg-base-100 p-1 rounded break-all">
-                {nostrGroupIdHex.slice(0, 32)}...
-              </div>
-            </div>
-
-            <div>
-              <span className="font-semibold text-sm">Admin Pubkeys:</span>
-              <div className="text-xs">
-                {group.marmotGroupData.adminPubkeys.length === 0 ? (
-                  <span className="text-base-content/60">None</span>
-                ) : (
-                  group.marmotGroupData.adminPubkeys
-                    .slice(0, 2)
-                    .map((pubkey, index) => (
-                      <div
-                        key={index}
-                        className="font-mono bg-base-100 p-1 rounded break-all mb-1"
-                      >
-                        {pubkey.slice(0, 32)}...
-                      </div>
-                    ))
-                )}
-                {group.marmotGroupData.adminPubkeys.length > 2 && (
-                  <div className="text-base-content/60 text-xs">
-                    +{group.marmotGroupData.adminPubkeys.length - 2} more
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <span className="font-semibold text-sm">Relays:</span>
-              <div className="text-xs">
-                {group.marmotGroupData.relays.length === 0 ? (
-                  <span className="text-base-content/60">None</span>
-                ) : (
-                  group.marmotGroupData.relays
-                    .slice(0, 2)
-                    .map((relay, index) => (
-                      <div
-                        key={index}
-                        className="bg-base-100 p-1 rounded break-all mb-1"
-                      >
-                        {relay}
-                      </div>
-                    ))
-                )}
-                {group.marmotGroupData.relays.length > 2 && (
-                  <div className="text-base-content/60 text-xs">
-                    +{group.marmotGroupData.relays.length - 2} more
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <span className="font-semibold text-sm">Image Hash:</span>
-              <div className="font-mono text-xs bg-base-100 p-1 rounded break-all">
-                {bytesToHex(group.marmotGroupData.imageHash).slice(0, 24)}...
-              </div>
+            <div className="stat-title text-xs">Nostr Group ID</div>
+            <div className="stat-value text-xs font-mono">
+              {nostrGroupIdHex.slice(0, 16)}...
             </div>
           </div>
         </div>
@@ -202,27 +114,10 @@ function GroupCard({ entry, onDelete }: GroupCardProps) {
           </button>
         </div>
 
-        {/* JSON Details */}
+        {/* Client State Details */}
         {showDetails && (
-          <div className="mt-4">
-            <JsonBlock
-              value={{
-                group: {
-                  groupId: groupIdHex,
-                  epoch: group.epoch,
-                  members: group.members.length,
-                  extensions: group.extensions.length,
-                  marmotGroupData: {
-                    ...group.marmotGroupData,
-                    nostrGroupId: nostrGroupIdHex,
-                    imageHash: bytesToHex(group.marmotGroupData.imageHash),
-                    imageKey: bytesToHex(group.marmotGroupData.imageKey),
-                    imageNonce: bytesToHex(group.marmotGroupData.imageNonce),
-                  },
-                },
-                clientState: entry.clientState,
-              }}
-            />
+          <div className="mt-4 bg-base-200 p-4 rounded-lg overflow-auto max-h-96">
+            <ClientStateDataView clientState={clientState} />
           </div>
         )}
       </div>
@@ -280,7 +175,7 @@ function LoadingState() {
 function GroupManager() {
   const groupStore = useObservable(groupStore$);
   const groupCount = useObservable(groupCount$);
-  const [groups, setGroups] = useState<StoredGroupEntry[]>([]);
+  const [groups, setGroups] = useState<ClientState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -307,7 +202,7 @@ function GroupManager() {
     loadGroups();
   }, [groupStore, groupCount]);
 
-  const handleDelete = async (groupId: Uint8Array) => {
+  const handleDelete = async (groupId: string) => {
     if (!groupStore) return;
 
     try {
@@ -359,13 +254,17 @@ function GroupManager() {
       {/* Groups Grid */}
       {!isLoading && groups.length > 0 && (
         <div className="grid grid-cols-1 gap-6">
-          {groups.map((entry) => (
-            <GroupCard
-              key={bytesToHex(entry.group.groupId)}
-              entry={entry}
-              onDelete={handleDelete}
-            />
-          ))}
+          {groups.map((clientState, index) => {
+            const groupIdHex = getGroupIdHex(clientState);
+
+            return (
+              <GroupCard
+                key={groupIdHex || index}
+                clientState={clientState}
+                onDelete={handleDelete}
+              />
+            );
+          })}
         </div>
       )}
 

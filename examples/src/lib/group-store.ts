@@ -6,7 +6,7 @@ import {
   shareReplay,
   switchMap,
 } from "rxjs";
-import { GroupStore } from "../../../src/core/group-store";
+import { GroupStore, defaultMarmotClientConfig } from "../../../src";
 import accounts from "./accounts";
 
 // Observable that triggers whenever the store changes
@@ -19,6 +19,7 @@ export const groupStore$ = accounts.active$.pipe(
       localforage.createInstance({
         name: "marmot-group-store",
       }),
+      defaultMarmotClientConfig,
       { prefix: account?.pubkey ?? "anon" },
     );
   }),

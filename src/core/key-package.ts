@@ -12,6 +12,7 @@ import { greaseValues } from "ts-mls/grease.js";
 import {
   KeyPackage,
   generateKeyPackage as MLSGenerateKeyPackage,
+  PrivateKeyPackage,
   decodeKeyPackage,
   encodeKeyPackage,
 } from "ts-mls/keyPackage.js";
@@ -25,7 +26,6 @@ import { ensureMarmotCapabilities } from "./capabilities.js";
 import { getCredentialPubkey } from "./credential.js";
 import { defaultCapabilities } from "./default-capabilities.js";
 import { ensureLastResortExtension } from "./extensions.js";
-import { CompleteKeyPackage } from "./key-package-store.js";
 import {
   KEY_PACKAGE_CIPHER_SUITE_TAG,
   KEY_PACKAGE_CLIENT_TAG,
@@ -37,6 +37,19 @@ import {
   MLS_VERSIONS,
   extendedExtensionTypes,
 } from "./protocol.js";
+
+/**
+ * A complete key package containing both public and private components.
+ *
+ * The public package can be shared with others to add this participant to groups,
+ * while the private package must be kept secret and is used for decryption and signing.
+ */
+export type CompleteKeyPackage = {
+  /** The public key package that can be shared with others */
+  publicPackage: KeyPackage;
+  /** The private key package that must be kept secret */
+  privatePackage: PrivateKeyPackage;
+};
 
 /** Get the {@link KeyPackage} from a kind 443 event */
 export function getKeyPackage(event: NostrEvent): KeyPackage {

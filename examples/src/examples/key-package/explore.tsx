@@ -27,7 +27,7 @@ import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
 import RelayPicker from "../../components/form/relay-picker";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/key-package/data-view";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import { LeafNodeCapabilitiesSection } from "../../components/key-package/leaf-node-capabilities";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import { encodeKeyPackage } from "ts-mls/keyPackage.js";
