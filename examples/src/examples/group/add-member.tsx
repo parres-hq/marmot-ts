@@ -1,35 +1,32 @@
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { useState } from "react";
 import { switchMap } from "rxjs";
-import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import { keyPackageStore$ } from "../../lib/key-package-store";
-import { groupStore$, notifyStoreChange } from "../../lib/group-store";
-import {
-  addMemberWithNostrIntegration,
-  type AddMemberResult,
-  type CompleteKeyPackage,
-  deserializeClientState,
-  StoredClientState,
-} from "../../../../src/core";
-import { ClientState } from "ts-mls/clientState.js";
-import {
-  defaultMarmotClientConfig,
-  MarmotGroupData,
-} from "../../../../src/core/protocol.js";
 import {
   defaultCryptoProvider,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
   type KeyPackage,
 } from "ts-mls";
+import { ClientState } from "ts-mls/clientState.js";
+import { CredentialBasic } from "ts-mls/credential.js";
+import {
+  addMemberWithNostrIntegration,
+  type AddMemberResult,
+  type CompleteKeyPackage,
+} from "../../../../src/core";
 import {
   extractMarmotGroupData,
   getMemberCount,
-} from "../../../../src/core/client-state-utils.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
+} from "../../../../src/core/client-state";
+import {
+  MarmotGroupData,
+} from "../../../../src/core/protocol.js";
 import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
-import { CredentialBasic } from "ts-mls/credential.js";
+import { groupStore$, notifyStoreChange } from "../../lib/group-store";
+import { keyPackageStore$ } from "../../lib/key-package-store";
 
 // Helper function to get member identities from ClientState
 function getMemberIdentities(clientState: ClientState): string[] {
@@ -84,7 +81,6 @@ interface GroupOption {
   memberCount: number;
   state: ClientState;
   marmotData: MarmotGroupData | null;
-  entry: StoredClientState;
 }
 
 interface ConfigurationFormProps {
@@ -452,7 +448,6 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
 
 function useAddMember() {
   const groupStore = useObservable(groupStore$);
-  const keyPackageStore = useObservable(keyPackageStore$);
   const [isAdding, setIsAdding] = useState(false);
   const [result, setResult] = useState<AddMemberResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -460,7 +455,7 @@ function useAddMember() {
   const addMember = async (
     selectedClientState: ClientState,
     selectedKeyPackage: CompleteKeyPackage,
-    recipientPubkey: string,
+    _recipientPubkey: string,
   ) => {
     try {
       setIsAdding(true);
@@ -526,10 +521,9 @@ function useAddMember() {
 // ============================================================================
 
 export default withSignIn(function AddMember() {
-  const groupStore = useObservable(groupStore$);
   const keyPackageStore = useObservable(keyPackageStore$);
 
-  const rawGroups =
+  const clientStates =
     useObservableMemo(
       () =>
         groupStore$.pipe(
@@ -538,8 +532,7 @@ export default withSignIn(function AddMember() {
       [],
     ) ?? [];
 
-  const groups = rawGroups.map((entry, index) => {
-    const state = deserializeClientState(entry, defaultMarmotClientConfig);
+  const groups = clientStates.map((state, index) => {
     const marmotData = extractMarmotGroupData(state);
     const groupIdHex = bytesToHex(state.groupContext.groupId);
     const epoch = Number(state.groupContext.epoch);
@@ -551,7 +544,6 @@ export default withSignIn(function AddMember() {
       name,
       epoch,
       memberCount,
-      entry,
       state,
       marmotData,
     };

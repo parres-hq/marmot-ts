@@ -1,29 +1,29 @@
+import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
+import { NostrEvent, Rumor, UnsignedEvent } from "applesauce-core/helpers";
+import { EventSigner } from "applesauce-factory";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
 import {
   CiphersuiteImpl,
-  Extension,
-  createCommit,
-  Proposal,
   CreateCommitResult,
+  Extension,
+  createGroup as MLSCreateGroup,
+  Proposal,
+  createCommit,
 } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
+import { CredentialBasic } from "ts-mls/credential.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
+import { encodeMlsMessage, type MLSMessage } from "ts-mls/message.js";
+import { createGiftWrap } from "../utils/nostr.js";
+import { extractMarmotGroupData } from "./client-state.js";
+import { CompleteKeyPackage } from "./key-package.js";
+import { marmotGroupDataToExtension } from "./marmot-group-data.js";
 import {
+  GROUP_EVENT_KIND,
   MARMOT_GROUP_DATA_EXTENSION_TYPE,
   MarmotGroupData,
-  createGroupEvent,
-  createWelcomeEvent,
 } from "./protocol.js";
-import { CompleteKeyPackage } from "./key-package-store.js";
-import { randomBytes } from "@noble/hashes/utils.js";
-import { createGroup as MLSCreateGroup } from "ts-mls";
-import { marmotGroupDataToExtension } from "./marmot-group-data.js";
-import { bytesToHex } from "@noble/hashes/utils.js";
-import { createGiftWrap } from "../utils/nostr.js";
-import { EventSigner } from "applesauce-factory";
-import { UnsignedEvent, NostrEvent } from "applesauce-core/helpers";
-import { Rumor } from "applesauce-core/helpers";
-import { CredentialBasic } from "ts-mls/credential.js";
-import { extractMarmotGroupData } from "./client-state-utils.js";
+import { createWelcomeEvent } from "./welcome.js";
 
 /**
  * Parameters for creating a new MLS group.
@@ -280,4 +280,30 @@ export async function addMemberToGroup(
       ratchetTreeExtension: true,
     },
   );
+}
+
+/**
+ * Creates an unsigned Nostr event (kind 445) for a group commit message.
+ *
+ * @param commitMessage - The serialized MLS commit message
+ * @param groupId - The 32-byte Nostr group ID (from MarmotGroupData)
+ * @param pubkey - The sender's public key (hex string)
+ * @param relays - Array of relay URLs for the group
+ * @returns Unsigned Nostr event
+ */
+export function createGroupEvent(
+  commitMessage: MLSMessage,
+  groupId: string,
+): NostrEvent {
+  const serializedMessage = encodeMlsMessage(commitMessage);
+  const content = bytesToHex(serializedMessage);
+  const secretKey = generateSecretKey();
+  const unsignedEvent = {
+    kind: GROUP_EVENT_KIND,
+    pubkey: getPublicKey(secretKey),
+    created_at: Math.floor(Date.now() / 1000),
+    content,
+    tags: [["h", groupId]],
+  };
+  return finalizeEvent(unsignedEvent, secretKey);
 }

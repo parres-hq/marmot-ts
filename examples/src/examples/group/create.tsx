@@ -5,7 +5,6 @@ import { keyPackageStore$ } from "../../lib/key-package-store";
 import { groupStore$, notifyStoreChange } from "../../lib/group-store";
 import {
   createSimpleGroup,
-  type CompleteKeyPackage,
   type CreateGroupResult,
 } from "../../../../src/core";
 import {
@@ -23,7 +22,8 @@ import { PubkeyListCreator } from "../../components/form/pubkey-list-creator";
 import {
   extractMarmotGroupData,
   getMemberCount,
-} from "../../../../src/core/client-state-utils";
+} from "../../../../src/core/client-state";
+import { CompleteKeyPackage } from "../../../../src";
 
 // ============================================================================
 // Component: ErrorAlert

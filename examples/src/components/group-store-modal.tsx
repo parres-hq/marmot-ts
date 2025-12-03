@@ -1,36 +1,33 @@
 import { useRef, useState } from "react";
 import { switchMap } from "rxjs";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { ClientState } from "ts-mls/clientState.js";
 
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
 import { groupStore$, notifyStoreChange } from "../lib/group-store";
 import JsonBlock from "./json-block";
 import {
-  defaultMarmotClientConfig,
-  deserializeClientState,
   extractMarmotGroupData,
   getMemberCount,
   replacer,
-  StoredClientState,
 } from "../../../src/core";
 
 interface StoredGroupDetailsProps {
-  entry: StoredClientState;
+  clientState: ClientState;
   index: number;
 }
 
-function StoredGroupDetails({ entry, index }: StoredGroupDetailsProps) {
-  // Extract metadata from the ClientState by deserializing it
-  const state = deserializeClientState(entry, defaultMarmotClientConfig);
-  const marmotData = extractMarmotGroupData(state);
-  const groupIdHex = bytesToHex(state.groupContext.groupId);
-  const epoch = Number(state.groupContext.epoch);
-  const memberCount = getMemberCount(state);
+function StoredGroupDetails({ clientState, index }: StoredGroupDetailsProps) {
+  // Extract metadata from the ClientState
+  const marmotData = extractMarmotGroupData(clientState);
+  const groupIdHex = bytesToHex(clientState.groupContext.groupId);
+  const epoch = Number(clientState.groupContext.epoch);
+  const memberCount = getMemberCount(clientState);
   const name = marmotData?.name || `Group #${index + 1}`;
 
   const handleActivate = () => {
     try {
-      console.log("✅ Group activated (rehydrated) successfully!", state);
+      console.log("✅ Group activated (rehydrated) successfully!", clientState);
       alert(
         `Group "${name}" activated successfully! Check console for ClientState object.`,
       );
@@ -106,7 +103,7 @@ function StoredGroupDetails({ entry, index }: StoredGroupDetailsProps) {
           </summary>
           <div className="collapse-content">
             <div className="bg-base-300 p-4 rounded-lg overflow-auto max-h-96">
-              <JsonBlock value={entry} />
+              <JsonBlock value={clientState} />
             </div>
           </div>
         </details>
@@ -217,8 +214,8 @@ export default function GroupStoreModal() {
                 {entries.length} group{entries.length !== 1 ? "s" : ""} stored
               </div>
 
-              {entries.map((entry, index) => (
-                <StoredGroupDetails key={index} entry={entry} index={index} />
+              {entries.map((clientState, index) => (
+                <StoredGroupDetails key={index} clientState={clientState} index={index} />
               ))}
             </>
           )}

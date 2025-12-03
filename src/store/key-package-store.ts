@@ -3,23 +3,11 @@ import { KeyPackage, PrivateKeyPackage } from "ts-mls";
 import { Hash } from "ts-mls/crypto/hash.js";
 import { makeHashImpl } from "ts-mls/crypto/implementation/noble/makeHashImpl.js";
 import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
+import { CompleteKeyPackage } from "../core/key-package.js";
 import { KeyValueStoreBackend } from "../utils/key-value.js";
 
 /** A generic interface for a key-value store */
 export interface KeyPackageStoreBackend extends KeyValueStoreBackend<CompleteKeyPackage> {}
-
-/**
- * A complete key package containing both public and private components.
- *
- * The public package can be shared with others to add this participant to groups,
- * while the private package must be kept secret and is used for decryption and signing.
- */
-export type CompleteKeyPackage = {
-  /** The public key package that can be shared with others */
-  publicPackage: KeyPackage;
-  /** The private key package that must be kept secret */
-  privatePackage: PrivateKeyPackage;
-};
 
 /** Options for creating a {@link KeyPackageStore} instance */
 export type KeyPackageStoreOptions = {

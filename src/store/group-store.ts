@@ -5,11 +5,11 @@ import { ClientConfig } from "ts-mls/clientConfig.js";
 import {
   serializeClientState,
   deserializeClientState,
-  StoredClientState,
-} from "./client-state-storage.js";
+  SerializedClientState,
+} from "../core/client-state.js";
 
-/** A generic interface for a group store backend */
-export interface GroupStoreBackend extends KeyValueStoreBackend<StoredClientState> {}
+/** A generic interface for a client state store backend */
+export interface GroupStoreBackend extends KeyValueStoreBackend<SerializedClientState> {}
 
 /** Options for creating a {@link GroupStore} instance */
 export type GroupStoreOptions = {
@@ -20,19 +20,27 @@ export type GroupStoreOptions = {
  * Stores {@link ClientState} objects in a {@link GroupStoreBackend}.
  *
  * This class manages the persistence of MLS groups, storing the serialized
- * ClientState and extracted metadata for efficient querying.
+ * ClientState internally but always returning deserialized ClientState objects.
+ * The ClientConfig is stored in the instance and used for all deserialization.
  */
 export class GroupStore {
   private backend: GroupStoreBackend;
   private readonly prefix?: string;
+  private readonly config: ClientConfig;
 
   /**
    * Creates a new GroupStore instance.
    * @param backend - The storage backend to use (e.g., localForage)
-   * @param prefix - Optional prefix to add to all storage keys (useful for namespacing)
+   * @param config - The ClientConfig to use for deserialization
+   * @param options - Optional configuration (prefix for namespacing)
    */
-  constructor(backend: GroupStoreBackend, { prefix }: GroupStoreOptions = {}) {
+  constructor(
+    backend: GroupStoreBackend,
+    config: ClientConfig,
+    { prefix }: GroupStoreOptions = {},
+  ) {
     this.backend = backend;
+    this.config = config;
     this.prefix = prefix;
   }
 
@@ -60,33 +68,18 @@ export class GroupStore {
   }
 
   /**
-   * Retrieves the stored group entry (metadata + serialized client state).
-   *
-   * @param groupId - The group ID (as Uint8Array or hex string)
-   * @returns A promise that resolves to the stored entry, or null if not found
-   */
-  async get(groupId: Uint8Array | string): Promise<StoredClientState | null> {
-    const key = this.resolveStorageKey(groupId);
-    return await this.backend.getItem(key);
-  }
-
-  /**
    * Retrieves the ClientState from storage.
    *
    * @param groupId - The group ID (as Uint8Array or hex string)
-   * @param config - The ClientConfig required to reconstruct the ClientState
    * @returns A promise that resolves to the ClientState, or null if not found
    */
-  async getClientState(
-    groupId: Uint8Array | string,
-    config: ClientConfig,
-  ): Promise<ClientState | null> {
+  async get(groupId: Uint8Array | string): Promise<ClientState | null> {
     const key = this.resolveStorageKey(groupId);
     const entry = await this.backend.getItem(key);
 
     if (!entry) return null;
 
-    return deserializeClientState(entry, config);
+    return deserializeClientState(entry, this.config);
   }
 
   /**
@@ -99,10 +92,10 @@ export class GroupStore {
   }
 
   /**
-   * Lists all stored group entries (metadata + serialized client state).
-   * @returns An array of stored group entries
+   * Lists all stored ClientState objects.
+   * @returns An array of ClientState objects
    */
-  async list(): Promise<StoredClientState[]> {
+  async list(): Promise<ClientState[]> {
     const allKeys = await this.backend.keys();
 
     const keys = this.prefix
@@ -113,9 +106,13 @@ export class GroupStore {
       keys.map((key) => this.backend.getItem(key)),
     );
 
-    return entries.filter((entry): entry is StoredClientState => {
-      return entry !== null;
-    });
+    const serializedEntries = entries.filter(
+      (entry): entry is SerializedClientState => entry !== null,
+    );
+
+    return serializedEntries.map((entry) =>
+      deserializeClientState(entry, this.config),
+    );
   }
 
   /** Gets the count of groups stored. */

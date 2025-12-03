@@ -1,37 +1,34 @@
-import { useState, useEffect } from "react";
-import { useObservable } from "../../hooks/use-observable";
+import { useEffect, useState } from "react";
+import { ClientState } from "ts-mls/clientState.js";
 import {
-  groupStore$,
-  notifyStoreChange,
-  groupCount$,
-} from "../../lib/group-store";
-import type { StoredClientState } from "../../../../src/core/client-state-storage";
-import {
-  defaultMarmotClientConfig,
-  deserializeClientState,
   extractMarmotGroupData,
-  getGroupIdHex,
   getEpoch,
+  getGroupIdHex,
   getMemberCount,
 } from "../../../../src/core";
 import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
+import { useObservable } from "../../hooks/use-observable";
+import {
+  groupCount$,
+  groupStore$,
+  notifyStoreChange,
+} from "../../lib/group-store";
 
 // ============================================================================
 // Component: GroupCard
 // ============================================================================
 
 interface GroupCardProps {
-  entry: StoredClientState;
+  clientState: ClientState;
   onDelete: (groupId: string) => Promise<void>;
 }
 
-function GroupCard({ entry, onDelete }: GroupCardProps) {
+function GroupCard({ clientState, onDelete }: GroupCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Extract metadata from the stored client state
-  const clientState = deserializeClientState(entry, defaultMarmotClientConfig);
+  // Extract metadata from the client state
   const marmotData = extractMarmotGroupData(clientState);
   const groupIdHex = getGroupIdHex(clientState);
   const epoch = getEpoch(clientState);
@@ -129,7 +126,7 @@ function GroupCard({ entry, onDelete }: GroupCardProps) {
                   memberCount: memberCount,
                   name: name,
                 },
-                clientState: entry,
+                clientState: clientState,
               }}
             />
           </div>
@@ -189,7 +186,7 @@ function LoadingState() {
 function GroupManager() {
   const groupStore = useObservable(groupStore$);
   const groupCount = useObservable(groupCount$);
-  const [groups, setGroups] = useState<StoredClientState[]>([]);
+  const [groups, setGroups] = useState<ClientState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -268,18 +265,13 @@ function GroupManager() {
       {/* Groups Grid */}
       {!isLoading && groups.length > 0 && (
         <div className="grid grid-cols-1 gap-6">
-          {groups.map((entry, index) => {
-            // Create a unique key for each entry
-            const clientState = deserializeClientState(
-              entry,
-              defaultMarmotClientConfig,
-            );
+          {groups.map((clientState, index) => {
             const groupIdHex = getGroupIdHex(clientState);
 
             return (
               <GroupCard
                 key={groupIdHex || index}
-                entry={entry}
+                clientState={clientState}
                 onDelete={handleDelete}
               />
             );

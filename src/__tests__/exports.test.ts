@@ -5,7 +5,6 @@ describe("exports", () => {
   it("should export the expected members", () => {
     expect(Object.keys(exports).sort()).toMatchInlineSnapshot(`
       [
-        "GIFT_WRAP_KIND",
         "GROUP_EVENT_KIND",
         "GroupStore",
         "KEY_PACKAGE_CIPHER_SUITE_TAG",
