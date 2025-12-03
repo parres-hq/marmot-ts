@@ -7,10 +7,6 @@ import {
   deserializeClientState,
   StoredClientState,
 } from "./client-state-storage.js";
-import {
-  extractMarmotGroupData,
-  getMemberCount,
-} from "./client-state-utils.js";
 
 /** A generic interface for a group store backend */
 export interface GroupStoreBackend extends KeyValueStoreBackend<StoredClientState> {}
