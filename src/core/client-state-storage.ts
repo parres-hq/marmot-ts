@@ -1,12 +1,10 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { ClientState } from "ts-mls/clientState.js";
 import { ClientConfig } from "ts-mls/clientConfig.js";
-import { defaultMarmotClientConfig } from "./protocol.js";
 
 /**
- * Interface for the stored client state.
- * We use a loose definition here because we're serializing the internal structure
- * of ClientState which is complex and contains many nested types.
+ * The serialized form of ClientState for storage.
+ * Uses JSON serialization with custom handling for Uint8Array, BigInt, and Map types.
  */
 export type StoredClientState = Record<string, unknown>;
 
@@ -41,24 +39,12 @@ export function deserializeClientState(
   return state;
 }
 
-/**
- * Rehydrates a ClientState from storage, handling both deserialization and logic injection.
- * This is the primary method for restoring a group session.
- *
- * @param stored - The stored client state
- * @param authService - The authentication service to use (defaults to Marmot's service)
- * @returns A fully functional ClientState object
- */
-export function rehydrateClientState(stored: StoredClientState): ClientState {
-  return deserializeClientState(stored, defaultMarmotClientConfig);
-}
-
 // --- Helpers ---
 
 const HEX_PREFIX = "hex:";
 const BIGINT_PREFIX = "bigint:";
 
-function replacer(key: string, value: any): any {
+export function replacer(key: string, value: any): any {
   // Exclude config from serialization
   if (key === "clientConfig") {
     return undefined;

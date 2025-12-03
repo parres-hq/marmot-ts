@@ -1,5 +1,6 @@
 export * from "./capabilities.js";
 export * from "./client-state-storage.js";
+export * from "./client-state-utils.js";
 export * from "./credential.js";
 export * from "./default-capabilities.js";
 export * from "./extensions.js";

@@ -1,6 +1,11 @@
 import { defaultExtensionTypes } from "ts-mls";
 import { defaultClientConfig } from "ts-mls/clientConfig.js";
 import { marmotAuthService } from "./auth-service.js";
+import { bytesToHex } from "@noble/ciphers/utils.js";
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
+import { encodeMlsMessage, type MLSMessage } from "ts-mls/message.js";
+import { encodeWelcome, type Welcome } from "ts-mls/welcome.js";
 
 /** The extension id for the last_resort key package extension for key packages */
 export const LAST_RESORT_KEY_PACKAGE_EXTENSION_TYPE = 0x000a;
@@ -83,4 +88,70 @@ export interface MarmotGroupData {
   imageKey: Uint8Array;
   /** ChaCha20-Poly1305 nonce for group image encryption (all zeros if no image) */
   imageNonce: Uint8Array;
+}
+
+/** Event kind for group events (commits, proposals, application messages) */
+export const GROUP_EVENT_KIND = 445;
+
+/** Event kind for welcome events */
+export const WELCOME_EVENT_KIND = 444;
+
+/** Event kind for gift wrap events (NIP-59) */
+export const GIFT_WRAP_KIND = 1059;
+
+/**
+ * Creates an unsigned Nostr event (kind 445) for a group commit message.
+ *
+ * @param commitMessage - The serialized MLS commit message
+ * @param groupId - The 32-byte Nostr group ID (from MarmotGroupData)
+ * @param pubkey - The sender's public key (hex string)
+ * @param relays - Array of relay URLs for the group
+ * @returns Unsigned Nostr event
+ */
+export function createGroupEvent(
+  commitMessage: MLSMessage,
+  groupId: string,
+): NostrEvent {
+  const serializedMessage = encodeMlsMessage(commitMessage);
+  const content = bytesToHex(serializedMessage);
+  const secretKey = generateSecretKey();
+  const unsignedEvent = {
+    kind: GROUP_EVENT_KIND,
+    pubkey: getPublicKey(secretKey),
+    created_at: Math.floor(Date.now() / 1000),
+    content,
+    tags: [["h", groupId]],
+  };
+  return finalizeEvent(unsignedEvent, secretKey);
+}
+
+/**
+ * Creates an unsigned Nostr event (kind 444) for a welcome message.
+ *
+ * @param welcomeMessage - The MLS welcome message
+ * @param keyPackageId - The ID of the key package used for the add operation
+ * @param pubkey - The sender's public key (hex string)
+ * @param relays - Array of relay URLs for the group
+ * @returns Unsigned Nostr event
+ */
+export function createWelcomeEvent(
+  welcomeMessage: Welcome,
+  keyPackageId: string,
+  pubkey: string,
+  relays: string[],
+): UnsignedEvent {
+  // Serialize the welcome message according to RFC 9420
+  const serializedWelcome = encodeWelcome(welcomeMessage);
+  const content = bytesToHex(serializedWelcome);
+
+  return {
+    kind: WELCOME_EVENT_KIND,
+    pubkey,
+    created_at: Math.floor(Date.now() / 1000),
+    content,
+    tags: [
+      ["e", keyPackageId],
+      ["relays", ...relays],
+    ],
+  };
 }

@@ -6,8 +6,7 @@ import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
 import { KeyValueStoreBackend } from "../utils/key-value.js";
 
 /** A generic interface for a key-value store */
-export interface KeyPackageStoreBackend
-  extends KeyValueStoreBackend<CompleteKeyPackage> {}
+export interface KeyPackageStoreBackend extends KeyValueStoreBackend<CompleteKeyPackage> {}
 
 /**
  * A complete key package containing both public and private components.
