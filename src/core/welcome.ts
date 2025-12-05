@@ -47,6 +47,11 @@ export function createWelcomeEvent(
  * @throws Error if the content cannot be decoded
  */
 export function getWelcome(event: NostrEvent): Welcome {
+  if (event.kind !== WELCOME_EVENT_KIND) {
+    throw new Error(
+      `Expected welcome event kind ${WELCOME_EVENT_KIND}, got ${event.kind}`,
+    );
+  }
   // Check for encoding tag, default to hex for backward compatibility
   const encodingFormat = getEncodingTag(event) ?? "hex";
   const content = decodeContent(event.content, encodingFormat);
