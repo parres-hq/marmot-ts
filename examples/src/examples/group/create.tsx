@@ -12,6 +12,7 @@ import {
   getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
+import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import type { KeyPackage } from "ts-mls";
 import JsonBlock from "../../components/json-block";
@@ -24,6 +25,8 @@ import {
   getMemberCount,
 } from "../../../../src/core/client-state";
 import { CompleteKeyPackage } from "../../../../src";
+import { createCredential } from "../../../../src/core/credential";
+import { generateKeyPackage } from "../../../../src/core/key-package";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -56,37 +59,116 @@ function ErrorAlert({ error }: { error: string | null }) {
 // Component: ConfigurationForm
 // ============================================================================
 
-interface ConfigurationFormProps {
-  keyPackages: KeyPackage[];
+interface ConfigurationFormData {
   selectedKeyPackageId: string;
+  selectedKeyPackage: CompleteKeyPackage | null;
   groupName: string;
   groupDescription: string;
   adminPubkeys: string[];
   relays: string[];
+}
+
+interface ConfigurationFormProps {
+  keyPackages: KeyPackage[];
+  keyPackageStore: any;
   isCreating: boolean;
-  onKeyPackageSelect: (id: string) => void;
-  onGroupNameChange: (name: string) => void;
-  onGroupDescriptionChange: (desc: string) => void;
-  onAdminPubkeysChange: (pubkeys: string[]) => void;
-  onRelaysChange: (relays: string[]) => void;
-  onSubmit: () => void;
+  onSubmit: (data: ConfigurationFormData) => void;
 }
 
 function ConfigurationForm({
   keyPackages,
-  selectedKeyPackageId,
-  groupName,
-  groupDescription,
-  adminPubkeys,
-  relays,
+  keyPackageStore,
   isCreating,
-  onKeyPackageSelect,
-  onGroupNameChange,
-  onGroupDescriptionChange,
-  onAdminPubkeysChange,
-  onRelaysChange,
   onSubmit,
 }: ConfigurationFormProps) {
+  const [selectedKeyPackageId, setSelectedKeyPackageId] = useState("");
+  const [selectedKeyPackage, setSelectedKeyPackage] =
+    useState<CompleteKeyPackage | null>(null);
+  const [groupName, setGroupName] = useState("My Group");
+  const [groupDescription, setGroupDescription] = useState("");
+  const [adminPubkeys, setAdminPubkeys] = useState<string[]>([]);
+  const [relays, setRelays] = useState<string[]>([]);
+
+  const handleKeyPackageSelect = async (keyPackageId: string) => {
+    if (!keyPackageStore || !keyPackageId) {
+      setSelectedKeyPackageId("");
+      setSelectedKeyPackage(null);
+      return;
+    }
+
+    try {
+      setSelectedKeyPackageId(keyPackageId);
+
+      const keyPackage = keyPackages.find(
+        (kp) => bytesToHex(kp.initKey) === keyPackageId,
+      );
+      if (!keyPackage) {
+        console.error("Selected key package not found");
+        return;
+      }
+
+      const completePackage =
+        await keyPackageStore.getCompletePackage(keyPackage);
+      if (completePackage) {
+        setSelectedKeyPackage(completePackage);
+      } else {
+        console.error("Could not load the complete key package");
+      }
+    } catch (err) {
+      console.error("Failed to load key package:", err);
+    }
+  };
+
+  const handleSubmit = async () => {
+    // If no key package is selected, generate a new one with defaults
+    let keyPackageToUse = selectedKeyPackage;
+
+    if (!keyPackageToUse) {
+      try {
+        const account = accounts.active;
+        if (!account) {
+          console.error("No active account");
+          return;
+        }
+
+        // Use default cipher suite
+        const defaultCipherSuite: CiphersuiteName =
+          "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519";
+
+        console.log(
+          "No key package selected, generating new one with defaults...",
+        );
+
+        // Get cipher suite implementation
+        const selectedCiphersuite = getCiphersuiteFromName(defaultCipherSuite);
+        const ciphersuiteImpl = await getCiphersuiteImpl(
+          selectedCiphersuite,
+          defaultCryptoProvider,
+        );
+
+        // Create credential and key package
+        const credential = createCredential(account.pubkey);
+        keyPackageToUse = await generateKeyPackage({
+          credential,
+          ciphersuiteImpl,
+        });
+
+        console.log("✅ Generated new key package with default cipher suite");
+      } catch (err) {
+        console.error("Failed to generate key package:", err);
+        return;
+      }
+    }
+
+    onSubmit({
+      selectedKeyPackageId,
+      selectedKeyPackage: keyPackageToUse,
+      groupName,
+      groupDescription,
+      adminPubkeys,
+      relays,
+    });
+  };
   return (
     <div className="card bg-base-100 border border-base-300">
       <div className="card-body">
@@ -100,45 +182,54 @@ function ConfigurationForm({
           <div className="form-control">
             <label className="label">
               <span className="label-text font-semibold">
-                Select Key Package
+                Select Key Package (Optional)
               </span>
             </label>
             {keyPackages.length === 0 ? (
-              <div className="alert alert-warning">
+              <div className="alert alert-info">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 shrink-0 stroke-current"
                   fill="none"
                   viewBox="0 0 24 24"
+                  className="h-6 w-6 shrink-0 stroke-current"
                 >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  ></path>
                 </svg>
                 <span>
-                  No key packages available. Create a key package first.
+                  No key packages available. A new one will be generated
+                  automatically with default settings.
                 </span>
               </div>
             ) : (
-              <select
-                className="select select-bordered w-full"
-                value={selectedKeyPackageId}
-                onChange={(e) => onKeyPackageSelect(e.target.value)}
-                disabled={isCreating}
-              >
-                <option value="">Select a key package...</option>
-                {keyPackages.map((kp) => (
-                  <option
-                    key={bytesToHex(kp.initKey)}
-                    value={bytesToHex(kp.initKey)}
-                  >
-                    Key Package ({bytesToHex(kp.initKey).slice(0, 16)}...)
-                  </option>
-                ))}
-              </select>
+              <>
+                <select
+                  className="select select-bordered w-full"
+                  value={selectedKeyPackageId}
+                  onChange={(e) => handleKeyPackageSelect(e.target.value)}
+                  disabled={isCreating}
+                >
+                  <option value="">Generate new key package (default)</option>
+                  {keyPackages.map((kp) => (
+                    <option
+                      key={bytesToHex(kp.initKey)}
+                      value={bytesToHex(kp.initKey)}
+                    >
+                      Key Package ({bytesToHex(kp.initKey).slice(0, 16)}...)
+                    </option>
+                  ))}
+                </select>
+                <label className="label">
+                  <span className="label-text-alt text-base-content/60">
+                    Leave unselected to generate a new key package with default
+                    cipher suite
+                  </span>
+                </label>
+              </>
             )}
           </div>
 
@@ -153,7 +244,7 @@ function ConfigurationForm({
                 placeholder="Enter group name"
                 className="input input-bordered w-full"
                 value={groupName}
-                onChange={(e) => onGroupNameChange(e.target.value)}
+                onChange={(e) => setGroupName(e.target.value)}
                 disabled={isCreating}
               />
             </div>
@@ -168,7 +259,7 @@ function ConfigurationForm({
                 placeholder="Enter group description"
                 className="textarea textarea-bordered w-full"
                 value={groupDescription}
-                onChange={(e) => onGroupDescriptionChange(e.target.value)}
+                onChange={(e) => setGroupDescription(e.target.value)}
                 rows={2}
                 disabled={isCreating}
               />
@@ -184,7 +275,7 @@ function ConfigurationForm({
                 placeholder="Enter hex-encoded public key"
                 disabled={isCreating}
                 emptyMessage="No admin keys configured. The group creator will be the only admin."
-                onPubkeysChange={onAdminPubkeysChange}
+                onPubkeysChange={setAdminPubkeys}
               />
             </div>
 
@@ -195,7 +286,7 @@ function ConfigurationForm({
                 placeholder="wss://relay.example.com"
                 disabled={isCreating}
                 emptyMessage="No relays configured. Add relays to publish group events."
-                onRelaysChange={onRelaysChange}
+                onRelaysChange={setRelays}
               />
             </div>
           </div>
@@ -204,10 +295,8 @@ function ConfigurationForm({
           <div className="card-actions justify-end mt-6">
             <button
               className="btn btn-primary btn-lg"
-              onClick={onSubmit}
-              disabled={
-                isCreating || !selectedKeyPackageId || !groupName.trim()
-              }
+              onClick={handleSubmit}
+              disabled={isCreating || !groupName.trim()}
             >
               {isCreating ? (
                 <>
@@ -565,13 +654,6 @@ export default withSignIn(function GroupCreation() {
       () => keyPackageStore$.pipe(switchMap((store) => store.list())),
       [],
     ) ?? [];
-  const [selectedKeyPackageId, setSelectedKeyPackageId] = useState("");
-  const [selectedKeyPackage, setSelectedKeyPackage] =
-    useState<CompleteKeyPackage | null>(null);
-  const [groupName, setGroupName] = useState("My Group");
-  const [groupDescription, setGroupDescription] = useState("");
-  const [adminPubkeys, setAdminPubkeys] = useState<string[]>([]);
-  const [relays, setRelays] = useState<string[]>([]);
 
   const {
     isCreating,
@@ -585,39 +667,9 @@ export default withSignIn(function GroupCreation() {
     reset,
   } = useGroupCreation();
 
-  const handleKeyPackageSelect = async (keyPackageId: string) => {
-    if (!keyPackageStore || !keyPackageId) {
-      setSelectedKeyPackageId("");
-      setSelectedKeyPackage(null);
-      return;
-    }
-
-    try {
-      setSelectedKeyPackageId(keyPackageId);
-
-      const keyPackage = keyPackages.find(
-        (kp) => bytesToHex(kp.initKey) === keyPackageId,
-      );
-      if (!keyPackage) {
-        console.error("Selected key package not found");
-        return;
-      }
-
-      const completePackage =
-        await keyPackageStore.getCompletePackage(keyPackage);
-      if (completePackage) {
-        setSelectedKeyPackage(completePackage);
-      } else {
-        console.error("Could not load the complete key package");
-      }
-    } catch (err) {
-      console.error("Failed to load key package:", err);
-    }
-  };
-
-  const handleCreateDraft = () => {
-    if (!selectedKeyPackage) {
-      console.error("Please select a key package first");
+  const handleFormSubmit = async (data: ConfigurationFormData) => {
+    if (!data.selectedKeyPackage) {
+      console.error("No key package provided");
       return;
     }
 
@@ -629,14 +681,14 @@ export default withSignIn(function GroupCreation() {
     }
 
     // Include current user as admin + any additional ones from the picker
-    const adminPubkeysList = [account.pubkey, ...adminPubkeys];
+    const adminPubkeysList = [account.pubkey, ...data.adminPubkeys];
 
-    const allRelays = [...relays];
+    const allRelays = [...data.relays];
 
-    createDraft(
-      selectedKeyPackage,
-      groupName,
-      groupDescription,
+    await createDraft(
+      data.selectedKeyPackage,
+      data.groupName,
+      data.groupDescription,
       adminPubkeysList,
       allRelays,
     );
@@ -656,18 +708,9 @@ export default withSignIn(function GroupCreation() {
       {!draftResult && !storedResult && (
         <ConfigurationForm
           keyPackages={keyPackages}
-          selectedKeyPackageId={selectedKeyPackageId}
-          groupName={groupName}
-          groupDescription={groupDescription}
-          adminPubkeys={adminPubkeys}
-          relays={relays}
+          keyPackageStore={keyPackageStore}
           isCreating={isCreating}
-          onKeyPackageSelect={handleKeyPackageSelect}
-          onGroupNameChange={setGroupName}
-          onGroupDescriptionChange={setGroupDescription}
-          onAdminPubkeysChange={setAdminPubkeys}
-          onRelaysChange={setRelays}
-          onSubmit={handleCreateDraft}
+          onSubmit={handleFormSubmit}
         />
       )}
 

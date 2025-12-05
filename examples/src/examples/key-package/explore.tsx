@@ -8,6 +8,14 @@ import { KeyPackage } from "ts-mls";
 import { CredentialBasic } from "ts-mls/credential.js";
 
 import {
+  addRelayHintsToPointer,
+  getEventPointerForEvent,
+  getSeenRelays,
+  NostrEvent,
+} from "applesauce-core/helpers";
+import { neventEncode } from "nostr-tools/nip19";
+import { encodeKeyPackage } from "ts-mls/keyPackage.js";
+import {
   getCredentialPubkey,
   getKeyPackage,
   getKeyPackageCipherSuiteId,
@@ -17,22 +25,19 @@ import {
   getKeyPackageRelays,
   KEY_PACKAGE_KIND,
 } from "../../../../src";
-import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import { pool } from "../../lib/nostr";
-import { relayConfig$ } from "../../lib/setting";
-
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import CredentialTypeBadge from "../../components/credential-type-badge";
+import KeyPackageDataView from "../../components/data-view/key-package";
+import { DetailsField } from "../../components/details-field";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
 import RelayPicker from "../../components/form/relay-picker";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/data-view/key-package";
 import { LeafNodeCapabilitiesSection } from "../../components/key-package/leaf-node-capabilities";
 import { UserAvatar, UserName } from "../../components/nostr-user";
-import { encodeKeyPackage } from "ts-mls/keyPackage.js";
-import { NostrEvent } from "applesauce-core/helpers";
-import { DetailsField } from "../../components/details-field";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
+import { pool } from "../../lib/nostr";
+import { relayConfig$ } from "../../lib/setting";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -248,6 +253,16 @@ function KeyPackageCardContent(props: { event: NostrEvent }) {
     [props.event],
   );
 
+  const nevent = useMemo(() => {
+    const seenRelays = getSeenRelays(props.event);
+    const relays = seenRelays ? Array.from(seenRelays) : [];
+    const pointer = addRelayHintsToPointer(
+      getEventPointerForEvent(props.event),
+      relays,
+    );
+    return neventEncode(pointer);
+  }, [props.event]);
+
   return (
     <div className="bg-base-100 p-6 rounded-lg">
       {/* Header with user info */}
@@ -259,7 +274,7 @@ function KeyPackageCardContent(props: { event: NostrEvent }) {
           </h3>
           <div className="text-xs text-base-content/60 space-y-1">
             <div className="font-mono break-all">
-              Event ID: {props.event.id}
+              nevent: <span className="select-all break-all">{nevent}</span>
             </div>
             <div>{formatDate(props.event.created_at)}</div>
           </div>
