@@ -18,9 +18,7 @@ import {
   extractMarmotGroupData,
   getMemberCount,
 } from "../../../../src/core/client-state";
-import {
-  MarmotGroupData,
-} from "../../../../src/core/protocol.js";
+import { MarmotGroupData } from "../../../../src/core/protocol.js";
 import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
