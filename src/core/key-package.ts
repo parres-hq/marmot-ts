@@ -1,4 +1,3 @@
-import { bytesToHex, hexToBytes } from "@noble/ciphers/utils.js";
 import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
 import { Capabilities } from "ts-mls/capabilities.js";
 import { Credential } from "ts-mls/credential.js";
@@ -18,7 +17,11 @@ import {
 } from "ts-mls/keyPackage.js";
 import { Lifetime } from "ts-mls/lifetime.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
-
+import {
+  decodeContent,
+  encodeContent,
+  getEncodingTag,
+} from "../utils/encoding.js";
 import { getTagValue } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 import { createThreeMonthLifetime } from "../utils/timestamp.js";
@@ -53,7 +56,9 @@ export type CompleteKeyPackage = {
 
 /** Get the {@link KeyPackage} from a kind 443 event */
 export function getKeyPackage(event: NostrEvent): KeyPackage {
-  const content = hexToBytes(event.content);
+  // Check for encoding tag, default to hex for backward compatibility
+  const encodingFormat = getEncodingTag(event) ?? "hex";
+  const content = decodeContent(event.content, encodingFormat);
   const decoded = decodeKeyPackage(content, 0);
   if (!decoded) throw new Error("Failed to decode key package");
 
@@ -199,7 +204,7 @@ export function createKeyPackageEvent(
 
   // Encode the public key package to bytes
   const encodedBytes = encodeKeyPackage(keyPackage);
-  const contentHex = bytesToHex(encodedBytes);
+  const content = encodeContent(encodedBytes, "base64");
 
   // Get the cipher suite from the key package
   const ciphersuiteId = ciphersuites[keyPackage.cipherSuite];
@@ -253,6 +258,7 @@ export function createKeyPackageEvent(
     [KEY_PACKAGE_MLS_VERSION_TAG, version],
     [KEY_PACKAGE_CIPHER_SUITE_TAG, ciphersuiteHex],
     [KEY_PACKAGE_EXTENSIONS_TAG, ...filteredExtensionTypes],
+    ["encoding", "base64"],
   ];
 
   // Add client tag if provided
@@ -265,7 +271,7 @@ export function createKeyPackageEvent(
     kind: KEY_PACKAGE_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags,
-    content: contentHex,
+    content,
     pubkey,
   };
 }

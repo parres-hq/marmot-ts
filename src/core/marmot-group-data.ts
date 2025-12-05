@@ -1,11 +1,11 @@
 import { randomBytes } from "@noble/hashes/utils.js";
 import { Extension } from "ts-mls";
+import { isHexKey } from "./credential.js";
 import {
-  MARMOT_GROUP_DATA_VERSION,
   MARMOT_GROUP_DATA_EXTENSION_TYPE,
+  MARMOT_GROUP_DATA_VERSION,
   MarmotGroupData,
 } from "./protocol.js";
-import { isHexKey } from "./credential.js";
 
 /**
  * Marmot Group Data Extension Implementation (MIP-01)

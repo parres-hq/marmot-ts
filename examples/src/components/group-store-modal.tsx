@@ -215,7 +215,11 @@ export default function GroupStoreModal() {
               </div>
 
               {entries.map((clientState, index) => (
-                <StoredGroupDetails key={index} clientState={clientState} index={index} />
+                <StoredGroupDetails
+                  key={index}
+                  clientState={clientState}
+                  index={index}
+                />
               ))}
             </>
           )}
