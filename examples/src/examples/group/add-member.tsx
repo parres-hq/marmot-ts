@@ -1,18 +1,12 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { decodePointer, NostrEvent } from "applesauce-core/helpers";
 import { useState } from "react";
-import { switchMap } from "rxjs";
-import {
-  defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
-  type KeyPackage,
-} from "ts-mls";
+import { of, switchMap } from "rxjs";
+import { getCiphersuiteFromName, getCiphersuiteImpl } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
-import { CredentialBasic } from "ts-mls/credential.js";
 import {
   addMemberWithNostrIntegration,
   type AddMemberResult,
-  type CompleteKeyPackage,
 } from "../../../../src/core";
 import {
   extractMarmotGroupData,
@@ -24,22 +18,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { groupStore$, notifyStoreChange } from "../../lib/group-store";
-import { keyPackageStore$ } from "../../lib/key-package-store";
-
-// Helper function to get member identities from ClientState
-function getMemberIdentities(clientState: ClientState): string[] {
-  const identities: string[] = [];
-  for (const node of clientState.ratchetTree) {
-    if (node && node.nodeType === "leaf") {
-      // Use type assertion to access credential property
-      const credential = node.leaf.credential;
-      if (credential) {
-        identities.push(bytesToHex((credential as CredentialBasic).identity));
-      }
-    }
-  }
-  return identities;
-}
+import { eventStore } from "../../lib/nostr";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -83,27 +62,23 @@ interface GroupOption {
 
 interface ConfigurationFormProps {
   groups: GroupOption[];
-  keyPackages: KeyPackage[];
   selectedGroupKey: string;
-  selectedKeyPackageId: string;
-  recipientPubkey: string;
+  keyPackageEventId: string;
+  hasKeyPackageEvent: boolean;
   isAdding: boolean;
   onGroupSelect: (key: string) => void;
-  onKeyPackageSelect: (id: string) => void;
-  onRecipientPubkeyChange: (pubkey: string) => void;
+  onKeyPackageEventIdChange: (id: string) => void;
   onSubmit: () => void;
 }
 
 function ConfigurationForm({
   groups,
-  keyPackages,
   selectedGroupKey,
-  selectedKeyPackageId,
-  recipientPubkey,
+  keyPackageEventId,
+  hasKeyPackageEvent,
   isAdding,
   onGroupSelect,
-  onKeyPackageSelect,
-  onRecipientPubkeyChange,
+  onKeyPackageEventIdChange,
   onSubmit,
 }: ConfigurationFormProps) {
   const selectedGroup = groups.find((g) => g.groupId === selectedGroupKey);
@@ -188,122 +163,52 @@ function ConfigurationForm({
           <div className="form-control">
             <label className="label">
               <span className="label-text font-semibold">
-                Select Key Package for New Member
-              </span>
-            </label>
-            {keyPackages.length === 0 ? (
-              <div className="alert alert-warning">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6 shrink-0 stroke-current"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-                <span>
-                  No key packages available. Create or import a key package
-                  first.
-                </span>
-              </div>
-            ) : (
-              <>
-                <select
-                  className="select select-bordered w-full"
-                  value={selectedKeyPackageId}
-                  onChange={(e) => onKeyPackageSelect(e.target.value)}
-                  disabled={isAdding}
-                >
-                  <option value="">Select a key package...</option>
-                  {keyPackages.map((kp) => {
-                    const kpId = bytesToHex(kp.initKey);
-                    const isAlreadyMember = selectedGroup
-                      ? getMemberIdentities(selectedGroup.state).includes(
-                          bytesToHex(
-                            (kp.leafNode.credential as CredentialBasic)
-                              .identity,
-                          ),
-                        )
-                      : false;
-
-                    return (
-                      <option
-                        key={kpId}
-                        value={kpId}
-                        disabled={isAlreadyMember}
-                      >
-                        {isAlreadyMember ? "✗ Already in group - " : ""}
-                        Key Package ({kpId.slice(0, 16)}...)
-                      </option>
-                    );
-                  })}
-                </select>
-                {selectedGroup && (
-                  <label className="label">
-                    <span className="label-text-alt text-warning">
-                      {
-                        keyPackages.filter((kp) =>
-                          getMemberIdentities(selectedGroup.state).includes(
-                            bytesToHex(
-                              (kp.leafNode.credential as CredentialBasic)
-                                .identity,
-                            ),
-                          ),
-                        ).length
-                      }{" "}
-                      of {keyPackages.length} key packages are already in this
-                      group
-                    </span>
-                  </label>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Recipient Pubkey */}
-          <div className="form-control">
-            <label className="label">
-              <span className="label-text font-semibold">
-                Recipient Public Key (for Gift-Wrap)
+                Key Package nevent (NIP-19)
               </span>
             </label>
             <input
               type="text"
-              placeholder="Enter hex-encoded public key"
+              placeholder="nevent1..."
               className="input input-bordered w-full"
-              value={recipientPubkey}
-              onChange={(e) => onRecipientPubkeyChange(e.target.value)}
+              value={keyPackageEventId}
+              onChange={(e) => onKeyPackageEventIdChange(e.target.value)}
               disabled={isAdding}
             />
-            <label className="label">
-              <span className="label-text-alt">
-                Optional: Provide recipient's pubkey for gift-wrapped welcome
-              </span>
-            </label>
+            {keyPackageEventId && !hasKeyPackageEvent && (
+              <label className="label">
+                <span className="label-text-alt text-warning">
+                  Waiting for key package event in event store...
+                </span>
+              </label>
+            )}
+            {keyPackageEventId && hasKeyPackageEvent && (
+              <label className="label">
+                <span className="label-text-alt text-success">
+                  Key package event loaded.
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Add Member Button */}
-          <div className="card-actions justify-end mt-6">
-            <button
-              className="btn btn-primary btn-lg"
-              onClick={onSubmit}
-              disabled={isAdding || !selectedGroupKey || !selectedKeyPackageId}
-            >
-              {isAdding ? (
-                <>
-                  <span className="loading loading-spinner"></span>
-                  Adding Member...
-                </>
-              ) : (
-                "Add Member"
-              )}
-            </button>
-          </div>
+          {hasKeyPackageEvent && (
+            <div className="card-actions justify-end mt-6">
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={onSubmit}
+                disabled={isAdding || !selectedGroupKey}
+              >
+                {isAdding ? (
+                  <>
+                    <span className="loading loading-spinner"></span>
+                    Adding Member...
+                  </>
+                ) : (
+                  "Add Member"
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -452,8 +357,7 @@ function useAddMember() {
 
   const addMember = async (
     selectedClientState: ClientState,
-    selectedKeyPackage: CompleteKeyPackage,
-    _recipientPubkey: string,
+    selectedKeyPackageEvent: NostrEvent,
   ) => {
     try {
       setIsAdding(true);
@@ -461,12 +365,8 @@ function useAddMember() {
       setResult(null);
 
       // Get cipher suite implementation
-      const ciphersuiteName = getCiphersuiteFromName(
-        selectedKeyPackage.publicPackage.cipherSuite,
-      );
-      const ciphersuiteImpl = await getCiphersuiteImpl(
-        ciphersuiteName,
-        defaultCryptoProvider,
+      const ciphersuite = await getCiphersuiteImpl(
+        getCiphersuiteFromName(selectedClientState.groupContext.cipherSuite),
       );
 
       // Get the current account for signing
@@ -477,9 +377,9 @@ function useAddMember() {
 
       // Add member with Nostr integration
       const addResult = await addMemberWithNostrIntegration({
-        currentClientState: selectedClientState,
-        newMemberKeyPackage: selectedKeyPackage.publicPackage,
-        ciphersuiteImpl,
+        state: selectedClientState,
+        keyPackageEvent: selectedKeyPackageEvent,
+        ciphersuite,
         signer: account.signer,
       });
 
@@ -519,8 +419,6 @@ function useAddMember() {
 // ============================================================================
 
 export default withSignIn(function AddMember() {
-  const keyPackageStore = useObservable(keyPackageStore$);
-
   const clientStates =
     useObservableMemo(
       () =>
@@ -547,20 +445,25 @@ export default withSignIn(function AddMember() {
     };
   });
 
-  const keyPackages =
-    useObservableMemo(
-      () =>
-        keyPackageStore$.pipe(
-          switchMap((store) => (store ? store.list() : Promise.resolve([]))),
-        ),
-      [],
-    ) ?? [];
-
   const [selectedGroupKey, setSelectedGroupKey] = useState("");
-  const [selectedKeyPackageId, setSelectedKeyPackageId] = useState("");
-  const [selectedKeyPackage, setSelectedKeyPackage] =
-    useState<CompleteKeyPackage | null>(null);
-  const [recipientPubkey, setRecipientPubkey] = useState("");
+  const [keyPackageEventId, setKeyPackageEventId] = useState("");
+
+  const keyPackageEvent =
+    useObservableMemo(() => {
+      if (!keyPackageEventId) return of(null);
+
+      try {
+        const result = decodePointer(keyPackageEventId);
+        // Expecting an nevent pointer; other pointer types are ignored
+        if (result.type !== "nevent") throw new Error("Invalid pointer type");
+
+        // Subscribe to the event via the event store so it will be
+        return eventStore.event(result.data);
+      } catch (err) {
+        console.error("Failed to decode NIP-19 pointer:", err);
+        return of(null);
+      }
+    }, [keyPackageEventId]) ?? null;
 
   const { isAdding, result, error, setError, addMember, reset } =
     useAddMember();
@@ -569,39 +472,11 @@ export default withSignIn(function AddMember() {
     setSelectedGroupKey(key);
   };
 
-  const handleKeyPackageSelect = async (keyPackageId: string) => {
-    if (!keyPackageStore || !keyPackageId) {
-      setSelectedKeyPackageId("");
-      setSelectedKeyPackage(null);
-      return;
-    }
-
-    try {
-      setSelectedKeyPackageId(keyPackageId);
-
-      const keyPackage = keyPackages.find(
-        (kp) => bytesToHex(kp.initKey) === keyPackageId,
-      );
-      if (!keyPackage) {
-        console.error("Selected key package not found");
-        return;
-      }
-
-      const completePackage =
-        await keyPackageStore.getCompletePackage(keyPackage);
-      if (completePackage) {
-        setSelectedKeyPackage(completePackage);
-      } else {
-        console.error("Could not load the complete key package");
-      }
-    } catch (err) {
-      console.error("Failed to load key package:", err);
-    }
-  };
-
   const handleAddMember = async () => {
-    if (!selectedGroupKey || !selectedKeyPackage) {
-      console.error("Please select both a group and a key package");
+    if (!selectedGroupKey || !keyPackageEvent) {
+      console.error(
+        "Please select a group and provide a valid key package event ID",
+      );
       return;
     }
 
@@ -632,7 +507,7 @@ export default withSignIn(function AddMember() {
     }
 
     // Use the already deserialized ClientState from the groups array
-    addMember(selectedGroupData.state, selectedKeyPackage, recipientPubkey);
+    addMember(selectedGroupData.state, keyPackageEvent);
   };
 
   return (
@@ -649,14 +524,12 @@ export default withSignIn(function AddMember() {
       {!result && (
         <ConfigurationForm
           groups={groups}
-          keyPackages={keyPackages}
           selectedGroupKey={selectedGroupKey}
-          selectedKeyPackageId={selectedKeyPackageId}
-          recipientPubkey={recipientPubkey}
+          keyPackageEventId={keyPackageEventId}
+          hasKeyPackageEvent={!!keyPackageEvent}
           isAdding={isAdding}
           onGroupSelect={handleGroupSelect}
-          onKeyPackageSelect={handleKeyPackageSelect}
-          onRecipientPubkeyChange={setRecipientPubkey}
+          onKeyPackageEventIdChange={setKeyPackageEventId}
           onSubmit={handleAddMember}
         />
       )}

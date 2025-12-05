@@ -19,7 +19,7 @@ export interface CreateGiftWrapOptions {
   /** The unsigned welcome event (kind 444) to wrap */
   rumor: Rumor;
   /** The recipient's public key (hex string) */
-  recipientPubkey: string;
+  recipient: string;
   /** The signer for creating the gift wrap */
   signer: EventSigner;
   /** Optional gift wrap options */
@@ -38,14 +38,8 @@ export interface CreateGiftWrapOptions {
 export async function createGiftWrap(
   options: CreateGiftWrapOptions,
 ): Promise<NostrEvent> {
-  const { rumor, recipientPubkey, signer, opts } = options;
+  const { rumor, recipient, signer, opts } = options;
 
   // Use the GiftWrapBlueprint to create the gift wrap
-  return await create(
-    { signer },
-    GiftWrapBlueprint,
-    recipientPubkey,
-    rumor,
-    opts,
-  );
+  return await create({ signer }, GiftWrapBlueprint, recipient, rumor, opts);
 }

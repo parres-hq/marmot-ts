@@ -1,5 +1,5 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { NostrEvent, Rumor, UnsignedEvent } from "applesauce-core/helpers";
+import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
 import { EventSigner } from "applesauce-factory";
 import {
   CiphersuiteImpl,
@@ -8,12 +8,13 @@ import {
   createCommit,
 } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
-import { CredentialBasic } from "ts-mls/credential.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
 import { createGiftWrap } from "../utils/nostr.js";
 import { extractMarmotGroupData } from "./client-state.js";
+import { getCredentialPubkey } from "./credential.js";
 import { createGroupEvent } from "./group.js";
-import { createWelcomeEvent } from "./welcome.js";
+import { getKeyPackage } from "./key-package.js";
+import { createWelcomeRumor } from "./welcome.js";
 
 /**
  * Result of adding a member to a group with Nostr integration.
@@ -34,11 +35,11 @@ export interface AddMemberResult {
  */
 export interface AddMemberParams {
   /** The current ClientState */
-  currentClientState: ClientState;
+  state: ClientState;
   /** The key package of the new member to add */
-  newMemberKeyPackage: KeyPackage;
+  keyPackageEvent: NostrEvent;
   /** The cipher suite implementation for cryptographic operations */
-  ciphersuiteImpl: CiphersuiteImpl;
+  ciphersuite: CiphersuiteImpl;
   /** The event signer for creating gift wraps */
   signer: EventSigner;
 }
@@ -59,46 +60,41 @@ export interface AddMemberParams {
 export async function addMemberWithNostrIntegration(
   params: AddMemberParams,
 ): Promise<AddMemberResult> {
-  const { currentClientState, newMemberKeyPackage, ciphersuiteImpl, signer } =
-    params;
+  const {
+    state,
+    keyPackageEvent: keyPackageEvent,
+    ciphersuite,
+    signer,
+  } = params;
 
   // Step 1: Perform MLS member addition
-  const commitResult = await addMemberToGroup(
-    currentClientState,
-    newMemberKeyPackage,
-    ciphersuiteImpl,
-  );
+  const keyPackage = getKeyPackage(keyPackageEvent);
+  const commitResult = await addMemberToGroup(state, keyPackage, ciphersuite);
 
   // Step 2: Create Nostr commit event
-  const marmotData = extractMarmotGroupData(currentClientState);
-  if (!marmotData) {
-    throw new Error("MarmotGroupData not found in ClientState");
-  }
-  const nostrGroupId = bytesToHex(marmotData.nostrGroupId);
+  const marmotData = extractMarmotGroupData(state);
+  if (!marmotData) throw new Error("MarmotGroupData not found in ClientState");
 
+  const nostrGroupId = bytesToHex(marmotData.nostrGroupId);
   const commitEvent = createGroupEvent(commitResult.commit, nostrGroupId);
 
   // Step 3: Create welcome event
-  if (!commitResult.welcome) {
+  if (!commitResult.welcome)
     throw new Error(
       "Welcome message not generated. This should not happen when adding a member.",
     );
-  }
 
-  const keyPackageId = bytesToHex(newMemberKeyPackage.initKey);
-  const welcomeEvent = createWelcomeEvent(
+  const welcomeEvent = createWelcomeRumor(
     commitResult.welcome,
-    keyPackageId,
+    keyPackageEvent.id,
     await signer.getPublicKey(),
     marmotData.relays,
   );
 
   // Step 4: create gift wrap
   const giftWrapEvent = await createGiftWrap({
-    rumor: welcomeEvent as Rumor,
-    recipientPubkey: bytesToHex(
-      (newMemberKeyPackage.leafNode.credential as CredentialBasic).identity,
-    ),
+    rumor: welcomeEvent,
+    recipient: getCredentialPubkey(keyPackage.leafNode.credential),
     signer,
   });
 
