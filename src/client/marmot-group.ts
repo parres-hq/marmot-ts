@@ -1,15 +1,41 @@
-import { NostrEvent } from "applesauce-core/helpers/event";
 import { EventSigner } from "applesauce-factory";
+import { NostrEvent } from "applesauce-core/helpers/event";
 import {
   CiphersuiteImpl,
   ClientState,
   CryptoProvider,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
+  KeyPackage,
 } from "ts-mls";
-import { addMemberToGroup } from "../core/group-membership.js";
-import { getKeyPackage } from "../core/key-package.js";
 import { GroupStore } from "../store/group-store.js";
+import { NostrPool } from "./interfaces.js";
+import { addMember } from "./transactions/add-member.js";
+import { extractMarmotGroupData } from "../core/client-state.js";
+import { MarmotGroupData } from "../core/protocol.js";
+
+/** An strict interface for what the transaction can read from the group */
+export type GroupTransactionInput = Readonly<{
+  /** The current state of the group */
+  state: ClientState;
+  /** The nostr relay pool to use for the transaction */
+  pool: NostrPool;
+  /** The signer used for the clients identity */
+  signer: EventSigner;
+  /** The ciphersuite implementation to use for the group */
+  ciphersuite: CiphersuiteImpl;
+}>;
+
+/** A generic type for group state transitions */
+export type GroupTransaction = (input: GroupTransactionInput) => Promise<{
+  /** New state for the group */
+  state: ClientState;
+}>;
+
+/** Builder for group transactions */
+export type GroupTransactionBuilder<Args extends unknown[]> = (
+  ...args: Args[]
+) => GroupTransaction;
 
 export type MarmotGroupOptions = {
   /** The backend to store and load the group from */
@@ -18,6 +44,8 @@ export type MarmotGroupOptions = {
   signer: EventSigner;
   /** The ciphersuite implementation to use for the group */
   ciphersuite: CiphersuiteImpl;
+  /** The nostr relay pool to use for the group */
+  pool: NostrPool;
 };
 
 export class MarmotGroup {
@@ -30,15 +58,24 @@ export class MarmotGroup {
   /** The ciphersuite implementation to use for the group */
   readonly ciphersuite: CiphersuiteImpl;
 
+  /** The nostr relay pool to use for the group */
+  readonly pool: NostrPool;
+
   /** Whether the group state has been modified */
   dirty = false;
 
-  /** Internal group state */
+  /** Internal state */
   private _state: ClientState;
+  private _groupData: MarmotGroupData | null = null;
 
   /** Read the current group state */
   get state() {
     return this._state;
+  }
+  get groupData() {
+    // If not cached, extract the group data from the state
+    if (!this._groupData) this._groupData = extractMarmotGroupData(this.state);
+    return this._groupData;
   }
 
   /**
@@ -46,15 +83,60 @@ export class MarmotGroup {
    * @warning It is not recommended to use this
    */
   set state(newState: ClientState) {
+    // Read new group data from the state
+    this._groupData = extractMarmotGroupData(newState);
+
+    // Set new state and mark as dirty
     this._state = newState;
     this.dirty = true;
   }
 
+  // Common accessors for marmot group data
+  get relays() {
+    return this.groupData?.relays;
+  }
+
   constructor(state: ClientState, options: MarmotGroupOptions) {
+    this._state = state;
     this.store = options.store;
     this.signer = options.signer;
-    this._state = state;
     this.ciphersuite = options.ciphersuite;
+    this.pool = options.pool;
+  }
+
+  /** Run a transaction on the group */
+  async transaction(transaction: GroupTransaction): Promise<void>;
+  async transaction<Args extends unknown[]>(
+    builder: GroupTransactionBuilder<Args>,
+    ...args: Args
+  ): Promise<void>;
+  async transaction(...args: unknown[]): Promise<void> {
+    let transaction: GroupTransaction;
+
+    // Either run the transaction or create a transaction from a builder
+    if (args.length === 1) {
+      transaction = args[0] as GroupTransaction;
+    } else {
+      const builder = args[0] as GroupTransactionBuilder<unknown[]>;
+      transaction = builder(...(args.slice(1) as any));
+    }
+
+    // Create a static input for the transaction
+    const input = Object.freeze({
+      state: this.state,
+      pool: this.pool,
+      signer: this.signer,
+      ciphersuite: this.ciphersuite,
+    });
+
+    // Run the transaction
+    const { state } = await transaction(input);
+
+    // Update the group state
+    this.state = state;
+
+    // Save the group state to the store
+    await this.save();
   }
 
   /** Loads a group from the store */
@@ -83,19 +165,10 @@ export class MarmotGroup {
     this.dirty = false;
   }
 
-  /**
-   * A simple test method for adding a member to the group based on a key package event.
-   * NOTE: This is way too simple and does not handle publishing the commit event or gift wrapping the welcome message.
-   */
-  async addMember(keyPackageEvent: NostrEvent) {
-    const keyPackage = getKeyPackage(keyPackageEvent);
-
-    const { newState } = await addMemberToGroup(
-      this.state,
-      keyPackage,
-      this.ciphersuite,
+  /** Temp add member transaction */
+  async addMember(keyPackage: NostrEvent) {
+    await this.transaction(
+      addMember({ keyPackageEvent: keyPackage, inboxes: this.relays ?? [] }),
     );
-
-    this.state = newState;
   }
 }

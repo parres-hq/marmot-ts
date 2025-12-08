@@ -18,9 +18,12 @@ import { createSimpleGroup, SimpleGroupOptions } from "../core/group.js";
 import { generateKeyPackage } from "../core/key-package.js";
 import { GroupStore } from "../store/group-store.js";
 import { KeyPackageStore } from "../store/key-package-store.js";
+import { NostrPool } from "./interfaces.js";
 import { MarmotGroup } from "./marmot-group.js";
 
 export type MarmotClientOptions = {
+  /** The signer used for the clients identity */
+  signer: EventSigner;
   /** The capabilities to use for the client */
   capabilities?: Capabilities;
   /** The backend to store and load the groups from */
@@ -29,12 +32,21 @@ export type MarmotClientOptions = {
   keyPackageStore: KeyPackageStore;
   /** The crypto provider to use for cryptographic operations */
   cryptoProvider?: CryptoProvider;
+  /** The nostr relay pool to use for the client */
+  pool: NostrPool;
 };
 
 export class MarmotClient {
+  /** The signer used for the clients identity */
+  readonly signer: EventSigner;
+  /** The capabilities to use for the client */
   readonly capabilities: Capabilities;
+  /** The backend to store and load the groups from */
   readonly groupStore: GroupStore;
+  /** The backend to store and load the key packages from */
   readonly keyPackageStore: KeyPackageStore;
+  /** The nostr relay pool to use for the client */
+  readonly pool: NostrPool;
 
   /** Crypto provider for cryptographic operations */
   public cryptoProvider?: CryptoProvider;
@@ -42,15 +54,12 @@ export class MarmotClient {
   /** Internal store for group classes */
   private groups = new Map<string, MarmotGroup>();
 
-  constructor(
-    readonly signer: EventSigner,
-    options: MarmotClientOptions,
-  ) {
+  constructor(options: MarmotClientOptions) {
+    this.signer = options.signer;
     this.capabilities = options.capabilities ?? defaultCapabilities();
-
-    // Setup storage
     this.groupStore = options.groupStore;
     this.keyPackageStore = options.keyPackageStore;
+    this.pool = options.pool;
   }
 
   /** Get a ciphersuite implementation from a name or id */
@@ -73,6 +82,7 @@ export class MarmotClient {
         store: this.groupStore,
         signer: this.signer,
         cryptoProvider: this.cryptoProvider,
+        pool: this.pool,
       });
 
       // Save group to cache
@@ -94,6 +104,7 @@ export class MarmotClient {
       ciphersuite: cipherSuite,
       store: this.groupStore,
       signer: this.signer,
+      pool: this.pool,
     });
 
     // Save the group to the store

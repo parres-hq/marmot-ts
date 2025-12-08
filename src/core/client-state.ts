@@ -30,9 +30,7 @@ export function extractMarmotGroupData(
       ext.extensionType === MARMOT_GROUP_DATA_EXTENSION_TYPE,
   );
 
-  if (!marmotExtension) {
-    return null;
-  }
+  if (!marmotExtension) return null;
 
   return decodeMarmotGroupData(marmotExtension.extensionData);
 }
