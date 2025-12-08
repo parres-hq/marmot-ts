@@ -153,7 +153,7 @@ export function replacer(key: string, value: any): any {
   return value;
 }
 
-function reviver(_key: string, value: any): any {
+function reviver(key: string, value: any): any {
   if (typeof value === "string") {
     // Restore Uint8Array
     if (value.startsWith(HEX_PREFIX)) {
@@ -174,6 +174,11 @@ function reviver(_key: string, value: any): any {
     Array.isArray(value.value)
   ) {
     return new Map(value.value);
+  }
+
+  // Handle ratchetTree array - convert null blank nodes back to undefined
+  if (key === "ratchetTree" && Array.isArray(value)) {
+    return value.map((node) => (node === null ? undefined : node));
   }
 
   return value;
