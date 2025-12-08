@@ -1,5 +1,5 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers";
+import { NostrEvent, Rumor } from "applesauce-core/helpers";
 import { EventSigner } from "applesauce-factory";
 import {
   CiphersuiteImpl,
@@ -24,8 +24,8 @@ export interface AddMemberResult {
   clientState: ClientState;
   /** The Nostr commit event that was published */
   commitEvent: NostrEvent;
-  /** The unsigned welcome event */
-  welcomeEvent: UnsignedEvent;
+  /** The welcome rumor with precomputed ID (used for gift-wrapping) */
+  welcomeEvent: Rumor;
   /** The gift-wrapped welcome event (kind 1059) */
   giftWrapEvent: NostrEvent;
 }
@@ -50,7 +50,7 @@ export interface AddMemberParams {
  * This function orchestrates the complete workflow for adding a member:
  * 1. Creates an Add proposal and Commit using MLS operations
  * 2. Generates Nostr events (commit and welcome)
- * 3. Optionally gift-wraps the welcome message for privacy
+ * 3. Gift-wraps the welcome message for privacy
  * 4. Returns all events and updated group state
  *
  * @param params - Parameters for adding a member with Nostr integration
