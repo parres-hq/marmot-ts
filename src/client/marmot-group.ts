@@ -1,18 +1,17 @@
-import { EventSigner } from "applesauce-factory";
 import { NostrEvent } from "applesauce-core/helpers/event";
+import { EventSigner } from "applesauce-factory";
 import {
   CiphersuiteImpl,
   ClientState,
   CryptoProvider,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
-  KeyPackage,
 } from "ts-mls";
+import { extractMarmotGroupData } from "../core/client-state.js";
+import { MarmotGroupData } from "../core/protocol.js";
 import { GroupStore } from "../store/group-store.js";
 import { NostrPool } from "./interfaces.js";
 import { addMember } from "./transactions/add-member.js";
-import { extractMarmotGroupData } from "../core/client-state.js";
-import { MarmotGroupData } from "../core/protocol.js";
 
 /** An strict interface for what the transaction can read from the group */
 export type GroupTransactionInput = Readonly<{
