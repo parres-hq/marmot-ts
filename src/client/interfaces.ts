@@ -44,5 +44,5 @@ export interface NostrPoolRead {
   ): Subscribable<NostrEvent[]>;
 }
 
-/** Merged intereface for a nostr relay pool */
+/** Merged interface for a nostr relay pool */
 export interface NostrPool extends NostrPoolWrite, NostrPoolRead {}

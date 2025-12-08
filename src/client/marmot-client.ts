@@ -60,6 +60,7 @@ export class MarmotClient {
     this.groupStore = options.groupStore;
     this.keyPackageStore = options.keyPackageStore;
     this.pool = options.pool;
+    this.cryptoProvider = options.cryptoProvider;
   }
 
   /** Get a ciphersuite implementation from a name or id */

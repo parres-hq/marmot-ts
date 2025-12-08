@@ -33,7 +33,7 @@ export type GroupTransaction = (input: GroupTransactionInput) => Promise<{
 
 /** Builder for group transactions */
 export type GroupTransactionBuilder<Args extends unknown[]> = (
-  ...args: Args[]
+  ...args: Args
 ) => GroupTransaction;
 
 export type MarmotGroupOptions = {
@@ -117,7 +117,7 @@ export class MarmotGroup {
       transaction = args[0] as GroupTransaction;
     } else {
       const builder = args[0] as GroupTransactionBuilder<unknown[]>;
-      transaction = builder(...(args.slice(1) as any));
+      transaction = builder(...args.slice(1));
     }
 
     // Create a static input for the transaction

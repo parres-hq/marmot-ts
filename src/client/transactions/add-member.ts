@@ -23,14 +23,16 @@ export interface AddMemberOptions {
  * Group transaction for adding a new member to an existing MLS group with
  * complete Nostr integration.
  *
- * This transaction orchestrates the complete workflow for adding a member:
+ * This transaction orchestrates the complete workflow for adding a member and
+ * delivering the corresponding Nostr events:
  * 1. Creates an Add proposal and Commit using MLS operations
  * 2. Generates Nostr events (commit and welcome)
  * 3. Gift-wraps the welcome message
+ * 4. Publishes the commit and gift-wrapped welcome events to the configured
+ *    inbox relays
  *
- * Note: The generated Nostr events are currently not published; callers are
- * expected to extend this transaction or add follow-up transactions for
- * publishing via the configured Nostr pool.
+ * Callers can still extend this transaction (e.g. to publish to additional
+ * relay targets or perform other side effects) if needed.
  */
 export function addMember(options: AddMemberOptions): GroupTransaction {
   return async ({ state, ciphersuite, signer, pool }) => {
@@ -70,7 +72,6 @@ export function addMember(options: AddMemberOptions): GroupTransaction {
     });
 
     // Publish the events to the inbox relays
-    // NOTE: I do not know if this is correct yet, mostly a placeholder for now
     await pool.publish(inboxes, commitEvent);
     await pool.publish(inboxes, giftWrapEvent);
 
