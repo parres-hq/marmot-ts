@@ -1,8 +1,8 @@
 import { NostrEvent, Rumor } from "applesauce-core/helpers";
-import { GiftWrapBlueprint } from "applesauce-factory/blueprints";
-import { EventFactory } from "applesauce-factory";
-import type { GiftWrapOptions } from "applesauce-factory/operations/gift-wrap";
 import type { EventSigner } from "applesauce-factory";
+import { create } from "applesauce-factory";
+import { GiftWrapBlueprint } from "applesauce-factory/blueprints";
+import type { GiftWrapOptions } from "applesauce-factory/operations/gift-wrap";
 
 /** Returns the value of a name / value tag */
 export function getTagValue(
@@ -19,7 +19,7 @@ export interface CreateGiftWrapOptions {
   /** The unsigned welcome event (kind 444) to wrap */
   rumor: Rumor;
   /** The recipient's public key (hex string) */
-  recipientPubkey: string;
+  recipient: string;
   /** The signer for creating the gift wrap */
   signer: EventSigner;
   /** Optional gift wrap options */
@@ -38,11 +38,8 @@ export interface CreateGiftWrapOptions {
 export async function createGiftWrap(
   options: CreateGiftWrapOptions,
 ): Promise<NostrEvent> {
-  const { rumor, recipientPubkey, signer, opts } = options;
-
-  // Create a factory with the signer
-  const factory = new EventFactory({ signer });
+  const { rumor, recipient, signer, opts } = options;
 
   // Use the GiftWrapBlueprint to create the gift wrap
-  return await factory.create(GiftWrapBlueprint, recipientPubkey, rumor, opts);
+  return await create({ signer }, GiftWrapBlueprint, recipient, rumor, opts);
 }

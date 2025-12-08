@@ -32,7 +32,7 @@ describe("exports", () => {
         "createMarmotGroupData",
         "createSimpleGroup",
         "createThreeMonthLifetime",
-        "createWelcomeEvent",
+        "createWelcomeRumor",
         "decodeContent",
         "decodeMarmotGroupData",
         "defaultCapabilities",
@@ -73,7 +73,6 @@ describe("exports", () => {
         "replacer",
         "serializeClientState",
         "supportsMarmotExtensions",
-        "validateKeyPackageForGroup",
       ]
     `);
   });

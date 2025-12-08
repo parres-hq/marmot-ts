@@ -1,4 +1,6 @@
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
+import { Rumor } from "applesauce-core/helpers";
+import { NostrEvent } from "applesauce-core/helpers/event";
+import { getEventHash } from "nostr-tools";
 import { decodeWelcome, encodeWelcome, type Welcome } from "ts-mls/welcome.js";
 import {
   decodeContent,
@@ -8,34 +10,42 @@ import {
 import { WELCOME_EVENT_KIND } from "./protocol.js";
 
 /**
- * Creates an unsigned Nostr event (kind 444) for a welcome message.
+ * Creates a welcome rumor (kind 444) for a welcome message.
  *
  * @param welcomeMessage - The MLS welcome message
- * @param keyPackageId - The ID of the key package used for the add operation
- * @param pubkey - The sender's public key (hex string)
- * @param relays - Array of relay URLs for the group
- * @returns Unsigned Nostr event
+ * @param keyPackageEventId - The ID of the key package event used for the add operation
+ * @param author - The author's public key (hex string)
+ * @param groupRelays - Array of relay URLs for the group
+ * @returns Welcome rumor with precomputed ID
  */
-export function createWelcomeEvent(
+export function createWelcomeRumor(
   welcomeMessage: Welcome,
-  keyPackageId: string,
-  pubkey: string,
-  relays: string[],
-): UnsignedEvent {
+  keyPackageEventId: string,
+  author: string,
+  groupRelays: string[],
+): Rumor {
   // Serialize the welcome message according to RFC 9420
   const serializedWelcome = encodeWelcome(welcomeMessage);
   const content = encodeContent(serializedWelcome, "base64");
 
-  return {
+  const draft = {
     kind: WELCOME_EVENT_KIND,
-    pubkey,
+    pubkey: author,
     created_at: Math.floor(Date.now() / 1000),
     content,
     tags: [
-      ["e", keyPackageId],
-      ["relays", ...relays],
+      ["e", keyPackageEventId],
+      ["relays", ...groupRelays],
       ["encoding", "base64"],
     ],
+  };
+
+  // Calculate the event ID for the rumor
+  const id = getEventHash(draft);
+
+  return {
+    ...draft,
+    id,
   };
 }
 
