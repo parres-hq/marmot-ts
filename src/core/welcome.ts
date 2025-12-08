@@ -10,13 +10,13 @@ import {
 import { WELCOME_EVENT_KIND } from "./protocol.js";
 
 /**
- * Creates an unsigned Nostr event (kind 444) for a welcome message.
+ * Creates a welcome rumor (kind 444) for a welcome message.
  *
  * @param welcomeMessage - The MLS welcome message
  * @param keyPackageEventId - The ID of the key package event used for the add operation
  * @param author - The author's public key (hex string)
  * @param groupRelays - Array of relay URLs for the group
- * @returns Unsigned Nostr event
+ * @returns Welcome rumor with precomputed ID
  */
 export function createWelcomeRumor(
   welcomeMessage: Welcome,
