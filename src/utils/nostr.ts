@@ -43,3 +43,8 @@ export async function createGiftWrap(
   // Use the GiftWrapBlueprint to create the gift wrap
   return await create({ signer }, GiftWrapBlueprint, recipient, rumor, opts);
 }
+
+/** Returns the current Unix timestamp in seconds */
+export function unixNow(): number {
+  return Math.floor(Date.now() / 1000);
+}

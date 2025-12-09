@@ -1,16 +1,13 @@
-import { bytesToHex, randomBytes } from "@noble/hashes/utils.js";
-import { NostrEvent } from "applesauce-core/helpers";
-import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools";
+import { randomBytes } from "@noble/hashes/utils.js";
 import {
   CiphersuiteImpl,
   Extension,
   createGroup as MLSCreateGroup,
 } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
-import { encodeMlsMessage, type MLSMessage } from "ts-mls/message.js";
 import { CompleteKeyPackage } from "./key-package.js";
 import { marmotGroupDataToExtension } from "./marmot-group-data.js";
-import { GROUP_EVENT_KIND, MarmotGroupData } from "./protocol.js";
+import { MarmotGroupData } from "./protocol.js";
 
 /**
  * Parameters for creating a new MLS group.
@@ -111,30 +108,4 @@ export async function createSimpleGroup(
     marmotGroupData,
     ciphersuiteImpl,
   });
-}
-
-/**
- * Creates an unsigned Nostr event (kind 445) for a group commit message.
- *
- * @param commitMessage - The serialized MLS commit message
- * @param groupId - The 32-byte Nostr group ID (from MarmotGroupData)
- * @param pubkey - The sender's public key (hex string)
- * @param relays - Array of relay URLs for the group
- * @returns Unsigned Nostr event
- */
-export function createGroupEvent(
-  commitMessage: MLSMessage,
-  groupId: string,
-): NostrEvent {
-  const serializedMessage = encodeMlsMessage(commitMessage);
-  const content = bytesToHex(serializedMessage);
-  const secretKey = generateSecretKey();
-  const unsignedEvent = {
-    kind: GROUP_EVENT_KIND,
-    pubkey: getPublicKey(secretKey),
-    created_at: Math.floor(Date.now() / 1000),
-    content,
-    tags: [["h", groupId]],
-  };
-  return finalizeEvent(unsignedEvent, secretKey);
 }
