@@ -68,6 +68,19 @@ export class GroupStore {
   }
 
   /**
+   * Updates an existing ClientState in the store.
+   *
+   * This is effectively an upsert: if a group with the same ID already
+   * exists, it will be overwritten; otherwise, it will be created.
+   *
+   * @param clientState - The updated ClientState to store
+   * @returns A promise that resolves to the storage key used
+   */
+  async update(clientState: ClientState): Promise<string> {
+    return this.add(clientState);
+  }
+
+  /**
    * Retrieves the ClientState from storage.
    *
    * @param groupId - The group ID (as Uint8Array or hex string)
