@@ -2,12 +2,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { decodePointer, NostrEvent } from "applesauce-core/helpers";
 import { useState } from "react";
 import { of, switchMap } from "rxjs";
-import { getCiphersuiteFromName, getCiphersuiteImpl } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
-import {
-  addMemberWithNostrIntegration,
-  type AddMemberResult,
-} from "../../../../src/core";
 import {
   extractMarmotGroupData,
   getMemberCount,
@@ -17,8 +12,9 @@ import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
-import { groupStore$, notifyStoreChange } from "../../lib/group-store";
+import { groupStore$ } from "../../lib/group-store";
 import { eventStore } from "../../lib/nostr";
+import { getMarmotClient } from "../../lib/marmot-client";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -220,7 +216,7 @@ function ConfigurationForm({
 // ============================================================================
 
 interface ResultsDisplayProps {
-  result: AddMemberResult;
+  result: { state: ClientState };
   onReset: () => void;
 }
 
@@ -245,7 +241,7 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
         <div>
           <div className="font-bold">Member added successfully!</div>
           <div className="text-sm">
-            Group epoch advanced to {result.clientState.groupContext.epoch}
+            Group epoch advanced to {result.state.groupContext.epoch}
           </div>
         </div>
       </div>
@@ -257,15 +253,13 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="stat bg-base-100 rounded">
               <div className="stat-title">Members</div>
-              <div className="stat-value">
-                {getMemberCount(result.clientState)}
-              </div>
+              <div className="stat-value">{getMemberCount(result.state)}</div>
             </div>
 
             <div className="stat bg-base-100 rounded">
               <div className="stat-title">Epoch</div>
               <div className="stat-value">
-                {result.clientState.groupContext.epoch}
+                {result.state.groupContext.epoch}
               </div>
             </div>
           </div>
@@ -274,7 +268,7 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
 
           <div className="space-y-2">
             {(() => {
-              const marmotData = extractMarmotGroupData(result.clientState);
+              const marmotData = extractMarmotGroupData(result.state);
               if (!marmotData)
                 return <div>Error: MarmotGroupData not found</div>;
 
@@ -303,38 +297,6 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
         </div>
       </div>
 
-      {/* Commit Event */}
-      <div className="card bg-base-200">
-        <div className="card-body">
-          <h2 className="card-title">
-            Commit Event (Kind {result.commitEvent.kind})
-          </h2>
-          <JsonBlock value={result.commitEvent} />
-        </div>
-      </div>
-
-      {/* Welcome Event */}
-      <div className="card bg-base-200">
-        <div className="card-body">
-          <h2 className="card-title">
-            Welcome Event (Kind {result.welcomeEvent.kind})
-          </h2>
-          <JsonBlock value={result.welcomeEvent} />
-        </div>
-      </div>
-
-      {/* Gift Wrap Event */}
-      {result.giftWrapEvent && (
-        <div className="card bg-base-200">
-          <div className="card-body">
-            <h2 className="card-title">
-              Gift-Wrap Event (Kind {result.giftWrapEvent.kind})
-            </h2>
-            <JsonBlock value={result.giftWrapEvent} />
-          </div>
-        </div>
-      )}
-
       {/* Reset Button */}
       <div className="flex justify-end">
         <button className="btn btn-outline" onClick={onReset}>
@@ -350,9 +312,8 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
 // ============================================================================
 
 function useAddMember() {
-  const groupStore = useObservable(groupStore$);
   const [isAdding, setIsAdding] = useState(false);
-  const [result, setResult] = useState<AddMemberResult | null>(null);
+  const [result, setResult] = useState<{ state: ClientState } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const addMember = async (
@@ -364,32 +325,13 @@ function useAddMember() {
       setError(null);
       setResult(null);
 
-      // Get cipher suite implementation
-      const ciphersuite = await getCiphersuiteImpl(
-        getCiphersuiteFromName(selectedClientState.groupContext.cipherSuite),
+      const client = await getMarmotClient();
+      const group = await client.getGroup(
+        selectedClientState.groupContext.groupId,
       );
+      await group.addMember(selectedKeyPackageEvent);
 
-      // Get the current account for signing
-      const account = accounts.active;
-      if (!account) {
-        throw new Error("No active account");
-      }
-
-      // Add member with Nostr integration
-      const addResult = await addMemberWithNostrIntegration({
-        state: selectedClientState,
-        keyPackageEvent: selectedKeyPackageEvent,
-        ciphersuite,
-        signer: account.signer,
-      });
-
-      // Update the group in storage
-      if (groupStore) {
-        await groupStore.add(addResult.clientState);
-        notifyStoreChange();
-      }
-
-      setResult(addResult);
+      setResult({ state: group.state });
       console.log("✅ Member added successfully!");
     } catch (err) {
       console.error("Error adding member:", err);

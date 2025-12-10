@@ -2,31 +2,20 @@ import { useState } from "react";
 import { switchMap } from "rxjs";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import { keyPackageStore$ } from "../../lib/key-package-store";
-import { groupStore$, notifyStoreChange } from "../../lib/group-store";
-import {
-  createSimpleGroup,
-  type CreateGroupResult,
-} from "../../../../src/core";
-import {
-  defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
-} from "ts-mls";
-import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
+import { getMarmotClient } from "../../lib/marmot-client";
 import { bytesToHex } from "@noble/hashes/utils.js";
-import type { KeyPackage } from "ts-mls";
+import type { CiphersuiteName, KeyPackage } from "ts-mls";
 import JsonBlock from "../../components/json-block";
 import { withSignIn } from "../../components/with-signIn";
 import accounts from "../../lib/accounts";
 import { RelayListCreator } from "../../components/form/relay-list-creator";
 import { PubkeyListCreator } from "../../components/form/pubkey-list-creator";
-import {
-  extractMarmotGroupData,
-  getMemberCount,
-} from "../../../../src/core/client-state";
+import { getMemberCount } from "../../../../src/core/client-state";
 import { CompleteKeyPackage } from "../../../../src";
 import { createCredential } from "../../../../src/core/credential";
 import { generateKeyPackage } from "../../../../src/core/key-package";
+import { getCiphersuiteFromName, getCiphersuiteImpl } from "ts-mls";
+import { defaultCryptoProvider } from "ts-mls";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -315,240 +304,18 @@ function ConfigurationForm({
 }
 
 // ============================================================================
-// Component: DraftDisplay
-// ============================================================================
-
-interface DraftDisplayProps {
-  result: CreateGroupResult;
-  isStoring: boolean;
-  onStore: () => void;
-  onReset: () => void;
-}
-
-function DraftDisplay({
-  result,
-  isStoring,
-  onStore,
-  onReset,
-}: DraftDisplayProps) {
-  return (
-    <div className="space-y-4">
-      {/* Group Details */}
-      <div className="card bg-base-200">
-        <div className="card-body">
-          <h2 className="card-title">Group Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="stat bg-base-100 rounded">
-              <div className="stat-title">Group ID</div>
-              <div className="stat-value text-sm font-mono">
-                {bytesToHex(result.clientState.groupContext.groupId).slice(
-                  0,
-                  16,
-                )}
-                ...
-              </div>
-            </div>
-
-            <div className="stat bg-base-100 rounded">
-              <div className="stat-title">Epoch</div>
-              <div className="stat-value">
-                {result.clientState.groupContext.epoch}
-              </div>
-            </div>
-
-            <div className="stat bg-base-100 rounded">
-              <div className="stat-title">Members</div>
-              <div className="stat-value">
-                {getMemberCount(result.clientState)}
-              </div>
-            </div>
-
-            <div className="stat bg-base-100 rounded">
-              <div className="stat-title">Extensions</div>
-              <div className="stat-value">
-                {result.clientState.groupContext.extensions.length}
-              </div>
-            </div>
-          </div>
-
-          <div className="divider"></div>
-
-          <div className="space-y-2">
-            {(() => {
-              const marmotData = extractMarmotGroupData(result.clientState);
-              if (!marmotData)
-                return <div>Error: MarmotGroupData not found</div>;
-
-              return (
-                <>
-                  <div>
-                    <span className="font-semibold">Group Name:</span>{" "}
-                    {marmotData.name}
-                  </div>
-                  {marmotData.description && (
-                    <div>
-                      <span className="font-semibold">Description:</span>{" "}
-                      {marmotData.description}
-                    </div>
-                  )}
-                  <div>
-                    <span className="font-semibold">Nostr Group ID:</span>{" "}
-                    <span className="font-mono text-sm">
-                      {bytesToHex(marmotData.nostrGroupId).slice(0, 16)}...
-                    </span>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      </div>
-
-      {/* Group State (JSON) */}
-      <div className="card bg-base-200">
-        <div className="card-body">
-          <h2 className="card-title">Group State</h2>
-          <JsonBlock
-            value={{
-              groupId: bytesToHex(result.clientState.groupContext.groupId),
-              epoch: Number(result.clientState.groupContext.epoch),
-              members: getMemberCount(result.clientState),
-              extensions: result.clientState.groupContext.extensions.length,
-              // Note: MarmotGroupData would need to be extracted from extensions
-              // This is a simplified version for the example
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex justify-between">
-        <button
-          className="btn btn-outline"
-          onClick={onReset}
-          disabled={isStoring}
-        >
-          Reset
-        </button>
-        <button
-          className="btn btn-success btn-lg"
-          onClick={onStore}
-          disabled={isStoring}
-        >
-          {isStoring ? (
-            <>
-              <span className="loading loading-spinner"></span>
-              Storing...
-            </>
-          ) : (
-            "Store Group Locally"
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Component: SuccessDisplay
-// ============================================================================
-
-interface SuccessDisplayProps {
-  result: CreateGroupResult;
-  storageKey: string;
-}
-
-function SuccessDisplay({ result, storageKey }: SuccessDisplayProps) {
-  // Extract basic info from ClientState
-  const groupId = bytesToHex(result.clientState.groupContext.groupId);
-  const epoch = Number(result.clientState.groupContext.epoch);
-  const memberCount = getMemberCount(result.clientState);
-  const extensionCount = result.clientState.groupContext.extensions.length;
-
-  return (
-    <div className="space-y-4">
-      <div className="alert alert-success">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="stroke-current shrink-0 h-6 w-6"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <div>
-          <div className="font-bold">
-            Group created and stored successfully!
-          </div>
-          <div className="text-sm">
-            Storage Key: {storageKey.slice(0, 16)}...
-          </div>
-        </div>
-      </div>
-
-      {/* Group Details */}
-      <div className="card bg-base-200">
-        <div className="card-body">
-          <h2 className="card-title">Created Group</h2>
-          <div className="divider my-1"></div>
-          <JsonBlock
-            value={{
-              groupId,
-              epoch,
-              members: memberCount,
-              extensions: extensionCount,
-              note: "MarmotGroupData can be extracted from extensions using extractMarmotGroupData()",
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="alert alert-info">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          className="h-6 w-6 shrink-0 stroke-current"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          ></path>
-        </svg>
-        <span>
-          The private MLS Group ID is stored locally and should never be
-          published to Nostr relays.
-        </span>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
 // Hook: useGroupCreation
 // ============================================================================
 
 function useGroupCreation() {
-  const groupStore = useObservable(groupStore$);
   const [isCreating, setIsCreating] = useState(false);
-  const [isStoring, setIsStoring] = useState(false);
-  const [draftResult, setDraftResult] = useState<CreateGroupResult | null>(
-    null,
-  );
-  const [storedResult, setStoredResult] = useState<CreateGroupResult | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    groupId: Uint8Array;
+    clientState: any;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [storageKey, setStorageKey] = useState<string | null>(null);
 
-  const createDraft = async (
+  const createGroup = async (
     selectedKeyPackage: CompleteKeyPackage,
     groupName: string,
     groupDescription: string,
@@ -558,33 +325,19 @@ function useGroupCreation() {
     try {
       setIsCreating(true);
       setError(null);
-      setDraftResult(null);
-      setStoredResult(null);
-      setStorageKey(null);
+      setResult(null);
 
-      // Get cipher suite implementation
-      const ciphersuiteName = getCiphersuiteFromName(
-        selectedKeyPackage.publicPackage.cipherSuite,
-      );
-      const ciphersuiteImpl = await getCiphersuiteImpl(
-        ciphersuiteName,
-        defaultCryptoProvider,
-      );
+      const client = await getMarmotClient();
+      const groupId = await client.createGroup(groupName, {
+        description: groupDescription,
+        adminPubkeys: adminPubkeys,
+        relays: relays,
+      });
 
-      // Create group with admin and relays
-      const result = await createSimpleGroup(
-        selectedKeyPackage,
-        ciphersuiteImpl,
-        groupName,
-        {
-          description: groupDescription,
-          adminPubkeys: adminPubkeys,
-          relays: relays,
-        },
-      );
-
-      setDraftResult(result);
-      console.log("✅ Group created! Ready to store.");
+      // Retrieve the group to get the client state for display
+      const group = await client.getGroup(groupId);
+      setResult({ groupId, clientState: group.state });
+      console.log("✅ Group created and stored successfully!");
     } catch (err) {
       console.error("Error creating group:", err);
       setError(err instanceof Error ? err.message : String(err));
@@ -593,52 +346,16 @@ function useGroupCreation() {
     }
   };
 
-  const storeGroup = async () => {
-    if (!draftResult || !groupStore) {
-      setError("No draft group to store");
-      return;
-    }
-
-    try {
-      setIsStoring(true);
-      setError(null);
-
-      // Store the group locally (including serialized client state)
-      console.log("Storing group locally...");
-      const key = await groupStore.add(draftResult.clientState);
-      setStorageKey(key);
-      console.log("Stored with key:", key);
-
-      // Notify that the store has changed
-      notifyStoreChange();
-
-      setStoredResult(draftResult);
-      setDraftResult(null);
-      console.log("✅ Group stored successfully!");
-    } catch (err) {
-      console.error("Error storing group:", err);
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsStoring(false);
-    }
-  };
-
   const reset = () => {
-    setDraftResult(null);
-    setStoredResult(null);
-    setStorageKey(null);
+    setResult(null);
     setError(null);
   };
 
   return {
     isCreating,
-    isStoring,
-    draftResult,
-    storedResult,
+    result,
     error,
-    storageKey,
-    createDraft,
-    storeGroup,
+    createGroup,
     reset,
   };
 }
@@ -655,17 +372,7 @@ export default withSignIn(function GroupCreation() {
       [],
     ) ?? [];
 
-  const {
-    isCreating,
-    isStoring,
-    draftResult,
-    storedResult,
-    error,
-    storageKey,
-    createDraft,
-    storeGroup,
-    reset,
-  } = useGroupCreation();
+  const { isCreating, result, error, createGroup, reset } = useGroupCreation();
 
   const handleFormSubmit = async (data: ConfigurationFormData) => {
     if (!data.selectedKeyPackage) {
@@ -680,12 +387,12 @@ export default withSignIn(function GroupCreation() {
       return;
     }
 
-    // Include current user as admin + any additional ones from the picker
-    const adminPubkeysList = [account.pubkey, ...data.adminPubkeys];
+    // Use only the admin pubkeys from the picker (creator is automatically added by MarmotClient)
+    const adminPubkeysList = [...data.adminPubkeys];
 
     const allRelays = [...data.relays];
 
-    await createDraft(
+    await createGroup(
       data.selectedKeyPackage,
       data.groupName,
       data.groupDescription,
@@ -705,7 +412,7 @@ export default withSignIn(function GroupCreation() {
       </div>
 
       {/* Configuration Form */}
-      {!draftResult && !storedResult && (
+      {!result && (
         <ConfigurationForm
           keyPackages={keyPackages}
           keyPackageStore={keyPackageStore}
@@ -717,19 +424,76 @@ export default withSignIn(function GroupCreation() {
       {/* Error Display */}
       <ErrorAlert error={error} />
 
-      {/* Draft Display */}
-      {draftResult && !storedResult && (
-        <DraftDisplay
-          result={draftResult}
-          isStoring={isStoring}
-          onStore={storeGroup}
-          onReset={reset}
-        />
-      )}
-
       {/* Success Display */}
-      {storedResult && storageKey && (
-        <SuccessDisplay result={storedResult} storageKey={storageKey} />
+      {result && (
+        <div className="space-y-4">
+          <div className="alert alert-success">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="stroke-current shrink-0 h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            <div>
+              <div className="font-bold">
+                Group created and stored successfully!
+              </div>
+              <div className="text-sm">
+                Group ID: {bytesToHex(result.groupId).slice(0, 16)}...
+              </div>
+            </div>
+          </div>
+
+          {/* Group Details */}
+          <div className="card bg-base-200">
+            <div className="card-body">
+              <h2 className="card-title">Created Group</h2>
+              <div className="divider my-1"></div>
+              <JsonBlock
+                value={{
+                  groupId: bytesToHex(result.groupId),
+                  epoch: Number(result.clientState.groupContext.epoch),
+                  members: getMemberCount(result.clientState),
+                  extensions: result.clientState.groupContext.extensions.length,
+                  note: "MarmotGroupData can be extracted from extensions using extractMarmotGroupData()",
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="alert alert-info">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              className="h-6 w-6 shrink-0 stroke-current"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <span>
+              The private MLS Group ID is stored locally and should never be
+              published to Nostr relays.
+            </span>
+          </div>
+
+          <div className="flex justify-end">
+            <button className="btn btn-outline" onClick={reset}>
+              Create Another Group
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
