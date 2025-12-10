@@ -4,7 +4,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { ClientState } from "ts-mls/clientState.js";
 
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
-import { groupStore$, notifyStoreChange } from "../lib/group-store";
+import { groupStore$ } from "../lib/group-store";
 import ClientStateDataView from "./data-view/client-state";
 import {
   extractMarmotGroupData,
@@ -141,7 +141,6 @@ export default function GroupStoreModal() {
     setClearing(true);
     try {
       await groupStore.clear();
-      notifyStoreChange();
     } catch (error) {
       console.error("Failed to clear groups:", error);
       alert("Failed to clear groups. Check console for details.");

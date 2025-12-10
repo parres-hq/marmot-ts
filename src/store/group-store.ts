@@ -14,6 +14,8 @@ export interface GroupStoreBackend extends KeyValueStoreBackend<SerializedClient
 /** Options for creating a {@link GroupStore} instance */
 export type GroupStoreOptions = {
   prefix?: string;
+  /** Optional callback invoked when a group is updated */
+  onUpdate?: (groupId?: string) => void;
 };
 
 /**
@@ -27,6 +29,7 @@ export class GroupStore {
   private backend: GroupStoreBackend;
   private readonly prefix?: string;
   private readonly config: ClientConfig;
+  private readonly onUpdate?: (groupId?: string) => void;
 
   /**
    * Creates a new GroupStore instance.
@@ -37,11 +40,12 @@ export class GroupStore {
   constructor(
     backend: GroupStoreBackend,
     config: ClientConfig,
-    { prefix }: GroupStoreOptions = {},
+    { prefix, onUpdate }: GroupStoreOptions = {},
   ) {
     this.backend = backend;
     this.config = config;
     this.prefix = prefix;
+    this.onUpdate = onUpdate;
   }
 
   /**
@@ -64,6 +68,12 @@ export class GroupStore {
     const storedClientState = serializeClientState(clientState);
 
     await this.backend.setItem(key, storedClientState);
+
+    // Notify about the change if callback provided
+    if (this.onUpdate) {
+      this.onUpdate(bytesToHex(clientState.groupContext.groupId));
+    }
+
     return key;
   }
 
@@ -77,7 +87,7 @@ export class GroupStore {
    * @returns A promise that resolves to the storage key used
    */
   async update(clientState: ClientState): Promise<string> {
-    return this.add(clientState);
+    return await this.add(clientState);
   }
 
   /**
@@ -148,6 +158,11 @@ export class GroupStore {
     } else {
       // Clear all keys
       await this.backend.clear();
+    }
+
+    // Notify about the change if callback provided
+    if (this.onUpdate) {
+      this.onUpdate();
     }
   }
 

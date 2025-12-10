@@ -460,7 +460,6 @@ export default withSignIn(function GroupCreation() {
                   epoch: Number(result.clientState.groupContext.epoch),
                   members: getMemberCount(result.clientState),
                   extensions: result.clientState.groupContext.extensions.length,
-                  note: "MarmotGroupData can be extracted from extensions using extractMarmotGroupData()",
                 }}
               />
             </div>
