@@ -316,7 +316,6 @@ function useGroupCreation() {
   const [error, setError] = useState<string | null>(null);
 
   const createGroup = async (
-    selectedKeyPackage: CompleteKeyPackage,
     groupName: string,
     groupDescription: string,
     adminPubkeys: string[],
@@ -393,7 +392,6 @@ export default withSignIn(function GroupCreation() {
     const allRelays = [...data.relays];
 
     await createGroup(
-      data.selectedKeyPackage,
       data.groupName,
       data.groupDescription,
       adminPubkeysList,
