@@ -10,8 +10,9 @@ import {
 import { extractMarmotGroupData } from "../core/client-state.js";
 import { MarmotGroupData } from "../core/protocol.js";
 import { GroupStore } from "../store/group-store.js";
-import { NostrPool } from "./interfaces.js";
+import { NostrPool, PublishResponse } from "./interfaces.js";
 import { addMember } from "./transactions/accept-add-member.js";
+import { NoGroupRelaysError, NoMarmotGroupDataError } from "./errors.js";
 
 /** An strict interface for what the transaction can read from the group */
 export type GroupTransactionInput = Readonly<{
@@ -23,6 +24,10 @@ export type GroupTransactionInput = Readonly<{
   signer: EventSigner;
   /** The ciphersuite implementation to use for the group */
   ciphersuite: CiphersuiteImpl;
+  /** The group marmot data for the group */
+  groupData: MarmotGroupData;
+  /** A function to publish an event to the group relays */
+  publish: (event: NostrEvent) => Promise<Record<string, PublishResponse>>;
 }>;
 
 /** A generic type for group state transitions */
@@ -112,11 +117,18 @@ export class MarmotGroup {
   }
 
   private createGroupInput(): GroupTransactionInput {
+    const groupData = this.groupData;
+
+    // TODO: This might not be the best place to throw this error.
+    if (!groupData) throw new NoMarmotGroupDataError();
+
     return Object.freeze({
+      groupData: this.groupData,
       state: this.state,
       pool: this.pool,
       signer: this.signer,
       ciphersuite: this.ciphersuite,
+      publish: this.publish.bind(this),
     });
   }
 
@@ -189,6 +201,13 @@ export class MarmotGroup {
     if (!this.dirty) return;
     await this.store.update(this.state);
     this.dirty = false;
+  }
+
+  /** Publish an event to the group relays */
+  async publish(event: NostrEvent): Promise<Record<string, PublishResponse>> {
+    const relays = this.relays;
+    if (!relays) throw new NoGroupRelaysError();
+    return await this.pool.publish(relays, event);
   }
 
   /** Temp add member transaction */

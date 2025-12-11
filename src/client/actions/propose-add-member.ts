@@ -1,5 +1,4 @@
 import { NostrEvent } from "applesauce-core/helpers/event";
-import { extractMarmotGroupData } from "../../core/client-state.js";
 import { createAddMemberProposalMessage } from "../../core/group-membership.js";
 import { createGroupEvent } from "../../core/group-message.js";
 import { getKeyPackage } from "../../core/key-package.js";
@@ -18,14 +17,6 @@ export interface ProposeAddMemberOptions {
    * group.
    */
   keyPackageEvent: NostrEvent;
-
-  /**
-   * Optional explicit relay list for publishing the proposal.
-   *
-   * If not provided, the group's relay list from `MarmotGroupData.relays`
-   * will be used.
-   */
-  relays?: string[];
 }
 
 /**
@@ -39,24 +30,12 @@ export interface ProposeAddMemberOptions {
 export function proposeAddMember(
   options: ProposeAddMemberOptions,
 ): GroupAction {
-  return async ({ state, pool, ciphersuite }) => {
-    const { keyPackageEvent, relays } = options;
+  return async ({ state, ciphersuite, publish }) => {
+    const { keyPackageEvent } = options;
 
     // Basic validation that the supplied event is a usable KeyPackage
     // (throws if decoding fails).
     getKeyPackage(keyPackageEvent);
-
-    const marmotData = extractMarmotGroupData(state);
-    if (!marmotData)
-      throw new Error("MarmotGroupData not found in ClientState for proposal");
-
-    const groupRelays = marmotData.relays ?? [];
-    const publishRelays = relays && relays.length > 0 ? relays : groupRelays;
-
-    if (publishRelays.length === 0)
-      throw new Error(
-        "No relays available to publish add-member proposal (group has no relays and none were provided)",
-      );
 
     const keyPackage = getKeyPackage(keyPackageEvent);
 
@@ -73,6 +52,6 @@ export function proposeAddMember(
       ciphersuite,
     );
 
-    await pool.publish(publishRelays, proposalEvent);
+    await publish(proposalEvent);
   };
 }
