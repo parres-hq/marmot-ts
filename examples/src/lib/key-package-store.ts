@@ -19,7 +19,10 @@ export const keyPackageStore$ = accounts.active$.pipe(
       localforage.createInstance({
         name: "marmot-key-package-store",
       }),
-      { prefix: account?.pubkey ?? "anon" },
+      {
+        prefix: account?.pubkey ?? "anon",
+        onUpdate: () => notifyStoreChange(), // Wire up notification
+      },
     );
   }),
   // Remit the store when the store changes
@@ -29,12 +32,13 @@ export const keyPackageStore$ = accounts.active$.pipe(
 );
 
 // Helper function to notify about store changes
-export function notifyStoreChange() {
+function notifyStoreChange() {
   storeChanges$.next(storeChanges$.value + 1);
 }
 
 // Observable for the count of key packages in the store
 // This will automatically update when the store changes
 export const keyPackageCount$ = keyPackageStore$.pipe(
-  switchMap((store) => store.count()),
+  combineLatestWith(storeChanges$),
+  switchMap(([store, _]) => store.count()),
 );

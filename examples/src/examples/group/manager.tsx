@@ -9,11 +9,7 @@ import {
 import ClientStateDataView from "../../components/data-view/client-state";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
-import {
-  groupCount$,
-  groupStore$,
-  notifyStoreChange,
-} from "../../lib/group-store";
+import { groupCount$, groupStore$ } from "../../lib/group-store";
 
 // ============================================================================
 // Component: GroupCard
@@ -208,7 +204,6 @@ function GroupManager() {
     try {
       await groupStore.remove(groupId);
       setError(null);
-      notifyStoreChange();
     } catch (err) {
       console.error("Failed to delete group:", err);
       setError(err instanceof Error ? err.message : String(err));

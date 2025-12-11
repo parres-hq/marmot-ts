@@ -4,7 +4,7 @@ import { switchMap } from "rxjs";
 import { KeyPackage, PrivateKeyPackage } from "ts-mls";
 
 import { useObservable, useObservableMemo } from "../hooks/use-observable";
-import { keyPackageStore$, notifyStoreChange } from "../lib/key-package-store";
+import { keyPackageStore$ } from "../lib/key-package-store";
 import KeyPackageDataView from "./data-view/key-package";
 
 interface StoredPackageDetailsProps {
@@ -140,8 +140,6 @@ export default function KeyPackageStoreModal() {
     setClearing(true);
     try {
       await keyPackageStore.clear();
-      // Notify that the store has changed
-      notifyStoreChange();
     } catch (error) {
       console.error("Failed to clear key packages:", error);
       alert("Failed to clear key packages. Check console for details.");

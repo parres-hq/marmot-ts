@@ -13,6 +13,8 @@ export interface KeyPackageStoreBackend extends KeyValueStoreBackend<CompleteKey
 export type KeyPackageStoreOptions = {
   prefix?: string;
   hash?: Hash;
+  /** Optional callback invoked when a key package is added/updated */
+  onUpdate?: (key?: string) => void;
 };
 
 /**
@@ -40,6 +42,7 @@ export class KeyPackageStore {
   private backend: KeyPackageStoreBackend;
   private readonly hash: Hash;
   private readonly prefix?: string;
+  private readonly onUpdate?: (key?: string) => void;
 
   /**
    * Creates a new KeyPackageStore instance.
@@ -49,11 +52,16 @@ export class KeyPackageStore {
    */
   constructor(
     backend: KeyPackageStoreBackend,
-    { prefix, hash = makeHashImpl("SHA-256") }: KeyPackageStoreOptions = {},
+    {
+      prefix,
+      hash = makeHashImpl("SHA-256"),
+      onUpdate,
+    }: KeyPackageStoreOptions = {},
   ) {
     this.backend = backend;
     this.hash = hash;
     this.prefix = prefix;
+    this.onUpdate = onUpdate;
   }
 
   /**
@@ -101,6 +109,12 @@ export class KeyPackageStore {
     };
 
     await this.backend.setItem(key, serialized);
+
+    // Notify about the change if callback provided
+    if (this.onUpdate) {
+      this.onUpdate(key);
+    }
+
     return key;
   }
 
@@ -160,6 +174,11 @@ export class KeyPackageStore {
   async remove(keyOrPackage: Uint8Array | string | KeyPackage): Promise<void> {
     const key = await this.resolveStorageKey(keyOrPackage);
     await this.backend.removeItem(key);
+
+    // Notify about the change if callback provided
+    if (this.onUpdate) {
+      this.onUpdate(key);
+    }
   }
 
   /**
@@ -215,6 +234,11 @@ export class KeyPackageStore {
     } else {
       // Clear all keys
       await this.backend.clear();
+    }
+
+    // Notify about the change if callback provided
+    if (this.onUpdate) {
+      this.onUpdate();
     }
   }
 

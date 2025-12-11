@@ -10,7 +10,7 @@ import { GroupStore, defaultMarmotClientConfig } from "../../../src";
 import accounts from "./accounts";
 
 // Observable that triggers whenever the store changes
-const storeChanges$ = new BehaviorSubject<number>(0);
+export const storeChanges$ = new BehaviorSubject<number>(0);
 
 // Create and export a shared GroupStore instance
 export const groupStore$ = accounts.active$.pipe(
@@ -20,7 +20,10 @@ export const groupStore$ = accounts.active$.pipe(
         name: "marmot-group-store",
       }),
       defaultMarmotClientConfig,
-      { prefix: account?.pubkey ?? "anon" },
+      {
+        prefix: account?.pubkey ?? "anon",
+        onUpdate: () => notifyStoreChange(), // Wire up notification
+      },
     );
   }),
   // Remit the store when the store changes
@@ -30,12 +33,13 @@ export const groupStore$ = accounts.active$.pipe(
 );
 
 // Helper function to notify about store changes
-export function notifyStoreChange() {
+function notifyStoreChange() {
   storeChanges$.next(storeChanges$.value + 1);
 }
 
 // Observable for the count of groups in the store
 // This will automatically update when the store changes
 export const groupCount$ = groupStore$.pipe(
-  switchMap((store) => store.count()),
+  combineLatestWith(storeChanges$),
+  switchMap(([store, _]) => store.count()),
 );
