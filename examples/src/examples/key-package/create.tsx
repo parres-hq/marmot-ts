@@ -26,10 +26,7 @@ import KeyPackageDataView from "../../components/data-view/key-package";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
-import {
-  keyPackageStore$,
-  notifyStoreChange,
-} from "../../lib/key-package-store";
+import { keyPackageStore$ } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
 import { relayConfig$ } from "../../lib/setting";
 
@@ -391,8 +388,6 @@ function useKeyPackageCreation() {
         const key = await keyPackageStore.add(keyPackage);
         setStorageKey(key);
         console.log("Stored with key:", key);
-        // Notify that the store has changed
-        notifyStoreChange();
       }
 
       setCreatedEvent(signedEvent);
