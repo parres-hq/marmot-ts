@@ -1,18 +1,18 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import {
-	finalizeEvent,
-	generateSecretKey,
-	getPublicKey,
-	nip44,
-	NostrEvent,
+  finalizeEvent,
+  generateSecretKey,
+  getPublicKey,
+  nip44,
+  NostrEvent,
 } from "nostr-tools";
 import { ClientState } from "ts-mls/clientState.js";
 import { CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
 import { mlsExporter } from "ts-mls/keySchedule.js";
 import {
-	decodeMlsMessage,
-	encodeMlsMessage,
-	type MLSMessage,
+  decodeMlsMessage,
+  encodeMlsMessage,
+  type MLSMessage,
 } from "ts-mls/message.js";
 import { unixNow } from "../utils/nostr.js";
 import { getNostrGroupIdHex } from "./client-state.js";
