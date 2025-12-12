@@ -23,6 +23,7 @@ describe("exports", () => {
         "Transactions",
         "WELCOME_EVENT_KIND",
         "addMemberToGroup",
+        "createAddMemberProposalMessage",
         "createCredential",
         "createDeleteKeyPackageEvent",
         "createGiftWrap",
@@ -52,6 +53,7 @@ describe("exports", () => {
         "getEncodingTag",
         "getEpoch",
         "getGroupIdHex",
+        "getGroupMessage",
         "getKeyPackage",
         "getKeyPackageCipherSuiteId",
         "getKeyPackageClient",
@@ -71,9 +73,11 @@ describe("exports", () => {
         "keyPackageDefaultExtensions",
         "marmotGroupDataToExtension",
         "normalizeRelayUrl",
+        "replaceExtension",
         "replacer",
         "serializeClientState",
         "supportsMarmotExtensions",
+        "unixNow",
       ]
     `);
   });

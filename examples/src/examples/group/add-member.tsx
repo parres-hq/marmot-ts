@@ -12,8 +12,8 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { groupStore$ } from "../../lib/group-store";
-import { eventStore } from "../../lib/nostr";
 import { getMarmotClient } from "../../lib/marmot-client";
+import { eventStore } from "../../lib/nostr";
 
 // ============================================================================
 // Component: ErrorAlert

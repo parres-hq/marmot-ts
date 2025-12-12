@@ -1,12 +1,7 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
-import {
-  getDisplayName,
-  normalizeToPubkey,
-  NostrEvent,
-  relaySet,
-} from "applesauce-core/helpers";
-import { useEffect, useMemo, useState } from "react";
+import { getDisplayName, NostrEvent, relaySet } from "applesauce-core/helpers";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
@@ -27,6 +22,7 @@ import {
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
+import UserSearch from "../../components/form/user-search";
 import JsonBlock from "../../components/json-block";
 import KeyPackageDataView from "../../components/data-view/key-package";
 import { UserAvatar, UserName } from "../../components/nostr-user";
@@ -239,18 +235,20 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 // ============================================================================
 
 export default function UserKeyPackages() {
-  const [pubkeyInput, setPubkeyInput] = useState("");
   const relayConfig = useObservable(relayConfig$);
   const allAccounts = useObservable(accounts.accounts$);
   const activeAccount = useObservable(accounts.active$);
   const selectedPubkey = useObservable(selectedPubkey$);
   const keyPackageRelays = useObservable(keyPackageRelaysList$);
+  const hasInitialized = useRef(false);
 
+  // Only auto-select the active account on initial mount
   useEffect(() => {
-    if (activeAccount?.pubkey && !selectedPubkey) {
+    if (!hasInitialized.current && activeAccount?.pubkey) {
       selectedPubkey$.next(activeAccount.pubkey);
+      hasInitialized.current = true;
     }
-  }, [activeAccount?.pubkey, selectedPubkey]);
+  }, [activeAccount?.pubkey]);
 
   // Get fallback relays from config - memoize to prevent infinite re-renders
   const fallbackRelays = useMemo(
@@ -275,16 +273,13 @@ export default function UserKeyPackages() {
     return combineLatest(profileObservables);
   }, [allAccounts]);
 
-  // Handle manual pubkey submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pubkeyInput.trim())
-      selectedPubkey$.next(normalizeToPubkey(pubkeyInput.trim()));
+  // Handle user selection from search
+  const handleUserSelect = (pubkey: string) => {
+    selectedPubkey$.next(pubkey);
   };
 
   // Handle clear
   const handleClear = () => {
-    setPubkeyInput("");
     selectedPubkey$.next(null);
   };
 
@@ -326,54 +321,40 @@ export default function UserKeyPackages() {
         </p>
       </div>
 
-      {/* User Selection Form */}
+      {/* User Selection */}
       <div className="card bg-base-200">
-        <div className="card-body p-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Enter user pubkey (hex)"
-                className="input input-bordered flex-1"
-                value={pubkeyInput}
-                onChange={(e) => setPubkeyInput(e.target.value)}
-              />
-              <button type="submit" className="btn btn-primary">
-                Load
+        <div className="card-body p-4 space-y-3">
+          <div className="flex gap-2 items-start">
+            <UserSearch
+              onSelect={handleUserSelect}
+              placeholder="Search for a user or enter pubkey/npub..."
+              className="flex-1"
+            />
+            {selectedPubkey && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={handleClear}
+              >
+                Clear
               </button>
-              {selectedPubkey && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={handleClear}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {allAccounts && allAccounts.length > 0 && (
-              <div>
-                <div className="text-sm text-base-content/60 mb-1">
-                  Or select an account:
-                </div>
-                <select
-                  className="select select-bordered"
-                  value={selectedPubkey ?? ""}
-                  onChange={(e) => selectedPubkey$.next(e.target.value)}
-                >
-                  <option value="" disabled>
-                    Select an account
-                  </option>
-                  {accountProfiles?.map(({ pubkey, displayName }) => (
-                    <option key={pubkey} value={pubkey}>
-                      {displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
             )}
-          </form>
+          </div>
+
+          {allAccounts && allAccounts.length > 0 && (
+            <select
+              className="select select-bordered"
+              value={selectedPubkey ?? ""}
+              onChange={(e) => selectedPubkey$.next(e.target.value || null)}
+            >
+              <option value="">Select an account</option>
+              {accountProfiles?.map(({ pubkey, displayName }) => (
+                <option key={pubkey} value={pubkey}>
+                  {displayName}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

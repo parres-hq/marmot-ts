@@ -10,8 +10,9 @@ import {
 import { extractMarmotGroupData } from "../core/client-state.js";
 import { MarmotGroupData } from "../core/protocol.js";
 import { GroupStore } from "../store/group-store.js";
-import { NostrPool } from "./interfaces.js";
-import { addMember } from "./transactions/add-member.js";
+import { NostrPool, PublishResponse } from "./interfaces.js";
+import { addMember } from "./transactions/accept-add-member.js";
+import { NoGroupRelaysError, NoMarmotGroupDataError } from "./errors.js";
 
 /** An strict interface for what the transaction can read from the group */
 export type GroupTransactionInput = Readonly<{
@@ -23,6 +24,10 @@ export type GroupTransactionInput = Readonly<{
   signer: EventSigner;
   /** The ciphersuite implementation to use for the group */
   ciphersuite: CiphersuiteImpl;
+  /** The group marmot data for the group */
+  groupData: MarmotGroupData;
+  /** A function to publish an event to the group relays */
+  publish: (event: NostrEvent) => Promise<Record<string, PublishResponse>>;
 }>;
 
 /** A generic type for group state transitions */
@@ -35,6 +40,14 @@ export type GroupTransaction = (input: GroupTransactionInput) => Promise<{
 export type GroupTransactionBuilder<Args extends unknown[]> = (
   ...args: Args
 ) => GroupTransaction;
+
+/** An async action that is run on a {@link MarmotGroup} */
+export type GroupAction = (input: GroupTransactionInput) => Promise<void>;
+
+/** A method that creates a {@link GroupAction} from a set of arguments */
+export type GroupActionBuilder<Args extends unknown[]> = (
+  ...args: Args
+) => GroupAction;
 
 export type MarmotGroupOptions = {
   /** The backend to store and load the group from */
@@ -103,6 +116,40 @@ export class MarmotGroup {
     this.pool = options.pool;
   }
 
+  private createGroupInput(): GroupTransactionInput {
+    const groupData = this.groupData;
+
+    // TODO: This might not be the best place to throw this error.
+    if (!groupData) throw new NoMarmotGroupDataError();
+
+    return Object.freeze({
+      groupData: this.groupData,
+      state: this.state,
+      pool: this.pool,
+      signer: this.signer,
+      ciphersuite: this.ciphersuite,
+      publish: this.publish.bind(this),
+    });
+  }
+
+  /** Run a {@link GroupAction} on the group */
+  async action(action: GroupAction): Promise<void>;
+  async action<Args extends unknown[]>(
+    action: GroupActionBuilder<Args>,
+    ...args: Args
+  ): Promise<void>;
+  async action(...args: unknown[]): Promise<void> {
+    let action: GroupAction;
+    if (args.length === 1) {
+      action = args[0] as GroupAction;
+    } else {
+      const builder = args[0] as GroupActionBuilder<unknown[]>;
+      action = builder(...args.slice(1));
+    }
+
+    await action(this.createGroupInput());
+  }
+
   /** Run a transaction on the group */
   async transaction(transaction: GroupTransaction): Promise<void>;
   async transaction<Args extends unknown[]>(
@@ -120,16 +167,8 @@ export class MarmotGroup {
       transaction = builder(...args.slice(1));
     }
 
-    // Create a static input for the transaction
-    const input = Object.freeze({
-      state: this.state,
-      pool: this.pool,
-      signer: this.signer,
-      ciphersuite: this.ciphersuite,
-    });
-
     // Run the transaction
-    const { state } = await transaction(input);
+    const { state } = await transaction(this.createGroupInput());
 
     // Update the group state
     this.state = state;
@@ -162,6 +201,13 @@ export class MarmotGroup {
     if (!this.dirty) return;
     await this.store.update(this.state);
     this.dirty = false;
+  }
+
+  /** Publish an event to the group relays */
+  async publish(event: NostrEvent): Promise<Record<string, PublishResponse>> {
+    const relays = this.relays;
+    if (!relays) throw new NoGroupRelaysError();
+    return await this.pool.publish(relays, event);
   }
 
   /** Temp add member transaction */

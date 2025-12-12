@@ -3,9 +3,12 @@ import {
   CreateCommitResult,
   Proposal,
   createCommit,
+  createProposal,
 } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
 import { KeyPackage } from "ts-mls/keyPackage.js";
+import type { MLSMessage } from "ts-mls/message.js";
+
 /**
  * Adds a new member to an existing MLS group.
  *
@@ -34,4 +37,30 @@ export async function addMemberToGroup(
       ratchetTreeExtension: true,
     },
   );
+}
+
+/**
+ * Creates an MLS Proposal message for adding a new member to the group.
+ *
+ * This does **not** change the ratchet tree itself; it just produces the
+ * MLSMessage that can be wrapped as a Group Event and published.
+ */
+export async function createAddMemberProposalMessage(
+  currentClientState: ClientState,
+  newMemberKeyPackage: KeyPackage,
+  ciphersuiteImpl: CiphersuiteImpl,
+): Promise<MLSMessage> {
+  const addProposal: Proposal = {
+    proposalType: "add",
+    add: { keyPackage: newMemberKeyPackage },
+  };
+
+  const { message } = await createProposal(
+    currentClientState,
+    true, // public message
+    addProposal,
+    ciphersuiteImpl,
+  );
+
+  return message;
 }

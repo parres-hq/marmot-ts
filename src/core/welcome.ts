@@ -8,6 +8,7 @@ import {
   getEncodingTag,
 } from "../utils/encoding.js";
 import { WELCOME_EVENT_KIND } from "./protocol.js";
+import { unixNow } from "../utils/nostr.js";
 
 /**
  * Creates a welcome rumor (kind 444) for a welcome message.
@@ -31,7 +32,7 @@ export function createWelcomeRumor(
   const draft = {
     kind: WELCOME_EVENT_KIND,
     pubkey: author,
-    created_at: Math.floor(Date.now() / 1000),
+    created_at: unixNow(),
     content,
     tags: [
       ["e", keyPackageEventId],

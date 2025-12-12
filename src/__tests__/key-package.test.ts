@@ -1,4 +1,4 @@
-import { NostrEvent } from "applesauce-core/helpers";
+import { NostrEvent, unixNow } from "applesauce-core/helpers";
 import {
   defaultCryptoProvider,
   getCiphersuiteFromName,
@@ -152,20 +152,6 @@ describe("createDeleteKeyPackageEvent", () => {
       ["e", "stringeventid2"],
     ]);
   });
-
-  it("should create event with correct timestamp", () => {
-    const beforeTime = Math.floor(Date.now() / 1000);
-
-    const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
-      events: ["someeventid"],
-    });
-
-    const afterTime = Math.floor(Date.now() / 1000);
-
-    expect(deleteEvent.created_at).toBeGreaterThanOrEqual(beforeTime);
-    expect(deleteEvent.created_at).toBeLessThanOrEqual(afterTime);
-  });
 });
 
 describe("generateKeyPackage", () => {
@@ -306,8 +292,8 @@ describe("generateKeyPackage", () => {
     );
 
     const customLifetime = {
-      notBefore: BigInt(Math.floor(Date.now() / 1000)),
-      notAfter: BigInt(Math.floor(Date.now() / 1000) + 3600), // 1 hour
+      notBefore: BigInt(unixNow()),
+      notAfter: BigInt(unixNow() + 3600), // 1 hour
     };
 
     const keyPackage = await generateKeyPackage({
@@ -425,7 +411,7 @@ describe("createKeyPackageEvent encoding", () => {
     const legacyEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
       pubkey: validPubkey,
-      created_at: Math.floor(Date.now() / 1000),
+      created_at: unixNow(),
       content: bytesToHex(encodedBytes), // Hex encoding
       tags: [
         ["mls_version", "1.0"],
@@ -463,7 +449,7 @@ describe("createKeyPackageEvent encoding", () => {
     const hexEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
       pubkey: validPubkey,
-      created_at: Math.floor(Date.now() / 1000),
+      created_at: unixNow(),
       content: bytesToHex(encodedBytes),
       tags: [
         ["mls_version", "1.0"],

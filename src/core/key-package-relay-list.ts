@@ -5,6 +5,7 @@ import {
   KEY_PACKAGE_RELAY_LIST_KIND,
   KEY_PACKAGE_RELAY_LIST_RELAY_TAG,
 } from "./protocol.js";
+import { unixNow } from "../utils/nostr.js";
 
 /**
  * Gets the relay URLs from a kind 10051 event.
@@ -111,7 +112,7 @@ export function createKeyPackageRelayListEvent(
 
   return {
     kind: KEY_PACKAGE_RELAY_LIST_KIND,
-    created_at: Math.floor(Date.now() / 1000),
+    created_at: unixNow(),
     tags,
     content: "",
     pubkey,

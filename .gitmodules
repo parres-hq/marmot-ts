@@ -1,0 +1,3 @@
+[submodule "marmot"]
+	path = marmot
+	url = https://github.com/marmot-protocol/marmot

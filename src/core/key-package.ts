@@ -22,7 +22,7 @@ import {
   encodeContent,
   getEncodingTag,
 } from "../utils/encoding.js";
-import { getTagValue } from "../utils/nostr.js";
+import { getTagValue, unixNow } from "../utils/nostr.js";
 import { isValidRelayUrl, normalizeRelayUrl } from "../utils/relay-url.js";
 import { createThreeMonthLifetime } from "../utils/timestamp.js";
 import { ensureMarmotCapabilities } from "./capabilities.js";
@@ -269,7 +269,7 @@ export function createKeyPackageEvent(
 
   return {
     kind: KEY_PACKAGE_KIND,
-    created_at: Math.floor(Date.now() / 1000),
+    created_at: unixNow(),
     tags,
     content,
     pubkey,
@@ -324,7 +324,7 @@ export function createDeleteKeyPackageEvent(
 
   return {
     kind: 5,
-    created_at: Math.floor(Date.now() / 1000),
+    created_at: unixNow(),
     tags,
     content: "",
     pubkey,
