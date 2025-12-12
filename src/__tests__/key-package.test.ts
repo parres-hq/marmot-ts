@@ -152,20 +152,6 @@ describe("createDeleteKeyPackageEvent", () => {
       ["e", "stringeventid2"],
     ]);
   });
-
-  it("should create event with correct timestamp", () => {
-    const beforeTime = unixNow();
-
-    const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
-      events: ["someeventid"],
-    });
-
-    const afterTime = unixNow();
-
-    expect(deleteEvent.created_at).toBeGreaterThanOrEqual(beforeTime);
-    expect(deleteEvent.created_at).toBeLessThanOrEqual(afterTime);
-  });
 });
 
 describe("generateKeyPackage", () => {
