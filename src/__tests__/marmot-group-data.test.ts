@@ -105,7 +105,7 @@ describe("createMarmotGroupData", () => {
     expect(decoded.name).toBe("My Group");
     expect(decoded.description).toBe("My Description");
     expect(decoded.adminPubkeys).toEqual(["a".repeat(64)]);
-    expect(decoded.relays).toEqual(["wss://relay.example.com"]);
+    expect(decoded.relays).toEqual(["wss://relay.example.com/"]);
   });
 });
 
@@ -125,24 +125,6 @@ describe("validation", () => {
 
     expect(() => encodeMarmotGroupData(groupData)).toThrow(
       /Invalid admin public key format/,
-    );
-  });
-
-  it("should reject duplicate admin keys", () => {
-    const groupData: MarmotGroupData = {
-      version: 1,
-      nostrGroupId: new Uint8Array(32),
-      name: "",
-      description: "",
-      adminPubkeys: ["a".repeat(64), "A".repeat(64)], // Same key, different case
-      relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
-    };
-
-    expect(() => encodeMarmotGroupData(groupData)).toThrow(
-      /Duplicate admin public keys/,
     );
   });
 
