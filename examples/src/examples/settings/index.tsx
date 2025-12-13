@@ -1,6 +1,95 @@
 import { useObservable } from "../../hooks/use-observable";
 import { lookupRelays$, extraRelays$ } from "../../lib/settings";
 import { RelayListCreator } from "../../components/form/relay-list-creator";
+import accountManager from "../../lib/accounts";
+import { UserAvatar, UserName } from "../../components/nostr-user";
+import QRButton from "../../components/qr-button";
+
+function AccountManagement() {
+  const accounts = useObservable(accountManager.accounts$) || [];
+  const activeAccount = useObservable(accountManager.active$);
+
+  const handleAddAccount = () => {
+    (document.getElementById("signin_modal") as HTMLDialogElement)?.showModal();
+  };
+
+  const handleSwitchAccount = (accountId: string) => {
+    accountManager.setActive(accountId);
+  };
+
+  const handleRemoveAccount = (accountId: string) => {
+    if (confirm("Are you sure you want to remove this account?")) {
+      accountManager.removeAccount(accountId);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Accounts</h2>
+        <p className="text-base-content/70 text-sm">
+          Manage your accounts. Switch between accounts or add new ones.
+        </p>
+      </div>
+      <div className="space-y-3">
+        {accounts.length === 0 ? (
+          <div className="text-base-content/70 text-sm">
+            No accounts configured. Add an account to get started.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {accounts.map((account) => {
+              const isActive = activeAccount?.id === account.id;
+              return (
+                <div
+                  key={account.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border ${
+                    isActive
+                      ? "border-primary bg-primary/10"
+                      : "border-base-300 bg-base-200"
+                  }`}
+                >
+                  <UserAvatar pubkey={account.pubkey} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">
+                      <UserName pubkey={account.pubkey} />
+                    </div>
+                    <div className="text-xs text-base-content/60 truncate">
+                      {account.pubkey.slice(0, 8)}...{account.pubkey.slice(-8)}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <QRButton
+                      data={account.pubkey}
+                      label="QR"
+                      className="btn-ghost"
+                    />
+                    <button
+                      className={`btn ${isActive ? "btn-primary" : "btn-ghost"}`}
+                      onClick={() => handleSwitchAccount(account.id)}
+                      disabled={isActive}
+                    >
+                      Switch
+                    </button>
+                    <button
+                      className="btn btn-ghost text-error"
+                      onClick={() => handleRemoveAccount(account.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <button className="btn btn-primary w-full" onClick={handleAddAccount}>
+          Add Account
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const lookupRelays = useObservable(lookupRelays$) || [];
@@ -21,6 +110,9 @@ export default function Settings() {
         <h1 className="text-3xl font-bold">Settings</h1>
         <p>Manage your relay configurations for the application.</p>
       </div>
+
+      {/* Account Management Section */}
+      <AccountManagement />
 
       {/* Lookup Relays Section */}
       <div className="space-y-4">

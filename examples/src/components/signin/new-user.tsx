@@ -9,10 +9,12 @@ import {
   uniqueNamesGenerator,
 } from "unique-names-generator";
 
+import { relaySet } from "applesauce-core/helpers";
 import { useObservable } from "../../hooks/use-observable";
 import accountManager from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { lookupRelays$ } from "../../lib/settings";
+import { extraRelays$, lookupRelays$ } from "../../lib/settings";
+import { createKeyPackageRelayListEvent } from "../../../../src";
 
 interface NewUserProps {
   onSuccess?: () => void;
@@ -29,6 +31,7 @@ export default function NewUser({ onSuccess }: NewUserProps) {
   const [error, setError] = useState<string | null>(null);
   const [previewUser, setPreviewUser] = useState<PreviewUser | null>(null);
   const lookupRelays = useObservable(lookupRelays$);
+  const extraRelays = useObservable(extraRelays$);
 
   const generateRandomName = () => {
     return uniqueNamesGenerator({
@@ -68,19 +71,29 @@ export default function NewUser({ onSuccess }: NewUserProps) {
 
       // Optionally publish a profile event with the name and robohash picture
       try {
-        const draft = await build(
-          { kind: 0 },
-          {},
-          Profile.setProfile({
-            name: name,
-            picture: `https://robohash.org/${account.pubkey}.png`,
+        const profile = await account.signEvent(
+          await build(
+            { kind: 0 },
+            {},
+            Profile.setProfile({
+              name: name,
+              picture: `https://robohash.org/${account.pubkey}.png`,
+            }),
+          ),
+        );
+        await pool.publish(relaySet(lookupRelays, extraRelays), profile);
+
+        // Create key package relay list event
+        const keyPackageRelays = await account.signEvent(
+          createKeyPackageRelayListEvent({
+            relays: extraRelays ?? [],
+            pubkey: account.pubkey,
           }),
         );
-
-        const profile = await account.signEvent(draft);
-
-        // Publish to connected relays
-        await pool.publish(lookupRelays ?? [], profile);
+        await pool.publish(
+          relaySet(lookupRelays, extraRelays),
+          keyPackageRelays,
+        );
 
         // Store locally in event store
         eventStore.add(profile);
