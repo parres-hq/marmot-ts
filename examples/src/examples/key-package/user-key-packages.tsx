@@ -5,8 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
-import { relayConfig$ } from "../../lib/setting";
-
 import {
   getCredentialPubkey,
   getKeyPackage,
@@ -20,15 +18,17 @@ import {
   KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
 import UserSearch from "../../components/form/user-search";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/data-view/key-package";
 import { UserAvatar, UserName } from "../../components/nostr-user";
+import QRButton from "../../components/qr-button";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
+import { relayConfig$ } from "../../lib/setting";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -365,9 +365,15 @@ export default function UserKeyPackages() {
             <div className="flex items-center gap-3">
               <UserAvatar pubkey={selectedPubkey} />
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-lg">
-                  <UserName pubkey={selectedPubkey} />
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg">
+                    <UserName pubkey={selectedPubkey} />
+                  </h3>
+                  <QRButton
+                    className="btn-sm btn-primary btn-link"
+                    data={selectedPubkey}
+                  />
+                </div>
                 <code className="text-xs text-base-content/60 truncate block">
                   {selectedPubkey}
                 </code>
