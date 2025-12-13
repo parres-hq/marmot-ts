@@ -1,9 +1,10 @@
-import { useObservable } from "../../hooks/use-observable";
-import { lookupRelays$, extraRelays$ } from "../../lib/settings";
+import { npubEncode } from "nostr-tools/nip19";
 import { RelayListCreator } from "../../components/form/relay-list-creator";
-import accountManager from "../../lib/accounts";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import QRButton from "../../components/qr-button";
+import { useObservable } from "../../hooks/use-observable";
+import accountManager from "../../lib/accounts";
+import { extraRelays$, lookupRelays$ } from "../../lib/settings";
 
 function AccountManagement() {
   const accounts = useObservable(accountManager.accounts$) || [];
@@ -59,11 +60,18 @@ function AccountManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <QRButton
-                      data={account.pubkey}
-                      label="QR"
-                      className="btn-ghost"
-                    />
+                    <div className="join">
+                      <QRButton
+                        data={npubEncode(account.pubkey)}
+                        label="npub"
+                        className="btn-ghost btn-sm join-item"
+                      />
+                      <QRButton
+                        data={account.pubkey}
+                        label="hex"
+                        className="btn-ghost btn-sm join-item"
+                      />
+                    </div>
                     <button
                       className={`btn ${isActive ? "btn-primary" : "btn-ghost"}`}
                       onClick={() => handleSwitchAccount(account.id)}

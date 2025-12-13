@@ -1,6 +1,8 @@
 import { getDisplayName, getProfilePicture } from "applesauce-core/helpers";
 import { useObservableMemo } from "../../hooks/use-observable";
+import accounts from "../../lib/accounts";
 import { eventStore } from "../../lib/nostr";
+import { UserName } from "../nostr-user";
 import UserSearch from "./user-search";
 
 function SelectedPubkeyItem({
@@ -102,6 +104,21 @@ export function PubkeyListCreator({
       {/* Add New Pubkey */}
       <div className="flex gap-2">
         <UserSearch onSelect={handleAddPubkey} placeholder={placeholder} />
+
+        <select
+          name="admin-pubkey-selector"
+          id="admin-pubkey-selector"
+          value={""}
+          className="select select-bordered w-xs"
+          onChange={(e) => handleAddPubkey(e.target.value)}
+        >
+          <option value="">Select an account</option>
+          {accounts.accounts.map((account) => (
+            <option key={account.pubkey} value={account.pubkey}>
+              <UserName pubkey={account.pubkey} />
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="mt-1">

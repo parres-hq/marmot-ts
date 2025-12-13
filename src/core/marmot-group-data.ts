@@ -1,4 +1,5 @@
 import { randomBytes } from "@noble/hashes/utils.js";
+import { relaySet } from "applesauce-core/helpers";
 import { Extension } from "ts-mls";
 import { isHexKey } from "./credential.js";
 import {
@@ -232,13 +233,15 @@ export function decodeMarmotGroupData(
 export function createMarmotGroupData(
   params: Partial<MarmotGroupData> = {},
 ): Uint8Array {
+  const uniqueAdmins = Array.from(new Set(params.adminPubkeys));
+
   const data: MarmotGroupData = {
     version: MARMOT_GROUP_DATA_VERSION,
     nostrGroupId: params.nostrGroupId || randomBytes(32),
     name: params.name || "",
     description: params.description || "",
-    adminPubkeys: params.adminPubkeys || [],
-    relays: params.relays || [],
+    adminPubkeys: uniqueAdmins,
+    relays: relaySet(params.relays),
     imageHash: params.imageHash || new Uint8Array(32),
     imageKey: params.imageKey || new Uint8Array(32),
     imageNonce: params.imageNonce || new Uint8Array(12),
@@ -338,12 +341,6 @@ function validateMarmotGroupData(data: MarmotGroupData): void {
         `Invalid admin public key format: ${pubkey} (must be 64 hex characters)`,
       );
     }
-  }
-
-  // Validate no duplicate admin keys
-  const uniqueAdmins = new Set(data.adminPubkeys.map((k) => k.toLowerCase()));
-  if (uniqueAdmins.size !== data.adminPubkeys.length) {
-    throw new Error("Duplicate admin public keys detected");
   }
 
   // Validate relays
