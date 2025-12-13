@@ -51,6 +51,17 @@ export const mailboxes$ = accounts.active$.pipe(
   ),
 );
 
+export const contacts$ = combineLatest([accounts.active$, mailboxes$]).pipe(
+  switchMap(([account, mailboxes]) =>
+    account
+      ? eventStore.contacts({
+          pubkey: account.pubkey,
+          relays: mailboxes?.outboxes,
+        })
+      : EMPTY,
+  ),
+);
+
 /** Observable of current user's key package relay list */
 export const keyPackageRelays$ = combineLatest([
   accounts.active$,

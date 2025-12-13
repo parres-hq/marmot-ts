@@ -55,8 +55,8 @@ function AccountManagement() {
                     <div className="font-semibold truncate">
                       <UserName pubkey={account.pubkey} />
                     </div>
-                    <div className="text-xs text-base-content/60 truncate">
-                      {account.pubkey.slice(0, 8)}...{account.pubkey.slice(-8)}
+                    <div className="text-xs text-base-content/60 truncate select-all">
+                      {account.pubkey}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
