@@ -64,11 +64,11 @@ export function proposeUpdateMetadata(
     );
 
     // Wrap in a Group Event and publish
-    const proposalEvent = await createGroupEvent(
-      proposalMessage,
+    const proposalEvent = await createGroupEvent({
+      message: proposalMessage,
       state,
       ciphersuite,
-    );
+    });
 
     await publish(proposalEvent);
   };

@@ -1,85 +1,48 @@
 import { getSeenRelays, NostrEvent, relaySet } from "applesauce-core/helpers";
 import { useEffect, useMemo, useState } from "react";
-import { combineLatest, map, of, startWith, switchMap } from "rxjs";
+import { combineLatest, EMPTY, map, of, startWith, switchMap } from "rxjs";
 import { KeyPackage } from "ts-mls";
 import {
   CiphersuiteId,
   getCiphersuiteNameFromId,
 } from "ts-mls/crypto/ciphersuite.js";
-
 import {
   createDeleteKeyPackageEvent,
   getKeyPackage,
   getKeyPackageCipherSuiteId,
   getKeyPackageClient,
-  getKeyPackageRelayList,
   KEY_PACKAGE_KIND,
-  KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import ErrorBoundary from "../../components/error-boundary";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/data-view/key-package";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import accounts, { mailboxes$ } from "../../lib/accounts";
+import accounts, { keyPackageRelays$, mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore$ } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
-import { relayConfig$ } from "../../lib/setting";
+import { extraRelays$ } from "../../lib/settings";
 
 // ============================================================================
 // Observables
 // ============================================================================
 
-/** Observable of current user's key package relay list */
-const keyPackageRelayList$ = combineLatest([
-  accounts.active$,
+/** Observable of all available relays */
+const relays$ = combineLatest([
   mailboxes$,
-  relayConfig$,
+  keyPackageRelays$,
+  extraRelays$,
 ]).pipe(
-  switchMap(([account, mailboxes, relayConfig]) =>
-    account
-      ? eventStore
-          .replaceable({
-            kind: KEY_PACKAGE_RELAY_LIST_KIND,
-            pubkey: account.pubkey,
-            relays: relaySet(
-              mailboxes?.outboxes
-                ? mailboxes.outboxes
-                : relayConfig.lookupRelays,
-              relayConfig.manualRelays,
-            ),
-          })
-          .pipe(map((event) => (event ? getKeyPackageRelayList(event) : [])))
-      : of([]),
+  map(([mailboxes, keyPackageRelays, extraRelays]) =>
+    relaySet(mailboxes?.outboxes, keyPackageRelays, extraRelays),
   ),
 );
 
-/** Observable of all available relays */
-const baseAvailableRelays$ = combineLatest([
-  accounts.active$,
-  mailboxes$,
-  keyPackageRelayList$,
-  relayConfig$,
-]).pipe(
-  map(([account, mailboxes, relayList, relayConfig]) => {
-    if (!account) return [];
-
-    return relaySet(
-      mailboxes?.outboxes ? mailboxes.outboxes : relayConfig.lookupRelays,
-      relayList,
-      relayConfig.manualRelays,
-    );
-  }),
-);
-
 /** Observable of current user's key packages from all available relays */
-const keyPackageSubscription$ = combineLatest([
-  accounts.active$,
-  baseAvailableRelays$,
-]).pipe(
+const keyPackageSubscription$ = combineLatest([accounts.active$, relays$]).pipe(
   switchMap(([account, relays]) => {
-    if (!account || relays.length === 0) return of([]);
+    if (!account) return EMPTY;
 
     return pool.subscription(
       relays,
@@ -580,7 +543,6 @@ function ConfirmationDialog({
 
 function KeyPackageManager() {
   // Observables
-  const baseRelays = useObservable(baseAvailableRelays$);
   const keyPackages = useObservable(keyPackageTimeline$);
   const keyPackageStore = useObservable(keyPackageStore$);
 
@@ -595,11 +557,7 @@ function KeyPackageManager() {
   const [afterDate, setAfterDate] = useState<string>("");
   const [beforeDate, setBeforeDate] = useState<string>("");
 
-  const relayConfig = useObservable(relayConfig$);
-
-  const allRelays = useMemo(() => {
-    return relaySet(baseRelays || []);
-  }, [baseRelays]);
+  const relays = useObservable(relays$);
 
   // Selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -708,10 +666,7 @@ function KeyPackageManager() {
       setIsDeleting(true);
       setDeleteError(null);
 
-      // 3. Get relays for publishing (use all available relays - relay list + manual relays)
-      const relays = allRelays && allRelays.length > 0 ? allRelays : [];
-
-      if (relays.length === 0)
+      if (!relays || relays.length === 0)
         throw new Error(
           "No relays available for publishing deletion event. Please configure your relay list or add manual relays.",
         );
@@ -789,23 +744,17 @@ function KeyPackageManager() {
       {/* Relay Configuration */}
       <div className="space-y-4">
         {/* Relay List Info */}
-        {allRelays && allRelays.length > 0 ? (
+        {relays && relays.length > 0 ? (
           <div className="alert alert-info">
             <div>
               <div className="font-semibold">
-                Monitoring {allRelays.length} relay
-                {allRelays.length !== 1 ? "s" : ""}
-                {relayConfig?.manualRelays.length > 0 &&
-                  " (includes manual relays)"}
+                Monitoring {relays.length} relay
+                {relays.length !== 1 ? "s" : ""}
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
-                {allRelays.map((relay) => (
-                  <span
-                    key={relay}
-                    className={`badge ${relayConfig?.manualRelays.includes(relay) ? "badge-warning" : ""}`}
-                  >
+                {relays.map((relay) => (
+                  <span key={relay} className="badge">
                     {relay.replace(/^wss?:\/\//, "").replace(/\/$/, "")}
-                    {relayConfig?.manualRelays.includes(relay) && " (manual)"}
                   </span>
                 ))}
               </div>

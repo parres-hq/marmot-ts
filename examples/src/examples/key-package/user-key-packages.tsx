@@ -1,8 +1,8 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
 import { getDisplayName, NostrEvent, relaySet } from "applesauce-core/helpers";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
+import { useEffect, useRef, useState } from "react";
+import { BehaviorSubject, combineLatest, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 import {
@@ -12,10 +12,8 @@ import {
   getKeyPackageClient,
   getKeyPackageExtensions,
   getKeyPackageMLSVersion,
-  getKeyPackageRelayList,
   getKeyPackageRelays,
   KEY_PACKAGE_KIND,
-  KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
 import KeyPackageDataView from "../../components/data-view/key-package";
@@ -26,9 +24,9 @@ import JsonBlock from "../../components/json-block";
 import { UserAvatar, UserName } from "../../components/nostr-user";
 import QRButton from "../../components/qr-button";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import accounts from "../../lib/accounts";
+import accounts, { keyPackageRelays$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { relayConfig$ } from "../../lib/setting";
+import { extraRelays$ } from "../../lib/settings";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -36,20 +34,6 @@ const formatDate = (timestamp: number) => {
 
 // Subject to hold the selected pubkey
 const selectedPubkey$ = new BehaviorSubject<string | null>(null);
-
-// Observable of pubkeys key package relays
-const keyPackageRelaysList$ = selectedPubkey$.pipe(
-  switchMap((pubkey) =>
-    pubkey
-      ? eventStore.replaceable({
-          kind: KEY_PACKAGE_RELAY_LIST_KIND,
-          pubkey,
-          relays: relaySet(relayConfig$.value.lookupRelays),
-        })
-      : NEVER,
-  ),
-  map((event) => event && getKeyPackageRelayList(event)),
-);
 
 // ============================================================================
 // Key Package Card Component (simplified version)
@@ -235,11 +219,10 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 // ============================================================================
 
 export default function UserKeyPackages() {
-  const relayConfig = useObservable(relayConfig$);
   const allAccounts = useObservable(accounts.accounts$);
   const activeAccount = useObservable(accounts.active$);
   const selectedPubkey = useObservable(selectedPubkey$);
-  const keyPackageRelays = useObservable(keyPackageRelaysList$);
+  const keyPackageRelays = useObservable(keyPackageRelays$);
   const hasInitialized = useRef(false);
 
   // Only auto-select the active account on initial mount
@@ -249,12 +232,6 @@ export default function UserKeyPackages() {
       hasInitialized.current = true;
     }
   }, [activeAccount?.pubkey]);
-
-  // Get fallback relays from config - memoize to prevent infinite re-renders
-  const fallbackRelays = useMemo(
-    () => relaySet(relayConfig?.manualRelays, relayConfig?.lookupRelays),
-    [relayConfig?.manualRelays, relayConfig?.lookupRelays],
-  );
 
   // Observable for account profiles with display names
   const accountProfiles = useObservableMemo(() => {
@@ -283,19 +260,23 @@ export default function UserKeyPackages() {
     selectedPubkey$.next(null);
   };
 
-  // Step 2: Fetch key packages from those relays (or fallback relays if none found)
+  // Step 2: Fetch key packages from those relays (always include extra relays)
   const keyPackages = useObservableMemo(
     () =>
-      combineLatest([selectedPubkey$, keyPackageRelaysList$]).pipe(
-        switchMap(([pubkey, relays]) => {
+      combineLatest([selectedPubkey$, keyPackageRelays$, extraRelays$]).pipe(
+        switchMap(([pubkey, keyPackageRelays, extraRelays]) => {
           if (!pubkey) return of([]);
 
-          // Use the user's specified relays, or fall back to config-based relays
-          const relaysToUse =
-            relays && relays.length > 0 ? relays : fallbackRelays;
+          // Always include extra relays when fetching events
+          const relays = relaySet(
+            keyPackageRelays && keyPackageRelays.length > 0
+              ? keyPackageRelays
+              : [],
+            extraRelays,
+          );
 
           return pool
-            .request(relaysToUse, {
+            .request(relays, {
               kinds: [KEY_PACKAGE_KIND],
               authors: [pubkey],
               limit: 50,
@@ -306,7 +287,7 @@ export default function UserKeyPackages() {
             );
         }),
       ),
-    [fallbackRelays],
+    [],
   );
 
   return (
@@ -412,11 +393,6 @@ export default function UserKeyPackages() {
                     <span>
                       No relay list found. Please select a relay to query:
                     </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-xs text-base-content/60">
-                      Using fallback relays: {fallbackRelays.join(", ")}
-                    </div>
                   </div>
                 </div>
               )}

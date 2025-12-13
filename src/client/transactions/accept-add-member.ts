@@ -62,11 +62,11 @@ export function addMember(options: AddMemberOptions): GroupTransaction {
 
     // Create group event with NIP-44 encryption using exporter_secret
     // Note: Use the NEW state after commit, as it has the updated exporter_secret
-    const commitEvent = await createGroupEvent(
-      commitResult.commit,
-      commitResult.newState,
+    const commitEvent = await createGroupEvent({
+      message: commitResult.commit,
+      state: commitResult.newState,
       ciphersuite,
-    );
+    });
 
     // Step 3: Create welcome event
     if (!commitResult.welcome)

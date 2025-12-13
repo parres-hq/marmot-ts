@@ -28,7 +28,7 @@ import { useObservable } from "../../hooks/use-observable";
 import accounts, { mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore$ } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
-import { relayConfig$ } from "../../lib/setting";
+import { relayConfig$ } from "../../lib/settings";
 
 /** Observable of current accounts key package relays */
 const keyPackageRelays$ = combineLatest([
@@ -446,7 +446,7 @@ export default withSignIn(function KeyPackageCreate() {
       // Fall back to config-based relays if no saved relay list
       const defaultRelays = relaySet(
         relayConfig.manualRelays,
-        relayConfig.commonRelays,
+        relayConfig.extraRelays || relayConfig.commonRelays,
         relayConfig.lookupRelays,
       );
       setRelays(defaultRelays);

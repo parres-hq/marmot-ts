@@ -8,14 +8,15 @@ import useHash from "./hooks/use-hash";
 import SignInModal from "./components/signin/modal.tsx";
 import KeyPackageStoreModal from "./components/key-package-store-modal.tsx";
 import GroupStoreModal from "./components/group-store-modal.tsx";
+import Settings from "./examples/settings/index.tsx";
 
-function ExampleView(props: { example?: Example }) {
+function ExampleView(props: { example?: Example; isSettings?: boolean }) {
   const [path, setPath] = useState("");
   const [Component, setComponent] = useState<ComponentType<any> | null>(null);
 
   // load selected example
   useEffect(() => {
-    if (!props.example) return;
+    if (!props.example || props.isSettings) return;
     let cancelled = false;
     setPath(props.example.path.replace(/^\.\//, ""));
     props.example
@@ -36,7 +37,7 @@ function ExampleView(props: { example?: Example }) {
     return () => {
       cancelled = true;
     };
-  }, [props.example]);
+  }, [props.example, props.isSettings]);
 
   return (
     <div className="drawer lg:drawer-open h-full min-h-screen">
@@ -69,22 +70,34 @@ function ExampleView(props: { example?: Example }) {
           </div>
           <div className="mx-2 flex-1 px-2">
             <span className="font-bold text-lg">
-              {props.example?.name ?? "Examples"}
+              {props.isSettings
+                ? "Settings"
+                : (props.example?.name ?? "Examples")}
             </span>
           </div>
-          <div className="flex-none">
-            <a
-              target="_blank"
-              className="btn btn-sm btn-ghost"
-              href={`https://github.com/parres-hq/marmot-ts/tree/${import.meta.env.VITE_REPO_BRANCH || "master"}/examples/src/${path}`}
-            >
-              <CodeIcon /> Source
-            </a>
-          </div>
+          {!props.isSettings && (
+            <div className="flex-none">
+              <a
+                target="_blank"
+                className="btn btn-sm btn-ghost"
+                href={`https://github.com/parres-hq/marmot-ts/tree/${import.meta.env.VITE_REPO_BRANCH || "master"}/examples/src/${path}`}
+              >
+                <CodeIcon /> Source
+              </a>
+            </div>
+          )}
         </div>
 
         {/* Page content */}
-        {Component ? (
+        {props.isSettings ? (
+          <ErrorBoundary
+            fallbackRender={({ error }) => (
+              <div className="text-red-500">{error.message}</div>
+            )}
+          >
+            <Settings />
+          </ErrorBoundary>
+        ) : Component ? (
           <ErrorBoundary
             fallbackRender={({ error }) => (
               <div className="text-red-500">{error.message}</div>
@@ -119,17 +132,24 @@ function ExampleView(props: { example?: Example }) {
 
 function App() {
   const [example, setExample] = useState<Example | null>(null);
+  const [isSettings, setIsSettings] = useState(false);
   const hash = useHash();
 
   // set example based on hash or fallback to a random example
   useEffect(() => {
     const name = hash.replace(/^#/, "");
-    const example = examples.find((e) => e.id === name);
-    if (example) setExample(example);
-    else setExample(examples[Math.floor(Math.random() * examples.length)]);
+    if (name === "settings") {
+      setIsSettings(true);
+      setExample(null);
+    } else {
+      setIsSettings(false);
+      const example = examples.find((e) => e.id === name);
+      if (example) setExample(example);
+      else setExample(examples[Math.floor(Math.random() * examples.length)]);
+    }
   }, [hash]);
 
-  return <ExampleView example={example ?? undefined} />;
+  return <ExampleView example={example ?? undefined} isSettings={isSettings} />;
 }
 
 export default App;

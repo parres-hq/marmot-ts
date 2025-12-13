@@ -1,10 +1,5 @@
 import { mapEventsToStore, mapEventsToTimeline } from "applesauce-core";
-import {
-  NostrEvent,
-  getSeenRelays,
-  kinds,
-  relaySet,
-} from "applesauce-core/helpers";
+import { NostrEvent, getSeenRelays, kinds } from "applesauce-core/helpers";
 import {
   BehaviorSubject,
   EMPTY,
@@ -24,7 +19,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { relayConfig$ } from "../../lib/setting";
+import { relayConfig$ } from "../../lib/settings";
 
 const contacts$ = accounts.active$.pipe(
   switchMap((account) =>
@@ -194,10 +189,6 @@ export default withSignIn(() => {
             .replaceable({
               kind: KEY_PACKAGE_RELAY_LIST_KIND,
               pubkey: user.pubkey,
-              relays: relaySet(
-                relayConfig.lookupRelays,
-                relayConfig.manualRelays,
-              ),
             })
             .pipe(
               map((event) => {

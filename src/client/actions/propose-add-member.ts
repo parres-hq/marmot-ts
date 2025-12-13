@@ -46,11 +46,11 @@ export function proposeAddMember(
       keyPackage,
       ciphersuite,
     );
-    const proposalEvent = await createGroupEvent(
-      proposalMessage,
+    const proposalEvent = await createGroupEvent({
+      message: proposalMessage,
       state,
       ciphersuite,
-    );
+    });
 
     await publish(proposalEvent);
   };

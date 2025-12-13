@@ -77,6 +77,15 @@ export default function SideNav() {
           >
             Groups {localGroups !== undefined && `(${localGroups})`}
           </button>
+          <a
+            href="#settings"
+            className={
+              "btn btn-ghost w-full justify-start gap-2 " +
+              (hash === "#settings" ? "btn-active" : "")
+            }
+          >
+            Settings
+          </a>
         </div>
         <AccountSwitcher />
       </div>

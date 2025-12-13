@@ -1,4 +1,5 @@
 import { useState } from "react";
+import RelayAvatar from "../relay-avatar";
 
 interface RelayListCreatorProps {
   relays: string[];
@@ -19,9 +20,23 @@ export function RelayListCreator({
 }: RelayListCreatorProps) {
   const [newRelay, setNewRelay] = useState("");
 
+  const normalizeRelayUrl = (url: string): string => {
+    const trimmed = url.trim();
+    if (!trimmed) return trimmed;
+
+    // If it already has a protocol, return as is
+    if (trimmed.startsWith("wss://") || trimmed.startsWith("ws://")) {
+      return trimmed;
+    }
+
+    // Otherwise, prepend wss://
+    return `wss://${trimmed}`;
+  };
+
   const handleAddRelay = () => {
-    if (newRelay.trim() && !relays.includes(newRelay.trim())) {
-      onRelaysChange([...relays, newRelay.trim()]);
+    const normalized = normalizeRelayUrl(newRelay);
+    if (normalized && !relays.includes(normalized)) {
+      onRelaysChange([...relays, normalized]);
       setNewRelay("");
     }
   };
@@ -57,6 +72,7 @@ export function RelayListCreator({
               key={index}
               className="flex items-center gap-2 p-2 bg-base-200 rounded"
             >
+              <RelayAvatar relay={relay} size="sm" />
               <span className="flex-1 font-mono text-sm">{relay}</span>
               <button
                 className="btn btn-sm btn-error"

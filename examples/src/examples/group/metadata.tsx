@@ -6,7 +6,7 @@ import {
 } from "../../../../src/core/marmot-group-data";
 import JsonBlock from "../../components/json-block";
 import { MarmotGroupData } from "../../../../src";
-import { relayConfig$ } from "../../lib/setting";
+import { relayConfig$ } from "../../lib/settings";
 import { useObservable } from "../../hooks/use-observable";
 
 // ============================================================================

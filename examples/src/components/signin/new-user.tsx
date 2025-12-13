@@ -12,7 +12,7 @@ import {
 import { useObservable } from "../../hooks/use-observable";
 import accountManager from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { lookupRelays$ } from "../../lib/setting";
+import { lookupRelays$ } from "../../lib/settings";
 
 interface NewUserProps {
   onSuccess?: () => void;
