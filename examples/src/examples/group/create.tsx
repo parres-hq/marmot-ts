@@ -1,7 +1,7 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { useState } from "react";
 import { switchMap } from "rxjs";
-import type { CiphersuiteName, KeyPackage } from "ts-mls";
+import type { CiphersuiteName, ClientState, KeyPackage } from "ts-mls";
 import {
   defaultCryptoProvider,
   getCiphersuiteFromName,
@@ -274,10 +274,10 @@ function ConfigurationForm({
             <div className="form-control">
               <RelayListCreator
                 relays={relays}
-                label="Relays (Optional)"
+                label="Relays (Required)"
                 placeholder="wss://relay.example.com"
                 disabled={isCreating}
-                emptyMessage="No relays configured. Add relays to publish group events."
+                emptyMessage="At least one relay is required to publish group events."
                 onRelaysChange={setRelays}
               />
             </div>
@@ -288,7 +288,7 @@ function ConfigurationForm({
             <button
               className="btn btn-primary btn-lg"
               onClick={handleSubmit}
-              disabled={isCreating || !groupName.trim()}
+              disabled={isCreating || !groupName.trim() || relays.length === 0}
             >
               {isCreating ? (
                 <>
@@ -314,7 +314,7 @@ function useGroupCreation() {
   const [isCreating, setIsCreating] = useState(false);
   const [result, setResult] = useState<{
     groupId: Uint8Array;
-    clientState: any;
+    clientState: ClientState;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
