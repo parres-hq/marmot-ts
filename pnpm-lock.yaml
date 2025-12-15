@@ -26,11 +26,11 @@ importers:
         specifier: ^4.0.0
         version: 4.0.0(typescript@5.9.3)
       nostr-tools:
-        specifier: ^2.18.2
-        version: 2.18.2(typescript@5.9.3)
+        specifier: ^2.19.3
+        version: 2.19.3(typescript@5.9.3)
       ts-mls:
-        specifier: ^1.4.2
-        version: 1.4.2(@noble/ciphers@2.0.1)(@noble/curves@2.0.1)
+        specifier: ^1.4.3
+        version: 1.4.3(@noble/ciphers@2.0.1)(@noble/curves@2.0.1)
     devDependencies:
       "@types/node":
         specifier: ^24.10.1
@@ -1248,10 +1248,10 @@ packages:
       typescript:
         optional: true
 
-  nostr-tools@2.18.2:
+  nostr-tools@2.19.3:
     resolution:
       {
-        integrity: sha512-lUCJQd9YZG3kEvxV5Zgm7qUkBpaeuvFrtqBz4TJLAxHzUn2pE7nmZZRDQmNzp5neEw20tQS3jR16o7XzzF8ncg==,
+        integrity: sha512-IJ1fcTYAfVVUbS8S/FtDopdPHCDh/34aHXnyppUzXDYGWlJMv2y1phomvOADZrMAQ6Z28iOIBEyGY256w1492Q==,
       }
     peerDependencies:
       typescript: ">=5.0.0"
@@ -1498,10 +1498,10 @@ packages:
         integrity: sha512-tmMpK00BjZiUyVyvrBK7knerNgmgvcV/KLVyuma/SC+TQN167GrMRciANTz09+k3zW8L8t60jWO1GpfkZdjTaw==,
       }
 
-  ts-mls@1.4.2:
+  ts-mls@1.4.3:
     resolution:
       {
-        integrity: sha512-NwHhJ30Z2w7ss6EjUwnu+LepSW/rdnBDGbiBUzxK+Vx8/w3/gC8LGi1RsYH+XSq42XpLnPnqchbL1BqXkWYuZQ==,
+        integrity: sha512-Suarl/GV93qr8bdnZsbMb0BqTHDjJZdd4mRi5oHpn5qDCT/LBosEYe3h2UvbKUs9WLGO80inK+eet+oCBzABSQ==,
       }
     peerDependencies:
       "@hpke/chacha20poly1305": 1.7.1
@@ -2051,7 +2051,7 @@ snapshots:
       applesauce-content: 4.0.0(typescript@5.9.3)
       applesauce-core: 4.4.2(typescript@5.9.3)
       nanoid: 5.1.6
-      nostr-tools: 2.18.2(typescript@5.9.3)
+      nostr-tools: 2.19.3(typescript@5.9.3)
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -2412,7 +2412,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  nostr-tools@2.18.2(typescript@5.9.3):
+  nostr-tools@2.19.3(typescript@5.9.3):
     dependencies:
       "@noble/ciphers": 0.5.3
       "@noble/curves": 1.2.0
@@ -2572,7 +2572,7 @@ snapshots:
 
   trough@2.2.0: {}
 
-  ts-mls@1.4.2(@noble/ciphers@2.0.1)(@noble/curves@2.0.1):
+  ts-mls@1.4.3(@noble/ciphers@2.0.1)(@noble/curves@2.0.1):
     dependencies:
       "@hpke/core": 1.7.5
       "@noble/ciphers": 2.0.1

@@ -23,8 +23,10 @@ describe("exports", () => {
         "Transactions",
         "WELCOME_EVENT_KIND",
         "addMemberToGroup",
+        "createAddMemberProposalMessage",
         "createCredential",
         "createDeleteKeyPackageEvent",
+        "createEncryptedGroupEventContent",
         "createGiftWrap",
         "createGroup",
         "createGroupEvent",
@@ -36,6 +38,7 @@ describe("exports", () => {
         "createWelcomeRumor",
         "decodeContent",
         "decodeMarmotGroupData",
+        "decryptGroupMessageEvent",
         "defaultCapabilities",
         "defaultMarmotClientConfig",
         "deserializeClientState",
@@ -71,9 +74,11 @@ describe("exports", () => {
         "keyPackageDefaultExtensions",
         "marmotGroupDataToExtension",
         "normalizeRelayUrl",
+        "replaceExtension",
         "replacer",
         "serializeClientState",
         "supportsMarmotExtensions",
+        "unixNow",
       ]
     `);
   });

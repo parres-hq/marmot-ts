@@ -1,1 +1,1 @@
-export * from "./add-member.js";
+export * from "./accept-add-member.js";

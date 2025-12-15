@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useObservable } from "../../hooks/use-observable";
-import { relayConfig$ } from "../../lib/setting";
+import { relayConfig$ } from "../../lib/settings";
 
 function RelayPickerModal(props: {
   isOpen: boolean;
@@ -60,10 +60,19 @@ export default function RelayPicker(props: {
   const relayConfig = useObservable(relayConfig$);
 
   const allRelayOptions = useMemo(() => {
-    const common = props.common || relayConfig?.commonRelays || [];
-    if (!props.value || common.includes(props.value)) return common;
-    else return [props.value, ...common];
-  }, [props.value, props.common, relayConfig?.commonRelays]);
+    const extra =
+      props.common ||
+      relayConfig?.extraRelays ||
+      relayConfig?.commonRelays ||
+      [];
+    if (!props.value || extra.includes(props.value)) return extra;
+    else return [props.value, ...extra];
+  }, [
+    props.value,
+    props.common,
+    relayConfig?.extraRelays,
+    relayConfig?.commonRelays,
+  ]);
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     props.onChange(e.target.value);

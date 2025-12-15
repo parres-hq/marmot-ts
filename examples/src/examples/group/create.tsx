@@ -1,21 +1,24 @@
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { useState } from "react";
 import { switchMap } from "rxjs";
-import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import { keyPackageStore$ } from "../../lib/key-package-store";
-import { getMarmotClient } from "../../lib/marmot-client";
-import { bytesToHex } from "@noble/hashes/utils.js";
-import type { CiphersuiteName, KeyPackage } from "ts-mls";
-import JsonBlock from "../../components/json-block";
-import { withSignIn } from "../../components/with-signIn";
-import accounts from "../../lib/accounts";
-import { RelayListCreator } from "../../components/form/relay-list-creator";
-import { PubkeyListCreator } from "../../components/form/pubkey-list-creator";
-import { getMemberCount } from "../../../../src/core/client-state";
+import type { CiphersuiteName, ClientState, KeyPackage } from "ts-mls";
+import {
+  defaultCryptoProvider,
+  getCiphersuiteFromName,
+  getCiphersuiteImpl,
+} from "ts-mls";
 import { CompleteKeyPackage } from "../../../../src";
+import { getMemberCount } from "../../../../src/core/client-state";
 import { createCredential } from "../../../../src/core/credential";
 import { generateKeyPackage } from "../../../../src/core/key-package";
-import { getCiphersuiteFromName, getCiphersuiteImpl } from "ts-mls";
-import { defaultCryptoProvider } from "ts-mls";
+import { PubkeyListCreator } from "../../components/form/pubkey-list-creator";
+import { RelayListCreator } from "../../components/form/relay-list-creator";
+import JsonBlock from "../../components/json-block";
+import { withSignIn } from "../../components/with-signIn";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
+import accounts from "../../lib/accounts";
+import { keyPackageStore$ } from "../../lib/key-package-store";
+import { getMarmotClient } from "../../lib/marmot-client";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -257,7 +260,7 @@ function ConfigurationForm({
 
           {/* Admin Pubkeys and Relays */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="form-control">
+            <div className="flex gap-2">
               <PubkeyListCreator
                 pubkeys={adminPubkeys}
                 label="Admin Public Keys (Optional)"
@@ -271,10 +274,10 @@ function ConfigurationForm({
             <div className="form-control">
               <RelayListCreator
                 relays={relays}
-                label="Relays (Optional)"
+                label="Relays (Required)"
                 placeholder="wss://relay.example.com"
                 disabled={isCreating}
-                emptyMessage="No relays configured. Add relays to publish group events."
+                emptyMessage="At least one relay is required to publish group events."
                 onRelaysChange={setRelays}
               />
             </div>
@@ -285,7 +288,7 @@ function ConfigurationForm({
             <button
               className="btn btn-primary btn-lg"
               onClick={handleSubmit}
-              disabled={isCreating || !groupName.trim()}
+              disabled={isCreating || !groupName.trim() || relays.length === 0}
             >
               {isCreating ? (
                 <>
@@ -311,7 +314,7 @@ function useGroupCreation() {
   const [isCreating, setIsCreating] = useState(false);
   const [result, setResult] = useState<{
     groupId: Uint8Array;
-    clientState: any;
+    clientState: ClientState;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 

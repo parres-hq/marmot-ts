@@ -45,3 +45,13 @@ export function ensureLastResortExtension(
     },
   ];
 }
+
+/** Replaces an extension in an array of extensions */
+export function replaceExtension(
+  extensions: Extension[],
+  extension: Extension,
+): Extension[] {
+  return extensions.map((ext) =>
+    ext.extensionType === extension.extensionType ? extension : ext,
+  );
+}

@@ -1,17 +1,10 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
-import {
-  getDisplayName,
-  normalizeToPubkey,
-  NostrEvent,
-  relaySet,
-} from "applesauce-core/helpers";
-import { useEffect, useMemo, useState } from "react";
-import { BehaviorSubject, combineLatest, NEVER, of, switchMap } from "rxjs";
+import { getDisplayName, NostrEvent, relaySet } from "applesauce-core/helpers";
+import { useEffect, useRef, useState } from "react";
+import { BehaviorSubject, combineLatest, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
-import { relayConfig$ } from "../../lib/setting";
-
 import {
   getCredentialPubkey,
   getKeyPackage,
@@ -19,20 +12,21 @@ import {
   getKeyPackageClient,
   getKeyPackageExtensions,
   getKeyPackageMLSVersion,
-  getKeyPackageRelayList,
   getKeyPackageRelays,
   KEY_PACKAGE_KIND,
-  KEY_PACKAGE_RELAY_LIST_KIND,
 } from "../../../../src";
 import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import KeyPackageDataView from "../../components/data-view/key-package";
 import ErrorBoundary from "../../components/error-boundary";
 import ExtensionBadge from "../../components/extension-badge";
+import UserSearch from "../../components/form/user-search";
 import JsonBlock from "../../components/json-block";
-import KeyPackageDataView from "../../components/data-view/key-package";
 import { UserAvatar, UserName } from "../../components/nostr-user";
+import QRButton from "../../components/qr-button";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
-import accounts from "../../lib/accounts";
+import accounts, { keyPackageRelays$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
+import { extraRelays$ } from "../../lib/settings";
 
 const formatDate = (timestamp: number) => {
   return new Date(timestamp * 1000).toLocaleString();
@@ -40,20 +34,6 @@ const formatDate = (timestamp: number) => {
 
 // Subject to hold the selected pubkey
 const selectedPubkey$ = new BehaviorSubject<string | null>(null);
-
-// Observable of pubkeys key package relays
-const keyPackageRelaysList$ = selectedPubkey$.pipe(
-  switchMap((pubkey) =>
-    pubkey
-      ? eventStore.replaceable({
-          kind: KEY_PACKAGE_RELAY_LIST_KIND,
-          pubkey,
-          relays: relaySet(relayConfig$.value.lookupRelays),
-        })
-      : NEVER,
-  ),
-  map((event) => event && getKeyPackageRelayList(event)),
-);
 
 // ============================================================================
 // Key Package Card Component (simplified version)
@@ -239,24 +219,19 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
 // ============================================================================
 
 export default function UserKeyPackages() {
-  const [pubkeyInput, setPubkeyInput] = useState("");
-  const relayConfig = useObservable(relayConfig$);
   const allAccounts = useObservable(accounts.accounts$);
   const activeAccount = useObservable(accounts.active$);
   const selectedPubkey = useObservable(selectedPubkey$);
-  const keyPackageRelays = useObservable(keyPackageRelaysList$);
+  const keyPackageRelays = useObservable(keyPackageRelays$);
+  const hasInitialized = useRef(false);
 
+  // Only auto-select the active account on initial mount
   useEffect(() => {
-    if (activeAccount?.pubkey && !selectedPubkey) {
+    if (!hasInitialized.current && activeAccount?.pubkey) {
       selectedPubkey$.next(activeAccount.pubkey);
+      hasInitialized.current = true;
     }
-  }, [activeAccount?.pubkey, selectedPubkey]);
-
-  // Get fallback relays from config - memoize to prevent infinite re-renders
-  const fallbackRelays = useMemo(
-    () => relaySet(relayConfig?.manualRelays, relayConfig?.lookupRelays),
-    [relayConfig?.manualRelays, relayConfig?.lookupRelays],
-  );
+  }, [activeAccount?.pubkey]);
 
   // Observable for account profiles with display names
   const accountProfiles = useObservableMemo(() => {
@@ -275,32 +250,33 @@ export default function UserKeyPackages() {
     return combineLatest(profileObservables);
   }, [allAccounts]);
 
-  // Handle manual pubkey submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pubkeyInput.trim())
-      selectedPubkey$.next(normalizeToPubkey(pubkeyInput.trim()));
+  // Handle user selection from search
+  const handleUserSelect = (pubkey: string) => {
+    selectedPubkey$.next(pubkey);
   };
 
   // Handle clear
   const handleClear = () => {
-    setPubkeyInput("");
     selectedPubkey$.next(null);
   };
 
-  // Step 2: Fetch key packages from those relays (or fallback relays if none found)
+  // Step 2: Fetch key packages from those relays (always include extra relays)
   const keyPackages = useObservableMemo(
     () =>
-      combineLatest([selectedPubkey$, keyPackageRelaysList$]).pipe(
-        switchMap(([pubkey, relays]) => {
+      combineLatest([selectedPubkey$, keyPackageRelays$, extraRelays$]).pipe(
+        switchMap(([pubkey, keyPackageRelays, extraRelays]) => {
           if (!pubkey) return of([]);
 
-          // Use the user's specified relays, or fall back to config-based relays
-          const relaysToUse =
-            relays && relays.length > 0 ? relays : fallbackRelays;
+          // Always include extra relays when fetching events
+          const relays = relaySet(
+            keyPackageRelays && keyPackageRelays.length > 0
+              ? keyPackageRelays
+              : [],
+            extraRelays,
+          );
 
           return pool
-            .request(relaysToUse, {
+            .request(relays, {
               kinds: [KEY_PACKAGE_KIND],
               authors: [pubkey],
               limit: 50,
@@ -311,7 +287,7 @@ export default function UserKeyPackages() {
             );
         }),
       ),
-    [fallbackRelays],
+    [],
   );
 
   return (
@@ -326,54 +302,40 @@ export default function UserKeyPackages() {
         </p>
       </div>
 
-      {/* User Selection Form */}
+      {/* User Selection */}
       <div className="card bg-base-200">
-        <div className="card-body p-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Enter user pubkey (hex)"
-                className="input input-bordered flex-1"
-                value={pubkeyInput}
-                onChange={(e) => setPubkeyInput(e.target.value)}
-              />
-              <button type="submit" className="btn btn-primary">
-                Load
+        <div className="card-body p-4 space-y-3">
+          <div className="flex gap-2 items-start">
+            <UserSearch
+              onSelect={handleUserSelect}
+              placeholder="Search for a user or enter pubkey/npub..."
+              className="flex-1"
+            />
+            {selectedPubkey && (
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={handleClear}
+              >
+                Clear
               </button>
-              {selectedPubkey && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={handleClear}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-
-            {allAccounts && allAccounts.length > 0 && (
-              <div>
-                <div className="text-sm text-base-content/60 mb-1">
-                  Or select an account:
-                </div>
-                <select
-                  className="select select-bordered"
-                  value={selectedPubkey ?? ""}
-                  onChange={(e) => selectedPubkey$.next(e.target.value)}
-                >
-                  <option value="" disabled>
-                    Select an account
-                  </option>
-                  {accountProfiles?.map(({ pubkey, displayName }) => (
-                    <option key={pubkey} value={pubkey}>
-                      {displayName}
-                    </option>
-                  ))}
-                </select>
-              </div>
             )}
-          </form>
+          </div>
+
+          {allAccounts && allAccounts.length > 0 && (
+            <select
+              className="select select-bordered"
+              value={selectedPubkey ?? ""}
+              onChange={(e) => selectedPubkey$.next(e.target.value || null)}
+            >
+              <option value="">Select an account</option>
+              {accountProfiles?.map(({ pubkey, displayName }) => (
+                <option key={pubkey} value={pubkey}>
+                  {displayName}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -384,9 +346,15 @@ export default function UserKeyPackages() {
             <div className="flex items-center gap-3">
               <UserAvatar pubkey={selectedPubkey} />
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-lg">
-                  <UserName pubkey={selectedPubkey} />
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-lg">
+                    <UserName pubkey={selectedPubkey} />
+                  </h3>
+                  <QRButton
+                    className="btn-sm btn-primary btn-link"
+                    data={selectedPubkey}
+                  />
+                </div>
                 <code className="text-xs text-base-content/60 truncate block">
                   {selectedPubkey}
                 </code>
@@ -425,11 +393,6 @@ export default function UserKeyPackages() {
                     <span>
                       No relay list found. Please select a relay to query:
                     </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-xs text-base-content/60">
-                      Using fallback relays: {fallbackRelays.join(", ")}
-                    </div>
                   </div>
                 </div>
               )}

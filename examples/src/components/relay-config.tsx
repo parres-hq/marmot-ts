@@ -1,15 +1,7 @@
+import { relaySet } from "applesauce-core/helpers";
 import { useState } from "react";
 import { useObservable } from "../hooks/use-observable";
-import {
-  relayConfig$,
-  updateLookupRelays,
-  updateCommonRelays,
-  addManualRelay,
-  removeManualRelay,
-  resetLookupRelays,
-  resetCommonRelays,
-  resetManualRelays,
-} from "../lib/setting";
+import { extraRelays$, lookupRelays$ } from "../lib/settings";
 
 interface RelayConfigProps {
   isOpen: boolean;
@@ -17,57 +9,57 @@ interface RelayConfigProps {
 }
 
 export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
-  const relayConfig = useObservable(relayConfig$);
+  const lookupRelays = useObservable(lookupRelays$);
+  const extraRelays = useObservable(extraRelays$);
   const [newLookupRelay, setNewLookupRelay] = useState("");
-  const [newCommonRelay, setNewCommonRelay] = useState("");
-  const [newManualRelay, setNewManualRelay] = useState("");
-
-  if (!relayConfig) return null;
+  const [newExtraRelay, setNewExtraRelay] = useState("");
 
   const handleAddLookupRelay = () => {
     if (newLookupRelay.trim()) {
-      const newRelays = [
-        ...new Set([...relayConfig.lookupRelays, newLookupRelay.trim()]),
-      ];
-      updateLookupRelays(newRelays);
+      const newRelays = [...new Set([...lookupRelays, newLookupRelay.trim()])];
+      lookupRelays$.next(newRelays);
       setNewLookupRelay("");
     }
   };
 
   const handleRemoveLookupRelay = (relay: string) => {
-    const newRelays = relayConfig.lookupRelays.filter((r) => r !== relay);
-    updateLookupRelays(newRelays);
+    const newRelays = lookupRelays.filter((r) => r !== relay);
+    lookupRelays$.next(newRelays);
   };
 
-  const handleAddCommonRelay = () => {
-    if (newCommonRelay.trim()) {
-      const newRelays = [
-        ...new Set([...relayConfig.commonRelays, newCommonRelay.trim()]),
-      ];
-      updateCommonRelays(newRelays);
-      setNewCommonRelay("");
+  const handleAddExtraRelay = () => {
+    if (newExtraRelay.trim()) {
+      const newRelays = [...new Set([...extraRelays, newExtraRelay.trim()])];
+      extraRelays$.next(newRelays);
+      setNewExtraRelay("");
     }
   };
 
-  const handleRemoveCommonRelay = (relay: string) => {
-    const newRelays = relayConfig.commonRelays.filter((r) => r !== relay);
-    updateCommonRelays(newRelays);
+  const handleRemoveExtraRelay = (relay: string) => {
+    const newRelays = extraRelays.filter((r) => r !== relay);
+    extraRelays$.next(newRelays);
   };
 
-  const handleAddManualRelay = () => {
-    if (newManualRelay.trim()) {
-      addManualRelay(newManualRelay.trim());
-      setNewManualRelay("");
-    }
+  const resetLookupRelays = () => {
+    lookupRelays$.next(["wss://purplepag.es/", "wss://index.hzrd149.com/"]);
   };
 
-  const handleRemoveManualRelay = (relay: string) => {
-    removeManualRelay(relay);
+  const resetExtraRelays = () => {
+    extraRelays$.next(
+      relaySet([
+        "wss://relay.damus.io",
+        "wss://nos.lol",
+        "wss://relay.primal.net",
+        "wss://relay.nostr.band",
+        "wss://nostr.wine",
+        "wss://relay.snort.social",
+      ]),
+    );
   };
 
   const handleKeyPress = (
     e: React.KeyboardEvent,
-    type: "lookup" | "common" | "manual",
+    type: "lookup" | "extra" | "manual",
   ) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -75,11 +67,8 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
         case "lookup":
           handleAddLookupRelay();
           break;
-        case "common":
-          handleAddCommonRelay();
-          break;
-        case "manual":
-          handleAddManualRelay();
+        case "extra":
+          handleAddExtraRelay();
           break;
       }
     }
@@ -114,7 +103,7 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
               </p>
 
               <div className="space-y-2">
-                {relayConfig.lookupRelays.map((relay, index) => (
+                {lookupRelays.map((relay, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <code className="flex-1 text-xs bg-base-100 p-2 rounded">
                       {relay}
@@ -149,32 +138,32 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
             </div>
           </div>
 
-          {/* Common Relays Section */}
+          {/* Extra Relays Section */}
           <div className="card bg-base-200">
             <div className="card-body p-4">
               <div className="flex justify-between items-center mb-3">
-                <h4 className="card-title text-sm">Common Relays</h4>
+                <h4 className="card-title text-sm">Extra Relays</h4>
                 <button
                   className="btn btn-xs btn-outline"
-                  onClick={resetCommonRelays}
-                  title="Reset to default common relays"
+                  onClick={resetExtraRelays}
+                  title="Reset to default extra relays"
                 >
                   Reset
                 </button>
               </div>
               <p className="text-xs text-base-content/60 mb-3">
-                Available in relay picker dropdowns across the app
+                Always used when fetching events across the app
               </p>
 
               <div className="space-y-2">
-                {relayConfig.commonRelays.map((relay, index) => (
+                {extraRelays.map((relay, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <code className="flex-1 text-xs bg-base-100 p-2 rounded">
                       {relay}
                     </code>
                     <button
                       className="btn btn-xs btn-error"
-                      onClick={() => handleRemoveCommonRelay(relay)}
+                      onClick={() => handleRemoveExtraRelay(relay)}
                     >
                       Remove
                     </button>
@@ -187,67 +176,14 @@ export default function RelayConfig({ isOpen, onClose }: RelayConfigProps) {
                   type="text"
                   placeholder="wss://relay.example.com"
                   className="input input-bordered input-sm join-item flex-1"
-                  value={newCommonRelay}
-                  onChange={(e) => setNewCommonRelay(e.target.value)}
-                  onKeyDown={(e) => handleKeyPress(e, "common")}
+                  value={newExtraRelay}
+                  onChange={(e) => setNewExtraRelay(e.target.value)}
+                  onKeyDown={(e) => handleKeyPress(e, "extra")}
                 />
                 <button
                   className="btn btn-primary btn-sm join-item"
-                  onClick={handleAddCommonRelay}
-                  disabled={!newCommonRelay.trim()}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Manual Relays Section */}
-          <div className="card bg-base-200">
-            <div className="card-body p-4">
-              <div className="flex justify-between items-center mb-3">
-                <h4 className="card-title text-sm">Manual Relays</h4>
-                <button
-                  className="btn btn-xs btn-outline"
-                  onClick={resetManualRelays}
-                  title="Reset to default manual relays"
-                >
-                  Reset
-                </button>
-              </div>
-              <p className="text-xs text-base-content/60 mb-3">
-                Used as fallback when no relay list is found
-              </p>
-
-              <div className="space-y-2">
-                {relayConfig.manualRelays.map((relay, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <code className="flex-1 text-xs bg-base-100 p-2 rounded">
-                      {relay}
-                    </code>
-                    <button
-                      className="btn btn-xs btn-error"
-                      onClick={() => handleRemoveManualRelay(relay)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="join w-full mt-3">
-                <input
-                  type="text"
-                  placeholder="wss://relay.example.com"
-                  className="input input-bordered input-sm join-item flex-1"
-                  value={newManualRelay}
-                  onChange={(e) => setNewManualRelay(e.target.value)}
-                  onKeyDown={(e) => handleKeyPress(e, "manual")}
-                />
-                <button
-                  className="btn btn-primary btn-sm join-item"
-                  onClick={handleAddManualRelay}
-                  disabled={!newManualRelay.trim()}
+                  onClick={handleAddExtraRelay}
+                  disabled={!newExtraRelay.trim()}
                 >
                   Add
                 </button>

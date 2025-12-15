@@ -1,21 +1,20 @@
 import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
-import { combineLatest, EMPTY, map, switchMap } from "rxjs";
+import { combineLatest, map, of, switchMap } from "rxjs";
 
 import {
   createKeyPackageRelayListEvent,
   getKeyPackageRelayList,
-  isValidKeyPackageRelayListEvent,
 } from "../../../../src/core/key-package-relay-list";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "../../../../src/core/protocol";
-import JsonBlock from "../../components/json-block";
 import { RelayListCreator } from "../../components/form/relay-list-creator";
+import JsonBlock from "../../components/json-block";
 import RelayAvatar from "../../components/relay-avatar";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
-import accounts, { mailboxes$ } from "../../lib/accounts";
+import accounts, { keyPackageRelays$, mailboxes$ } from "../../lib/accounts";
 import { eventStore, pool } from "../../lib/nostr";
-import { relayConfig$ } from "../../lib/setting";
+import { extraRelays$, lookupRelays$ } from "../../lib/settings";
 
 // ============================================================================
 // Component: RelayListForm
@@ -269,6 +268,8 @@ function SuccessDisplay({ event, relayList }: SuccessDisplayProps) {
 // ============================================================================
 
 function useRelayListManagement() {
+  const extraRelays = useObservable(extraRelays$);
+  const lookupRelays = useObservable(lookupRelays$);
   const [isCreating, setIsCreating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [createdEvent, setCreatedEvent] = useState<NostrEvent | null>(null);
@@ -330,15 +331,15 @@ function useRelayListManagement() {
       console.log("Signed event:", signedEvent);
 
       // Parse relay URLs from the signed event (these are the advertised relays)
-      const advertisedRelays = getKeyPackageRelayList(signedEvent);
+      const newRelays = getKeyPackageRelayList(signedEvent);
 
       // Combine outbox relays with advertised relays and config-based relays, removing duplicates
       const outboxRelays = mailboxes?.outboxes || [];
       const allPublishingRelays = relaySet(
         outboxRelays,
-        advertisedRelays,
-        relayConfig$.value.manualRelays,
-        relayConfig$.value.lookupRelays,
+        newRelays,
+        extraRelays,
+        lookupRelays,
       );
 
       if (allPublishingRelays.length === 0) {
@@ -394,29 +395,20 @@ function useRelayListManagement() {
 const currentRelayList$ = combineLatest([
   accounts.active$,
   mailboxes$,
-  relayConfig$,
+  keyPackageRelays$,
 ]).pipe(
-  switchMap(([account, mailboxes, relayConfig]) =>
+  switchMap(([account, mailboxes, keyPackageRelays]) =>
     account
       ? eventStore
           .replaceable({
             kind: KEY_PACKAGE_RELAY_LIST_KIND,
             pubkey: account.pubkey,
-            relays: relaySet(
-              mailboxes?.outboxes
-                ? mailboxes.outboxes
-                : relayConfig.lookupRelays,
-              relayConfig.manualRelays,
-            ),
+            relays: relaySet(mailboxes?.outboxes, keyPackageRelays),
           })
           .pipe(
-            map((event) =>
-              event && isValidKeyPackageRelayListEvent(event)
-                ? getKeyPackageRelayList(event)
-                : [],
-            ),
+            map((event) => (event ? getKeyPackageRelayList(event) : undefined)),
           )
-      : EMPTY,
+      : of(undefined),
   ),
 );
 
@@ -436,41 +428,6 @@ export default withSignIn(function KeyPackageRelays() {
     if (currentRelayList && currentRelayList.length > 0)
       setRelays(currentRelayList);
   }, [currentRelayList]);
-
-  // Also fetch from config-based relays when they change
-  useEffect(() => {
-    const account = accounts.active;
-    if (!account) return;
-
-    const relayConfig = relayConfig$.value;
-    const allRelays = relaySet(
-      relayConfig.lookupRelays,
-      relayConfig.manualRelays,
-    );
-
-    const subscription = eventStore
-      .replaceable({
-        kind: KEY_PACKAGE_RELAY_LIST_KIND,
-        pubkey: account.pubkey,
-        relays: allRelays,
-      })
-      .subscribe({
-        next: (event) => {
-          if (event && isValidKeyPackageRelayListEvent(event)) {
-            const relayList = getKeyPackageRelayList(event);
-            setRelays(relayList);
-          }
-        },
-        error: (error) => {
-          console.error(
-            `Error fetching from relays ${allRelays.join(", ")}:`,
-            error,
-          );
-        },
-      });
-
-    return () => subscription.unsubscribe();
-  }, [relayConfig$.value.lookupRelays, relayConfig$.value.manualRelays]);
 
   const {
     isCreating,
