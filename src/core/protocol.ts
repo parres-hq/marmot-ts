@@ -71,11 +71,11 @@ export interface MarmotGroupData {
   /** Array of WebSocket URLs for Nostr relays */
   relays: string[];
   /** SHA-256 hash of the encrypted group image (all zeros if no image) */
-  imageHash: Uint8Array;
+  imageHash: Uint8Array | null;
   /** ChaCha20-Poly1305 encryption key for the group image (all zeros if no image) */
-  imageKey: Uint8Array;
+  imageKey: Uint8Array | null;
   /** ChaCha20-Poly1305 nonce for group image encryption (all zeros if no image) */
-  imageNonce: Uint8Array;
+  imageNonce: Uint8Array | null;
 }
 
 /** Event kind for group events (commits, proposals, application messages) */

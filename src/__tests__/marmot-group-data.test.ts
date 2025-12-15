@@ -4,8 +4,8 @@ import {
   decodeMarmotGroupData,
   encodeMarmotGroupData,
   isAdmin,
-  type MarmotGroupData,
 } from "../core/marmot-group-data.js";
+import { MarmotGroupData } from "../core/protocol.js";
 
 describe("encodeMarmotGroupData and decodeMarmotGroupData", () => {
   it("should encode and decode group data correctly", () => {
@@ -43,9 +43,9 @@ describe("encodeMarmotGroupData and decodeMarmotGroupData", () => {
       description: "",
       adminPubkeys: [],
       relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     const encoded = encodeMarmotGroupData(groupData);
@@ -63,9 +63,9 @@ describe("encodeMarmotGroupData and decodeMarmotGroupData", () => {
       description: "Description with émojis and spëcial çharacters",
       adminPubkeys: [],
       relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     const encoded = encodeMarmotGroupData(groupData);
@@ -73,6 +73,45 @@ describe("encodeMarmotGroupData and decodeMarmotGroupData", () => {
 
     expect(decoded.name).toBe(groupData.name);
     expect(decoded.description).toBe(groupData.description);
+  });
+
+  it("should handle null image fields correctly", () => {
+    const groupData: MarmotGroupData = {
+      version: 1,
+      nostrGroupId: new Uint8Array(32).fill(5),
+      name: "Group with null images",
+      description: "Testing null image fields",
+      adminPubkeys: ["a".repeat(64)],
+      relays: ["wss://relay.example.com"],
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
+    };
+
+    const encoded = encodeMarmotGroupData(groupData);
+    const decoded = decodeMarmotGroupData(encoded);
+
+    expect(decoded.imageHash).toBeNull();
+    expect(decoded.imageKey).toBeNull();
+    expect(decoded.imageNonce).toBeNull();
+  });
+
+  it("should reject invalid image field lengths", () => {
+    const groupData: MarmotGroupData = {
+      version: 1,
+      nostrGroupId: new Uint8Array(32),
+      name: "",
+      description: "",
+      adminPubkeys: [],
+      relays: [],
+      imageHash: new Uint8Array(16), // Wrong size!
+      imageKey: null,
+      imageNonce: null,
+    };
+
+    expect(() => encodeMarmotGroupData(groupData)).toThrow(
+      /image_hash must be null or exactly 32 bytes/,
+    );
   });
 });
 
@@ -118,9 +157,9 @@ describe("validation", () => {
       description: "",
       adminPubkeys: ["invalid"],
       relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     expect(() => encodeMarmotGroupData(groupData)).toThrow(
@@ -136,9 +175,9 @@ describe("validation", () => {
       description: "",
       adminPubkeys: [],
       relays: ["http://not-a-websocket.com"],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     expect(() => encodeMarmotGroupData(groupData)).toThrow(/Invalid relay URL/);
@@ -152,9 +191,9 @@ describe("validation", () => {
       description: "",
       adminPubkeys: [],
       relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     expect(() => encodeMarmotGroupData(groupData)).toThrow(
@@ -164,7 +203,7 @@ describe("validation", () => {
 
   it("should reject truncated extension data", () => {
     const validData = createMarmotGroupData();
-    const truncated = validData.slice(0, 50);
+    const truncated = validData.slice(0, 40); // Less than minimum 48 bytes
 
     expect(() => decodeMarmotGroupData(truncated)).toThrow(
       /Extension data too short/,
@@ -182,9 +221,9 @@ describe("isAdmin", () => {
       description: "",
       adminPubkeys: [adminKey],
       relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     expect(isAdmin(groupData, adminKey)).toBe(true);
@@ -199,9 +238,9 @@ describe("isAdmin", () => {
       description: "",
       adminPubkeys: ["a".repeat(64)],
       relays: [],
-      imageHash: new Uint8Array(32),
-      imageKey: new Uint8Array(32),
-      imageNonce: new Uint8Array(12),
+      imageHash: null,
+      imageKey: null,
+      imageNonce: null,
     };
 
     expect(isAdmin(groupData, "b".repeat(64))).toBe(false);

@@ -98,9 +98,9 @@ export async function createSimpleGroup(
     description: options?.description || "",
     adminPubkeys: options?.adminPubkeys || [],
     relays: options?.relays || [],
-    imageHash: new Uint8Array(32),
-    imageKey: new Uint8Array(32),
-    imageNonce: new Uint8Array(12),
+    imageHash: null,
+    imageKey: null,
+    imageNonce: null,
   };
 
   return createGroup({

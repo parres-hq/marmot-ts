@@ -62,16 +62,27 @@ export function encodeMarmotGroupData(data: MarmotGroupData): Uint8Array {
   const relaysBytes = textEncoder.encode(relaysStr);
   const relaysWithLength = encodeVariableLengthField(relaysBytes);
 
-  // Image fields (fixed-length)
-  if (data.imageHash.length !== 32) {
-    throw new Error("image_hash must be exactly 32 bytes");
+  // Image fields (variable-length)
+  // Encode image_hash (0 or 32 bytes with 2-byte length prefix)
+  const imageHashBytes = data.imageHash || new Uint8Array(0);
+  if (imageHashBytes.length !== 0 && imageHashBytes.length !== 32) {
+    throw new Error("image_hash must be 0 or 32 bytes");
   }
-  if (data.imageKey.length !== 32) {
-    throw new Error("image_key must be exactly 32 bytes");
+  const imageHashWithLength = encodeVariableLengthField(imageHashBytes);
+
+  // Encode image_key (0 or 32 bytes with 2-byte length prefix)
+  const imageKeyBytes = data.imageKey || new Uint8Array(0);
+  if (imageKeyBytes.length !== 0 && imageKeyBytes.length !== 32) {
+    throw new Error("image_key must be 0 or 32 bytes");
   }
-  if (data.imageNonce.length !== 12) {
-    throw new Error("image_nonce must be exactly 12 bytes");
+  const imageKeyWithLength = encodeVariableLengthField(imageKeyBytes);
+
+  // Encode image_nonce (0 or 12 bytes with 2-byte length prefix)
+  const imageNonceBytes = data.imageNonce || new Uint8Array(0);
+  if (imageNonceBytes.length !== 0 && imageNonceBytes.length !== 12) {
+    throw new Error("image_nonce must be 0 or 12 bytes");
   }
+  const imageNonceWithLength = encodeVariableLengthField(imageNonceBytes);
 
   // Calculate total length
   const totalLength =
@@ -81,9 +92,9 @@ export function encodeMarmotGroupData(data: MarmotGroupData): Uint8Array {
     descWithLength.length +
     adminWithLength.length +
     relaysWithLength.length +
-    data.imageHash.length +
-    data.imageKey.length +
-    data.imageNonce.length;
+    imageHashWithLength.length +
+    imageKeyWithLength.length +
+    imageNonceWithLength.length;
 
   // Concatenate all parts
   const result = new Uint8Array(totalLength);
@@ -107,13 +118,13 @@ export function encodeMarmotGroupData(data: MarmotGroupData): Uint8Array {
   result.set(relaysWithLength, offset);
   offset += relaysWithLength.length;
 
-  result.set(data.imageHash, offset);
-  offset += data.imageHash.length;
+  result.set(imageHashWithLength, offset);
+  offset += imageHashWithLength.length;
 
-  result.set(data.imageKey, offset);
-  offset += data.imageKey.length;
+  result.set(imageKeyWithLength, offset);
+  offset += imageKeyWithLength.length;
 
-  result.set(data.imageNonce, offset);
+  result.set(imageNonceWithLength, offset);
 
   return result;
 }
@@ -128,7 +139,7 @@ export function encodeMarmotGroupData(data: MarmotGroupData): Uint8Array {
 export function decodeMarmotGroupData(
   extensionData: Uint8Array,
 ): MarmotGroupData {
-  const MIN_SIZE = 2 + 32 + 2 + 2 + 2 + 2 + 32 + 32 + 12; // 118 bytes
+  const MIN_SIZE = 2 + 32 + 2 + 2 + 2 + 2 + 2 + 2 + 2; // 48 bytes minimum
 
   if (extensionData.length < MIN_SIZE) {
     throw new Error(
@@ -182,26 +193,23 @@ export function decodeMarmotGroupData(
   const relays = relaysStr.length > 0 ? relaysStr.split(",") : [];
   offset = relaysOffset;
 
-  // Read image_hash (32 bytes)
-  if (offset + 32 > extensionData.length) {
-    throw new Error("Extension data truncated: missing image_hash");
-  }
-  const imageHash = extensionData.slice(offset, offset + 32);
-  offset += 32;
+  // Read image_hash (variable-length with 2-byte length prefix)
+  const { data: imageHashBytes, nextOffset: imageHashOffset } =
+    decodeVariableLengthField(extensionData, offset);
+  const imageHash = imageHashBytes.length > 0 ? imageHashBytes : null;
+  offset = imageHashOffset;
 
-  // Read image_key (32 bytes)
-  if (offset + 32 > extensionData.length) {
-    throw new Error("Extension data truncated: missing image_key");
-  }
-  const imageKey = extensionData.slice(offset, offset + 32);
-  offset += 32;
+  // Read image_key (variable-length with 2-byte length prefix)
+  const { data: imageKeyBytes, nextOffset: imageKeyOffset } =
+    decodeVariableLengthField(extensionData, offset);
+  const imageKey = imageKeyBytes.length > 0 ? imageKeyBytes : null;
+  offset = imageKeyOffset;
 
-  // Read image_nonce (12 bytes)
-  if (offset + 12 > extensionData.length) {
-    throw new Error("Extension data truncated: missing image_nonce");
-  }
-  const imageNonce = extensionData.slice(offset, offset + 12);
-  offset += 12;
+  // Read image_nonce (variable-length with 2-byte length prefix)
+  const { data: imageNonceBytes, nextOffset: imageNonceOffset } =
+    decodeVariableLengthField(extensionData, offset);
+  const imageNonce = imageNonceBytes.length > 0 ? imageNonceBytes : null;
+  offset = imageNonceOffset;
 
   // Validate no extra data
   if (offset !== extensionData.length) {
@@ -242,9 +250,9 @@ export function createMarmotGroupData(
     description: params.description || "",
     adminPubkeys: uniqueAdmins,
     relays: relaySet(params.relays),
-    imageHash: params.imageHash || new Uint8Array(32),
-    imageKey: params.imageKey || new Uint8Array(32),
-    imageNonce: params.imageNonce || new Uint8Array(12),
+    imageHash: params.imageHash ?? null,
+    imageKey: params.imageKey ?? null,
+    imageNonce: params.imageNonce ?? null,
   };
 
   return encodeMarmotGroupData(data);
@@ -352,15 +360,15 @@ function validateMarmotGroupData(data: MarmotGroupData): void {
     }
   }
 
-  // Validate image field lengths
-  if (data.imageHash.length !== 32) {
-    throw new Error("image_hash must be exactly 32 bytes");
+  // Validate image field lengths (null or exact size)
+  if (data.imageHash !== null && data.imageHash.length !== 32) {
+    throw new Error("image_hash must be null or exactly 32 bytes");
   }
-  if (data.imageKey.length !== 32) {
-    throw new Error("image_key must be exactly 32 bytes");
+  if (data.imageKey !== null && data.imageKey.length !== 32) {
+    throw new Error("image_key must be null or exactly 32 bytes");
   }
-  if (data.imageNonce.length !== 12) {
-    throw new Error("image_nonce must be exactly 12 bytes");
+  if (data.imageNonce !== null && data.imageNonce.length !== 12) {
+    throw new Error("image_nonce must be null or exactly 12 bytes");
   }
 }
 

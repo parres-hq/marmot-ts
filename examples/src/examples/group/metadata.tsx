@@ -383,19 +383,19 @@ function DecodeTab() {
               <div>
                 <div className="text-sm font-semibold mb-1">Image Hash</div>
                 <code className="text-xs break-all select-all block">
-                  {bytesToHex(decoded.imageHash)}
+                  {decoded.imageHash ? bytesToHex(decoded.imageHash) : "null"}
                 </code>
               </div>
               <div>
                 <div className="text-sm font-semibold mb-1">Image Key</div>
                 <code className="text-xs break-all select-all block">
-                  {bytesToHex(decoded.imageKey)}
+                  {decoded.imageKey ? bytesToHex(decoded.imageKey) : "null"}
                 </code>
               </div>
               <div>
                 <div className="text-sm font-semibold mb-1">Image Nonce</div>
                 <code className="text-xs break-all select-all block">
-                  {bytesToHex(decoded.imageNonce)}
+                  {decoded.imageNonce ? bytesToHex(decoded.imageNonce) : "null"}
                 </code>
               </div>
             </div>
@@ -412,9 +412,15 @@ function DecodeTab() {
                 value={{
                   ...decoded,
                   nostrGroupId: bytesToHex(decoded.nostrGroupId),
-                  imageHash: bytesToHex(decoded.imageHash),
-                  imageKey: bytesToHex(decoded.imageKey),
-                  imageNonce: bytesToHex(decoded.imageNonce),
+                  imageHash: decoded.imageHash
+                    ? bytesToHex(decoded.imageHash)
+                    : null,
+                  imageKey: decoded.imageKey
+                    ? bytesToHex(decoded.imageKey)
+                    : null,
+                  imageNonce: decoded.imageNonce
+                    ? bytesToHex(decoded.imageNonce)
+                    : null,
                 }}
               />
             </div>
