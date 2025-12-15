@@ -26,14 +26,15 @@ export type ProposalContext = {
 };
 
 /** A function that builds an MLS Proposal from group context */
-export type ProposalBuilder<T extends Proposal = Proposal> = (
+export type ProposalBuilder<T extends Proposal | Proposal[]> = (
   context: ProposalContext,
 ) => Promise<T>;
 
 /** A method that creates a {@link ProposalBuilder} from a set of arguments */
-export type ProposalAction<Args extends unknown[], T extends Proposal> = (
-  ...args: Args
-) => ProposalBuilder<T>;
+export type ProposalAction<
+  Args extends unknown[],
+  T extends Proposal | Proposal[],
+> = (...args: Args) => ProposalBuilder<T>;
 
 export type MarmotGroupOptions = {
   /** The backend to store and load the group from */
@@ -143,14 +144,14 @@ export class MarmotGroup {
    * Creates and publishes a proposal as a private MLS message.
    * @returns Promise resolving to the publish response from the relays
    */
-  async propose<Args extends unknown[], T extends Proposal>(
+  async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
     action: ProposalAction<Args, T>,
     ...args: Args
   ): Promise<Record<string, PublishResponse>>;
-  async propose<Args extends unknown[], T extends Proposal>(
+  async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
     buildProposal: ProposalBuilder<T>,
   ): Promise<Record<string, PublishResponse>>;
-  async propose<Args extends unknown[], T extends Proposal>(
+  async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
     ...args: Args
   ): Promise<Record<string, PublishResponse>> {
     const groupData = this.groupData;
@@ -162,18 +163,28 @@ export class MarmotGroup {
       groupData: this.groupData,
     };
 
-    let proposal: T;
+    let proposals: T;
     if (args.length === 1) {
-      proposal = await (args[0] as ProposalAction<Args, T>)(...args)(context);
+      proposals = await (args[0] as ProposalAction<Args, T>)(...args)(context);
     } else {
-      proposal = await (args[0] as ProposalBuilder<T>)(context);
+      proposals = await (args[0] as ProposalBuilder<T>)(context);
     }
 
-    if (!proposal)
+    if (!proposals)
       throw new Error("Proposal is undefined. This should not happen.");
 
-    // Publish to the group's relays
-    return await this.sendProposal(proposal);
+    // Handle both single proposals and arrays of proposals
+    const proposalArray = Array.isArray(proposals) ? proposals : [proposals];
+
+    // Send all proposals and collect responses
+    const responses: Record<string, PublishResponse> = {};
+    for (const proposal of proposalArray) {
+      const response = await this.sendProposal(proposal as Proposal);
+      // Merge responses (later responses override earlier ones for the same relay)
+      Object.assign(responses, response);
+    }
+
+    return responses;
   }
 
   /** Sends a proposal to the group relays */
@@ -200,7 +211,11 @@ export class MarmotGroup {
 
   /** Creates a commit from existing proposals or new ones and send the commit message to the group */
   async commit(
-    ...input: (Proposal | ProposalBuilder | (Proposal | ProposalBuilder)[])[]
+    ...input: (
+      | Proposal
+      | ProposalBuilder<Proposal>
+      | (Proposal | ProposalBuilder<Proposal>)[]
+    )[]
   ) {
     const groupData = this.groupData;
     if (!groupData) throw new NoMarmotGroupDataError();

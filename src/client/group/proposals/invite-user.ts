@@ -4,8 +4,8 @@ import { type ProposalAdd } from "ts-mls/proposal.js";
 import { getKeyPackage } from "../../../core/key-package.js";
 import { ProposalBuilder } from "../marmot-group.js";
 
-/** Builds an add member proposal from a key package event or raw key package */
-export function proposeAddMember(
+/** Builds a proposal to invite a user to the group from a key package event or raw key package */
+export function proposeInviteUser(
   keyPackageEvent: KeyPackage | NostrEvent,
 ): ProposalBuilder<ProposalAdd> {
   return async () => {

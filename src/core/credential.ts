@@ -1,5 +1,9 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import { Credential, CredentialBasic } from "ts-mls/credential.js";
+import {
+  Credential,
+  CredentialBasic,
+  encodeCredential,
+} from "ts-mls/credential.js";
 
 export function isHexKey(str: string): boolean {
   return /^[0-9a-fA-F]{64}$/.test(str);
@@ -36,4 +40,15 @@ export function getCredentialPubkey(credential: Credential): string {
   }
 
   return str;
+}
+
+/** Checks if two credentials are the same. */
+export function isSameCredential(a: Credential, b: Credential): boolean {
+  // If they are basic credentials, we can just compare the identities
+  if (a.credentialType === "basic" && b.credentialType === "basic") {
+    return bytesToHex(a.identity) === bytesToHex(b.identity);
+  }
+
+  // NOTE: assuming the encoding is deterministic
+  return bytesToHex(encodeCredential(a)) === bytesToHex(encodeCredential(b));
 }
