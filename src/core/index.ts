@@ -3,7 +3,6 @@ export * from "./client-state.js";
 export * from "./credential.js";
 export * from "./default-capabilities.js";
 export * from "./extensions.js";
-export * from "./group-membership.js";
 export * from "./group-message.js";
 export * from "./group.js";
 export * from "./key-package-relay-list.js";
