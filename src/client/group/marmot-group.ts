@@ -15,9 +15,13 @@ import { createGroupEvent } from "../../core/group-message.js";
 import { MarmotGroupData } from "../../core/protocol.js";
 import { createWelcomeRumor } from "../../core/welcome.js";
 import { GroupStore } from "../../store/group-store.js";
-import { NoGroupRelaysError, NoMarmotGroupDataError } from "../errors.js";
+import {
+  NoGroupRelaysError,
+  NoMarmotGroupDataError,
+  NoRelayReceivedEventError,
+} from "../errors.js";
 import { NostrPool, PublishResponse } from "../interfaces.js";
-import { createGiftWrap } from "../../utils/index.js";
+import { createGiftWrap, hasAck } from "../../utils/index.js";
 
 export type ProposalContext = {
   state: ClientState;
@@ -256,7 +260,7 @@ export class MarmotGroup {
 
       for (const user of users) {
         // TODO: how do we get the newly added users keypackage event id
-        const welcomeRumor = await createWelcomeRumor(
+        const welcomeRumor = createWelcomeRumor(
           welcome,
           user,
           pubkey,
@@ -286,6 +290,7 @@ export class MarmotGroup {
 
     // Publish to the group's relays
     const response = await this.publish(commitEvent);
+    if (!hasAck(response)) throw new NoRelayReceivedEventError(commitEvent.id);
 
     // Update the group state after successful publish
     this.state = newState;

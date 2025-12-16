@@ -3,6 +3,7 @@ import type { EventSigner } from "applesauce-factory";
 import { create } from "applesauce-factory";
 import { GiftWrapBlueprint } from "applesauce-factory/blueprints";
 import type { GiftWrapOptions } from "applesauce-factory/operations/gift-wrap";
+import { PublishResponse } from "src/client/interfaces.js";
 
 /** Returns the value of a name / value tag */
 export function getTagValue(
@@ -48,3 +49,6 @@ export async function createGiftWrap(
 export function unixNow(): number {
   return Math.floor(Date.now() / 1000);
 }
+
+export const hasAck = (publishResult: Record<string, PublishResponse>) =>
+  Object.values(publishResult).some((res) => res.ok);

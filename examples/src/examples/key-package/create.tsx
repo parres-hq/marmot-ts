@@ -313,7 +313,6 @@ function useKeyPackageCreation() {
 
       console.log("Generating key package with cipher suite:", cipherSuite);
 
-      // TODO: `defaultLifetime` defaults to notBefore: 0n, notAfter: 9223372036854775807n
       const keyPackage = await generateKeyPackage({
         credential,
         ciphersuiteImpl,
