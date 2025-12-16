@@ -67,6 +67,7 @@ describe("exports", () => {
         "getPubkeyLeafNodes",
         "getTagValue",
         "getWelcome",
+        "hasAck",
         "isAdmin",
         "isHexKey",
         "isLifetimeValid",
