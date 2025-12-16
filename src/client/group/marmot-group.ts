@@ -285,6 +285,11 @@ export class MarmotGroup {
     });
 
     // Publish to the group's relays
-    return await this.publish(commitEvent);
+    const response = await this.publish(commitEvent);
+
+    // Update the group state after successful publish
+    this.state = newState;
+
+    return response;
   }
 }
