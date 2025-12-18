@@ -11,3 +11,10 @@ export class NoMarmotGroupDataError extends Error {
     super("MarmotGroupData not found in ClientState.");
   }
 }
+
+/** An error that is thrown if no relay received an event. */
+export class NoRelayReceivedEventError extends Error {
+  constructor(eventId: string) {
+    super(`No relay received event ${eventId}`);
+  }
+}

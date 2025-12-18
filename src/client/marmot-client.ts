@@ -18,8 +18,8 @@ import { createSimpleGroup, SimpleGroupOptions } from "../core/group.js";
 import { generateKeyPackage } from "../core/key-package.js";
 import { GroupStore } from "../store/group-store.js";
 import { KeyPackageStore } from "../store/key-package-store.js";
-import { NostrPool } from "./interfaces.js";
-import { MarmotGroup } from "./marmot-group.js";
+import { NostrPool } from "./nostr-interface.js";
+import { MarmotGroup } from "./group/marmot-group.js";
 
 export type MarmotClientOptions = {
   /** The signer used for the clients identity */
