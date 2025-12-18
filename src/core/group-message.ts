@@ -6,6 +6,7 @@ import {
   NostrEvent,
 } from "nostr-tools";
 import { hexToBytes, bytesToHex } from "nostr-tools/utils";
+import { Rumor } from "applesauce-core/helpers";
 import { ClientState } from "ts-mls/clientState.js";
 import { CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
 import { mlsExporter } from "ts-mls/keySchedule.js";
@@ -170,6 +171,35 @@ export async function createGroupEvent({
 
 /** A type for a decrypted group message event */
 export type GroupMessagePair = { event: NostrEvent; message: MLSMessage };
+
+/**
+ * Serializes a Nostr event (rumor) to application data for use in MLS application messages.
+ *
+ * According to the Marmot spec (MIP-03), application messages contain unsigned Nostr events
+ * (rumors) as their payload. This function:
+ * 1. Ensures the event is unsigned (removes sig field if present)
+ * 2. Serializes the event to JSON
+ * 3. Converts the JSON string to UTF-8 bytes
+ *
+ * The inner Nostr events MUST:
+ * - Be unsigned (no sig field) to prevent leaks from being publishable
+ * - Use the member's Nostr identity key for the pubkey field
+ * - NOT include "h" tags or other tags that would identify the group
+ *
+ * @param rumor - The unsigned Nostr event (rumor) to serialize
+ * @returns The serialized event as Uint8Array (UTF-8 encoded JSON)
+ */
+export function serializeApplicationRumor(rumor: Rumor): Uint8Array {
+  // Create a copy without the sig field (if present)
+  // According to spec, inner events MUST be unsigned
+  const { sig, ...unsignedEvent } = rumor as Rumor & { sig?: string };
+
+  // Serialize to JSON
+  const jsonString = JSON.stringify(unsignedEvent);
+
+  // Convert to UTF-8 bytes
+  return new TextEncoder().encode(jsonString);
+}
 
 /**
  * Sorts group commits according to MIP-03.

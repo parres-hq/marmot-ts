@@ -1,8 +1,10 @@
 import { NostrEvent } from "applesauce-core/helpers/event";
+import { Rumor } from "applesauce-core/helpers";
 import { EventSigner } from "applesauce-factory";
 import {
   CiphersuiteImpl,
   ClientState,
+  createApplicationMessage,
   createCommit,
   createProposal,
   CryptoProvider,
@@ -15,6 +17,7 @@ import {
 } from "ts-mls";
 import { acceptAll } from "ts-mls/incomingMessageAction.js";
 import {
+  MLSMessage,
   type MlsPrivateMessage,
   type MlsPublicMessage,
 } from "ts-mls/message.js";
@@ -23,6 +26,7 @@ import {
   createGroupEvent,
   GroupMessagePair,
   readGroupMessages,
+  serializeApplicationRumor,
   sortGroupCommits,
 } from "../../core/group-message.js";
 import { isPrivateMessage } from "../../core/message.js";
@@ -230,6 +234,56 @@ export class MarmotGroup {
 
     // Publish to the group's relays
     return await this.publish(proposalEvent);
+  }
+
+  /**
+   * Creates and sends an application message to the group.
+   *
+   * Application messages contain the actual content shared within the group (e.g., chat messages,
+   * reactions, etc.). The inner Nostr event (rumor) must be unsigned and will be serialized
+   * according to the Marmot spec.
+   *
+   * @param rumor - The unsigned Nostr event (rumor) to send as the application message
+   * @returns Promise resolving to the publish response from the relays
+   */
+  async sendApplicationRumor(
+    rumor: Rumor,
+  ): Promise<Record<string, PublishResponse>> {
+    // Serialize the Nostr event (rumor) to application data according to Marmot spec
+    const applicationData = serializeApplicationRumor(rumor);
+
+    // Create the application message using ts-mls
+    const { newState, privateMessage } = await createApplicationMessage(
+      this.state,
+      applicationData,
+      this.ciphersuite,
+    );
+
+    // Convert PrivateMessage to MLSMessage by wrapping it in the proper structure
+    const mlsMessage: MLSMessage = {
+      version: this.state.groupContext.version,
+      wireformat: "mls_private_message",
+      privateMessage,
+    };
+
+    // Wrap the message in a group event
+    // Use this.state (not newState) to get the exporter_secret for the current epoch
+    const applicationEvent = await createGroupEvent({
+      message: mlsMessage,
+      state: this.state,
+      ciphersuite: this.ciphersuite,
+    });
+
+    // Publish to the group's relays
+    const response = await this.publish(applicationEvent);
+    if (!hasAck(response))
+      throw new NoRelayReceivedEventError(applicationEvent.id);
+
+    // Update the group state after successful publish
+    // Application messages update state for forward secrecy (key schedule rotation)
+    this.state = newState;
+
+    return response;
   }
 
   /**
