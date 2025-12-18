@@ -17,6 +17,7 @@ import {
 import { unixNow } from "../utils/nostr.js";
 import { getNostrGroupIdHex } from "./client-state.js";
 import { GROUP_EVENT_KIND } from "./protocol.js";
+import { isPrivateMessage } from "./message.js";
 
 /**
  * Gets the exporter secret for NIP-44 encryption from the current group epoch.
@@ -165,4 +166,65 @@ export async function createGroupEvent({
   };
 
   return finalizeEvent(unsignedEvent, ephemeralSecretKey);
+}
+
+/** A type for a decrypted group message event */
+export type GroupMessagePair = { event: NostrEvent; message: MLSMessage };
+
+/**
+ * Sorts group commits according to MIP-03.
+ *
+ * When multiple admins send commits for the same epoch, we need to apply exactly one. The priority order is:
+ * 1. Epoch number (process commits in epoch order)
+ * 2. created_at timestamp (earliest wins)
+ * 3. event id (lexicographically smallest wins as tiebreaker)
+ *
+ * @param commits - The commits to sort
+ * @returns The sorted commits
+ */
+export function sortGroupCommits(
+  commits: GroupMessagePair[],
+): GroupMessagePair[] {
+  return Array.from(commits).sort((a, b) => {
+    if (!isPrivateMessage(a.message) || !isPrivateMessage(b.message)) return 0;
+
+    const pmA = a.message.privateMessage;
+    const pmB = b.message.privateMessage;
+
+    // First priority: Sort by epoch number
+    if (pmA.epoch !== pmB.epoch) {
+      if (pmA.epoch < pmB.epoch) return -1;
+      if (pmA.epoch > pmB.epoch) return 1;
+      return 0;
+    }
+
+    // Same epoch - second priority: Use timestamp (earliest wins)
+    if (a.event.created_at !== b.event.created_at)
+      return a.event.created_at - b.event.created_at;
+
+    // Same timestamp - third priority: Use event id (lexicographically smallest wins)
+    return a.event.id.localeCompare(b.event.id);
+  });
+}
+
+/** Read an array of group message events into MLSMessages and an array of unreadable events */
+export async function readGroupMessages(
+  events: NostrEvent[],
+  state: ClientState,
+  ciphersuite: CiphersuiteImpl,
+): Promise<{ read: GroupMessagePair[]; unreadable: NostrEvent[] }> {
+  const read: GroupMessagePair[] = [];
+  const unreadable: NostrEvent[] = [];
+
+  for (const event of events) {
+    try {
+      const message = await decryptGroupMessageEvent(event, state, ciphersuite);
+      read.push({ event, message });
+    } catch {
+      // Ignore reading errors, this is either a message or a past / future epoch or spam
+      unreadable.push(event);
+    }
+  }
+
+  return { read, unreadable };
 }
