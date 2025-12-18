@@ -3,7 +3,7 @@ import type { EventSigner } from "applesauce-factory";
 import { create } from "applesauce-factory";
 import { GiftWrapBlueprint } from "applesauce-factory/blueprints";
 import type { GiftWrapOptions } from "applesauce-factory/operations/gift-wrap";
-import { PublishResponse } from "../client/interfaces.js";
+import { PublishResponse } from "../client/nostr-interface.js";
 
 /** Returns the value of a name / value tag */
 export function getTagValue(

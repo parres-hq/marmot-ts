@@ -1,6 +1,6 @@
 import { ProposalRemove } from "ts-mls/proposal.js";
 import { getPubkeyLeafNodeIndexes } from "../../../core/group-members.js";
-import { ProposalBuilder } from "../marmot-group.js";
+import { ProposalAction } from "../marmot-group.js";
 
 /**
  * Proposes removing all leaf nodes (devices/clients) for a given Nostr user.
@@ -11,7 +11,7 @@ import { ProposalBuilder } from "../marmot-group.js";
  */
 export function proposeKickUser(
   pubkey: string,
-): ProposalBuilder<ProposalRemove[]> {
+): ProposalAction<ProposalRemove[]> {
   return async ({ state }) => {
     const leafIndexes = getPubkeyLeafNodeIndexes(state, pubkey);
 

@@ -2,12 +2,12 @@ import { type ProposalGroupContextExtensions } from "ts-mls/proposal.js";
 import { replaceExtension } from "../../../core/extensions.js";
 import { marmotGroupDataToExtension } from "../../../core/marmot-group-data.js";
 import { MarmotGroupData } from "../../../core/protocol.js";
-import type { ProposalBuilder } from "../marmot-group.js";
+import type { ProposalAction } from "../marmot-group.js";
 
 /** Builds a proposal to update a group's marmot group data extension */
 export function proposeUpdateMetadata(
   metadata: Partial<MarmotGroupData>,
-): ProposalBuilder<ProposalGroupContextExtensions> {
+): ProposalAction<ProposalGroupContextExtensions> {
   return async ({ state, groupData }) => {
     // Create updated group data, preserving existing values for unchanged fields
     const updatedGroupData: MarmotGroupData = {

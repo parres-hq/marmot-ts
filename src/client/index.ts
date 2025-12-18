@@ -1,2 +1,2 @@
-export * from "./interfaces.js";
+export * from "./nostr-interface.js";
 export * from "./marmot-client.js";

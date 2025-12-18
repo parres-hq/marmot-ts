@@ -15,13 +15,13 @@ import { createGroupEvent } from "../../core/group-message.js";
 import { MarmotGroupData } from "../../core/protocol.js";
 import { createWelcomeRumor } from "../../core/welcome.js";
 import { GroupStore } from "../../store/group-store.js";
+import { createGiftWrap, hasAck } from "../../utils/index.js";
 import {
   NoGroupRelaysError,
   NoMarmotGroupDataError,
   NoRelayReceivedEventError,
 } from "../errors.js";
-import { NostrPool, PublishResponse } from "../interfaces.js";
-import { createGiftWrap, hasAck } from "../../utils/index.js";
+import { NostrPool, PublishResponse } from "../nostr-interface.js";
 
 export type ProposalContext = {
   state: ClientState;
@@ -30,15 +30,15 @@ export type ProposalContext = {
 };
 
 /** A function that builds an MLS Proposal from group context */
-export type ProposalBuilder<T extends Proposal | Proposal[]> = (
+export type ProposalAction<T extends Proposal | Proposal[]> = (
   context: ProposalContext,
 ) => Promise<T>;
 
-/** A method that creates a {@link ProposalBuilder} from a set of arguments */
-export type ProposalAction<
+/** A method that creates a {@link ProposalAction} from a set of arguments */
+export type ProposalBuilder<
   Args extends unknown[],
   T extends Proposal | Proposal[],
-> = (...args: Args) => ProposalBuilder<T>;
+> = (...args: Args) => ProposalAction<T>;
 
 export type MarmotGroupOptions = {
   /** The backend to store and load the group from */
@@ -149,11 +149,11 @@ export class MarmotGroup {
    * @returns Promise resolving to the publish response from the relays
    */
   async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
-    action: ProposalAction<Args, T>,
+    action: ProposalBuilder<Args, T>,
     ...args: Args
   ): Promise<Record<string, PublishResponse>>;
   async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
-    buildProposal: ProposalBuilder<T>,
+    action: ProposalAction<T>,
   ): Promise<Record<string, PublishResponse>>;
   async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
     ...args: Args
@@ -169,9 +169,9 @@ export class MarmotGroup {
 
     let proposals: T;
     if (args.length === 1) {
-      proposals = await (args[0] as ProposalAction<Args, T>)(...args)(context);
+      proposals = await (args[0] as ProposalAction<T>)(context);
     } else {
-      proposals = await (args[0] as ProposalBuilder<T>)(context);
+      proposals = await (args[0] as ProposalBuilder<Args, T>)(...args)(context);
     }
 
     if (!proposals)
@@ -195,6 +195,7 @@ export class MarmotGroup {
   async sendProposal(
     proposal: Proposal,
   ): Promise<Record<string, PublishResponse>> {
+    // NOTE: new client state is explicitly ignored here because the only change is adding the proposal to the unappliedProposals array
     const { message } = await createProposal(
       this.state,
       false, // private message
@@ -217,8 +218,8 @@ export class MarmotGroup {
   async commit(
     ...input: (
       | Proposal
-      | ProposalBuilder<Proposal>
-      | (Proposal | ProposalBuilder<Proposal>)[]
+      | ProposalAction<Proposal>
+      | (Proposal | ProposalAction<Proposal>)[]
     )[]
   ) {
     const groupData = this.groupData;
