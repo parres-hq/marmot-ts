@@ -384,7 +384,7 @@ function useGroupSubscription(
 
       try {
         const newMessages: Rumor[] = [];
-        for await (const result of group.injest(events)) {
+        for await (const result of group.ingest(events)) {
           if (result.kind === "applicationMessage") {
             try {
               // Deserialize the application data to get the rumor

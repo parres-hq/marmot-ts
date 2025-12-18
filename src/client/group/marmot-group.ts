@@ -218,8 +218,8 @@ export class MarmotGroup {
     proposal: Proposal,
   ): Promise<Record<string, PublishResponse>> {
     // NOTE: We don't update state here because:
-    // 1. The proposal will be received back from relays and processed via injest()
-    // 2. When processed via injest(), it will be added to state.unappliedProposals
+    // 1. The proposal will be received back from relays and processed via ingest()
+    // 2. When processed via ingest(), it will be added to state.unappliedProposals
     // 3. If you need to commit immediately with this proposal, pass it explicitly to commit()
     const { message } = await createProposal(
       this.state,
@@ -420,7 +420,7 @@ export class MarmotGroup {
   }
 
   /**
-   * Injests an array of group messages and applies commits to the group state.
+   * ingests an array of group messages and applies commits to the group state.
    *
    * Processing happens in two stages:
    * 1. Process all non-commit messages (proposals, application messages)
@@ -433,7 +433,7 @@ export class MarmotGroup {
    * @param events - Array of Nostr events containing encrypted MLS messages
    * @yields ProcessMessageResult - Either a new state (from commits/proposals) or an application message
    */
-  async *injest(events: NostrEvent[]): AsyncGenerator<ProcessMessageResult> {
+  async *ingest(events: NostrEvent[]): AsyncGenerator<ProcessMessageResult> {
     // Early return if no events to process
     if (events.length === 0) return;
 
@@ -453,7 +453,7 @@ export class MarmotGroup {
     // If nothing was readable, try unreadable events again later
     if (read.length === 0) {
       if (unreadable.length > 0) {
-        yield* this.injest(unreadable);
+        yield* this.ingest(unreadable);
       }
       return;
     }
@@ -592,11 +592,11 @@ export class MarmotGroup {
     // - An event from epoch N+1 might have been unreadable when we were at epoch N
     // - After processing a commit that advances us to epoch N+1, we can now read it
     //
-    // We recursively call injest on unreadable events to retry them.
+    // We recursively call ingest on unreadable events to retry them.
     // This continues until no more events can be read.
 
     if (unreadable.length > 0) {
-      yield* this.injest(unreadable);
+      yield* this.ingest(unreadable);
     }
   }
 }
