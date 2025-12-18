@@ -1,3 +1,4 @@
+import { isRumor, Rumor } from "applesauce-core/helpers";
 import {
   finalizeEvent,
   generateSecretKey,
@@ -5,8 +6,7 @@ import {
   nip44,
   NostrEvent,
 } from "nostr-tools";
-import { hexToBytes, bytesToHex } from "nostr-tools/utils";
-import { Rumor } from "applesauce-core/helpers";
+import { bytesToHex, hexToBytes } from "nostr-tools/utils";
 import { ClientState } from "ts-mls/clientState.js";
 import { CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
 import { mlsExporter } from "ts-mls/keySchedule.js";
@@ -17,8 +17,8 @@ import {
 } from "ts-mls/message.js";
 import { unixNow } from "../utils/nostr.js";
 import { getNostrGroupIdHex } from "./client-state.js";
-import { GROUP_EVENT_KIND } from "./protocol.js";
 import { isPrivateMessage } from "./message.js";
+import { GROUP_EVENT_KIND } from "./protocol.js";
 
 /**
  * Gets the exporter secret for NIP-44 encryption from the current group epoch.
@@ -199,6 +199,14 @@ export function serializeApplicationRumor(rumor: Rumor): Uint8Array {
 
   // Convert to UTF-8 bytes
   return new TextEncoder().encode(jsonString);
+}
+
+/** Deserializes a serialized application rumor back into a Rumor object */
+export function deserializeApplicationRumor(data: Uint8Array): Rumor {
+  const jsonString = new TextDecoder().decode(data);
+  const rumor = JSON.parse(jsonString);
+  if (!isRumor(rumor)) throw new Error("Invalid rumor");
+  return rumor;
 }
 
 /**

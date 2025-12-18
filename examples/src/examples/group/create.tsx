@@ -1,7 +1,7 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { useState } from "react";
 import { switchMap } from "rxjs";
-import type { CiphersuiteName, ClientState, KeyPackage } from "ts-mls";
+import type { CiphersuiteName, KeyPackage } from "ts-mls";
 import {
   defaultCryptoProvider,
   getCiphersuiteFromName,
@@ -18,7 +18,7 @@ import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
 import { keyPackageStore$ } from "../../lib/key-package-store";
-import { getMarmotClient } from "../../lib/marmot-client";
+import { marmotClient$ } from "../../lib/marmot-client";
 
 // ============================================================================
 // Component: ErrorAlert
@@ -29,20 +29,7 @@ function ErrorAlert({ error }: { error: string | null }) {
 
   return (
     <div className="alert alert-error">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="stroke-current shrink-0 h-6 w-6"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <span>Error: {error}</span>
+      <span>❌ Error: {error}</span>
     </div>
   );
 }
@@ -95,7 +82,6 @@ function ConfigurationForm({
         (kp) => bytesToHex(kp.initKey) === keyPackageId,
       );
       if (!keyPackage) {
-        console.error("Selected key package not found");
         return;
       }
 
@@ -103,11 +89,9 @@ function ConfigurationForm({
         await keyPackageStore.getCompletePackage(keyPackage);
       if (completePackage) {
         setSelectedKeyPackage(completePackage);
-      } else {
-        console.error("Could not load the complete key package");
       }
     } catch (err) {
-      console.error("Failed to load key package:", err);
+      // Silently handle key package loading errors
     }
   };
 
@@ -119,17 +103,12 @@ function ConfigurationForm({
       try {
         const account = accounts.active;
         if (!account) {
-          console.error("No active account");
           return;
         }
 
         // Use default cipher suite
         const defaultCipherSuite: CiphersuiteName =
           "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519";
-
-        console.log(
-          "No key package selected, generating new one with defaults...",
-        );
 
         // Get cipher suite implementation
         const selectedCiphersuite = getCiphersuiteFromName(defaultCipherSuite);
@@ -144,10 +123,7 @@ function ConfigurationForm({
           credential,
           ciphersuiteImpl,
         });
-
-        console.log("✅ Generated new key package with default cipher suite");
       } catch (err) {
-        console.error("Failed to generate key package:", err);
         return;
       }
     }
@@ -179,21 +155,8 @@ function ConfigurationForm({
             </label>
             {keyPackages.length === 0 ? (
               <div className="alert alert-info">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  className="h-6 w-6 shrink-0 stroke-current"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  ></path>
-                </svg>
                 <span>
-                  No key packages available. A new one will be generated
+                  ℹ️ No key packages available. A new one will be generated
                   automatically with default settings.
                 </span>
               </div>
@@ -290,14 +253,7 @@ function ConfigurationForm({
               onClick={handleSubmit}
               disabled={isCreating || !groupName.trim() || relays.length === 0}
             >
-              {isCreating ? (
-                <>
-                  <span className="loading loading-spinner"></span>
-                  Creating...
-                </>
-              ) : (
-                "Show Group Details"
-              )}
+              {isCreating ? "⏳ Creating..." : "Show Group Details"}
             </button>
           </div>
         </div>
@@ -307,41 +263,61 @@ function ConfigurationForm({
 }
 
 // ============================================================================
-// Hook: useGroupCreation
+// Main Component
 // ============================================================================
 
-function useGroupCreation() {
+export default withSignIn(function GroupCreation() {
+  const client = useObservable(marmotClient$);
+  const keyPackageStore = useObservable(keyPackageStore$);
+  const keyPackages =
+    useObservableMemo(
+      () => keyPackageStore$.pipe(switchMap((store) => store.list())),
+      [],
+    ) ?? [];
+
   const [isCreating, setIsCreating] = useState(false);
   const [result, setResult] = useState<{
     groupId: Uint8Array;
-    clientState: ClientState;
+    clientState: any;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const createGroup = async (
-    groupName: string,
-    groupDescription: string,
-    adminPubkeys: string[],
-    relays: string[],
-  ) => {
+  const handleFormSubmit = async (data: ConfigurationFormData) => {
+    if (!data.selectedKeyPackage) {
+      return;
+    }
+
+    if (!client) {
+      setError("Marmot client not available");
+      return;
+    }
+
     try {
       setIsCreating(true);
       setError(null);
       setResult(null);
 
-      const client = await getMarmotClient();
-      const groupId = await client.createGroup(groupName, {
-        description: groupDescription,
-        adminPubkeys: adminPubkeys,
-        relays: relays,
+      // Get current user's pubkey as admin
+      const account = accounts.active;
+      if (!account) {
+        setError("No active account");
+        return;
+      }
+
+      // Use only the admin pubkeys from the picker (creator is automatically added by MarmotClient)
+      const adminPubkeysList = [...data.adminPubkeys];
+      const allRelays = [...data.relays];
+
+      const groupId = await client.createGroup(data.groupName, {
+        description: data.groupDescription,
+        adminPubkeys: adminPubkeysList,
+        relays: allRelays,
       });
 
       // Retrieve the group to get the client state for display
       const group = await client.getGroup(groupId);
       setResult({ groupId, clientState: group.state });
-      console.log("✅ Group created and stored successfully!");
     } catch (err) {
-      console.error("Error creating group:", err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsCreating(false);
@@ -351,55 +327,6 @@ function useGroupCreation() {
   const reset = () => {
     setResult(null);
     setError(null);
-  };
-
-  return {
-    isCreating,
-    result,
-    error,
-    createGroup,
-    reset,
-  };
-}
-
-// ============================================================================
-// Main Component
-// ============================================================================
-
-export default withSignIn(function GroupCreation() {
-  const keyPackageStore = useObservable(keyPackageStore$);
-  const keyPackages =
-    useObservableMemo(
-      () => keyPackageStore$.pipe(switchMap((store) => store.list())),
-      [],
-    ) ?? [];
-
-  const { isCreating, result, error, createGroup, reset } = useGroupCreation();
-
-  const handleFormSubmit = async (data: ConfigurationFormData) => {
-    if (!data.selectedKeyPackage) {
-      console.error("No key package provided");
-      return;
-    }
-
-    // Get current user's pubkey as admin
-    const account = accounts.active;
-    if (!account) {
-      console.error("No active account");
-      return;
-    }
-
-    // Use only the admin pubkeys from the picker (creator is automatically added by MarmotClient)
-    const adminPubkeysList = [...data.adminPubkeys];
-
-    const allRelays = [...data.relays];
-
-    await createGroup(
-      data.groupName,
-      data.groupDescription,
-      adminPubkeysList,
-      allRelays,
-    );
   };
 
   return (
@@ -429,22 +356,9 @@ export default withSignIn(function GroupCreation() {
       {result && (
         <div className="space-y-4">
           <div className="alert alert-success">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="stroke-current shrink-0 h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
             <div>
               <div className="font-bold">
-                Group created and stored successfully!
+                ✅ Group created and stored successfully!
               </div>
               <div className="text-sm">
                 Group ID: {bytesToHex(result.groupId).slice(0, 16)}...
@@ -469,21 +383,8 @@ export default withSignIn(function GroupCreation() {
           </div>
 
           <div className="alert alert-info">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              className="h-6 w-6 shrink-0 stroke-current"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
             <span>
-              The private MLS Group ID is stored locally and should never be
+              ℹ️ The private MLS Group ID is stored locally and should never be
               published to Nostr relays.
             </span>
           </div>

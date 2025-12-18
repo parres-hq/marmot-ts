@@ -12,6 +12,9 @@ import accounts from "./accounts";
 // Observable that triggers whenever the store changes
 export const storeChanges$ = new BehaviorSubject<number>(0);
 
+// BehaviorSubject for the currently selected group ID
+export const selectedGroupId$ = new BehaviorSubject<string | null>(null);
+
 // Create and export a shared GroupStore instance
 export const groupStore$ = accounts.active$.pipe(
   map((account) => {

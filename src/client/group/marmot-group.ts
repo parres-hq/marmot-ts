@@ -39,7 +39,10 @@ import {
   NoMarmotGroupDataError,
   NoRelayReceivedEventError,
 } from "../errors.js";
-import { NostrPool, PublishResponse } from "../nostr-interface.js";
+import {
+  NostrNetworkInterface as NostrNetworkInterface,
+  PublishResponse,
+} from "../nostr-interface.js";
 import { CreateCommitOptions } from "ts-mls/createCommit.js";
 
 export type ProposalContext = {
@@ -66,8 +69,8 @@ export type MarmotGroupOptions = {
   signer: EventSigner;
   /** The ciphersuite implementation to use for the group */
   ciphersuite: CiphersuiteImpl;
-  /** The nostr relay pool to use for the group */
-  pool: NostrPool;
+  /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
+  network: NostrNetworkInterface;
 };
 
 export class MarmotGroup {
@@ -81,7 +84,7 @@ export class MarmotGroup {
   readonly ciphersuite: CiphersuiteImpl;
 
   /** The nostr relay pool to use for the group */
-  readonly pool: NostrPool;
+  readonly network: NostrNetworkInterface;
 
   /** Whether the group state has been modified */
   dirty = false;
@@ -126,12 +129,12 @@ export class MarmotGroup {
     this.store = options.store;
     this.signer = options.signer;
     this.ciphersuite = options.ciphersuite;
-    this.pool = options.pool;
+    this.network = options.network;
   }
 
   /** Loads a group from the store */
   static async load(
-    groupId: Uint8Array,
+    groupId: Uint8Array | string,
     options: Omit<MarmotGroupOptions, "ciphersuite"> & {
       cryptoProvider?: CryptoProvider;
     },
@@ -160,7 +163,7 @@ export class MarmotGroup {
   async publish(event: NostrEvent): Promise<Record<string, PublishResponse>> {
     const relays = this.relays;
     if (!relays) throw new NoGroupRelaysError();
-    return await this.pool.publish(relays, event);
+    return await this.network.publish(relays, event);
   }
 
   /**
@@ -404,8 +407,9 @@ export class MarmotGroup {
             signer: this.signer,
           });
 
-          // TODO: how do we get the newly added users inbox relays?
-          await this.pool.publish([], giftWrapEvent);
+          // Get the newly added user's inbox relays using the GroupNostrInterface
+          const inboxRelays = await this.network.getUserInboxRelays(user);
+          await this.network.publish(inboxRelays, giftWrapEvent);
 
           // TODO: need to detect publish failure to attempt to send later
         }),
