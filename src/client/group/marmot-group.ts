@@ -38,6 +38,7 @@ import {
   NoGroupRelaysError,
   NoMarmotGroupDataError,
   NoRelayReceivedEventError,
+  MaxRetriesExceededError,
 } from "../errors.js";
 import {
   NostrNetworkInterface as NostrNetworkInterface,
@@ -434,9 +435,26 @@ export class MarmotGroup {
    * After both stages, recursively retry unreadable messages until no more can be read.
    *
    * @param events - Array of Nostr events containing encrypted MLS messages
+   * @param options - Options for controlling retry behavior
+   * @param options.retryCount - Current retry attempt count (internal use)
+   * @param options.maxRetries - Maximum number of retry attempts (default: 5)
    * @yields ProcessMessageResult - Either a new state (from commits/proposals) or an application message
    */
-  async *ingest(events: NostrEvent[]): AsyncGenerator<ProcessMessageResult> {
+  async *ingest(
+    events: NostrEvent[],
+    options?: {
+      retryCount?: number;
+      maxRetries?: number;
+    },
+  ): AsyncGenerator<ProcessMessageResult> {
+    // Set default retry options
+    const retryCount = options?.retryCount ?? 0;
+    const maxRetries = options?.maxRetries ?? 5;
+
+    // Check if we've exceeded the maximum retry attempts
+    if (retryCount > maxRetries) {
+      throw new MaxRetriesExceededError(maxRetries);
+    }
     // Early return if no events to process
     if (events.length === 0) return;
 
@@ -599,7 +617,10 @@ export class MarmotGroup {
     // This continues until no more events can be read.
 
     if (unreadable.length > 0) {
-      yield* this.ingest(unreadable);
+      yield* this.ingest(unreadable, {
+        retryCount: retryCount + 1,
+        maxRetries: maxRetries,
+      });
     }
   }
 }
