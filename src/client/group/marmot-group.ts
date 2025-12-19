@@ -471,13 +471,8 @@ export class MarmotGroup {
       this.ciphersuite,
     );
 
-    // If nothing was readable, try unreadable events again later
-    if (read.length === 0) {
-      if (unreadable.length > 0) {
-        yield* this.ingest(unreadable);
-      }
-      return;
-    }
+    // If nothing was readable, exit
+    if (read.length === 0) return;
 
     // ============================================================================
     // STEP 2: Separate commits from non-commit messages
