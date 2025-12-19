@@ -386,6 +386,9 @@ export class MarmotGroup {
     // Update the group state after successful publish
     this.state = newState;
 
+    // Persist local-authoritative epoch transition immediately.
+    await this.save();
+
     // If new users were added, send the welcome events
     if (welcome) {
       // How do we know what nostr users added?
