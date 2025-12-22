@@ -1,3 +1,4 @@
+import { isRumor, Rumor } from "applesauce-core/helpers";
 import {
   finalizeEvent,
   generateSecretKey,
@@ -5,7 +6,7 @@ import {
   nip44,
   NostrEvent,
 } from "nostr-tools";
-import { hexToBytes, bytesToHex } from "nostr-tools/utils";
+import { bytesToHex, hexToBytes } from "nostr-tools/utils";
 import { ClientState } from "ts-mls/clientState.js";
 import { CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
 import { mlsExporter } from "ts-mls/keySchedule.js";
@@ -16,6 +17,7 @@ import {
 } from "ts-mls/message.js";
 import { unixNow } from "../utils/nostr.js";
 import { getNostrGroupIdHex } from "./client-state.js";
+import { isPrivateMessage } from "./message.js";
 import { GROUP_EVENT_KIND } from "./protocol.js";
 
 /**
@@ -165,4 +167,102 @@ export async function createGroupEvent({
   };
 
   return finalizeEvent(unsignedEvent, ephemeralSecretKey);
+}
+
+/** A type for a decrypted group message event */
+export type GroupMessagePair = { event: NostrEvent; message: MLSMessage };
+
+/**
+ * Serializes a Nostr event (rumor) to application data for use in MLS application messages.
+ *
+ * According to the Marmot spec (MIP-03), application messages contain unsigned Nostr events
+ * (rumors) as their payload. This function:
+ * 1. Ensures the event is unsigned (removes sig field if present)
+ * 2. Serializes the event to JSON
+ * 3. Converts the JSON string to UTF-8 bytes
+ *
+ * The inner Nostr events MUST:
+ * - Be unsigned (no sig field) to prevent leaks from being publishable
+ * - Use the member's Nostr identity key for the pubkey field
+ * - NOT include "h" tags or other tags that would identify the group
+ *
+ * @param rumor - The unsigned Nostr event (rumor) to serialize
+ * @returns The serialized event as Uint8Array (UTF-8 encoded JSON)
+ */
+export function serializeApplicationRumor(rumor: Rumor): Uint8Array {
+  // Create a copy without the sig field (if present)
+  // According to spec, inner events MUST be unsigned
+  const { sig, ...unsignedEvent } = rumor as Rumor & { sig?: string };
+
+  // Serialize to JSON
+  const jsonString = JSON.stringify(unsignedEvent);
+
+  // Convert to UTF-8 bytes
+  return new TextEncoder().encode(jsonString);
+}
+
+/** Deserializes a serialized application rumor back into a Rumor object */
+export function deserializeApplicationRumor(data: Uint8Array): Rumor {
+  const jsonString = new TextDecoder().decode(data);
+  const rumor = JSON.parse(jsonString);
+  if (!isRumor(rumor)) throw new Error("Invalid rumor");
+  return rumor;
+}
+
+/**
+ * Sorts group commits according to MIP-03.
+ *
+ * When multiple admins send commits for the same epoch, we need to apply exactly one. The priority order is:
+ * 1. Epoch number (process commits in epoch order)
+ * 2. created_at timestamp (earliest wins)
+ * 3. event id (lexicographically smallest wins as tiebreaker)
+ *
+ * @param commits - The commits to sort
+ * @returns The sorted commits
+ */
+export function sortGroupCommits(
+  commits: GroupMessagePair[],
+): GroupMessagePair[] {
+  return Array.from(commits).sort((a, b) => {
+    if (!isPrivateMessage(a.message) || !isPrivateMessage(b.message)) return 0;
+
+    const pmA = a.message.privateMessage;
+    const pmB = b.message.privateMessage;
+
+    // First priority: Sort by epoch number
+    if (pmA.epoch !== pmB.epoch) {
+      if (pmA.epoch < pmB.epoch) return -1;
+      if (pmA.epoch > pmB.epoch) return 1;
+      return 0;
+    }
+
+    // Same epoch - second priority: Use timestamp (earliest wins)
+    if (a.event.created_at !== b.event.created_at)
+      return a.event.created_at - b.event.created_at;
+
+    // Same timestamp - third priority: Use event id (lexicographically smallest wins)
+    return a.event.id.localeCompare(b.event.id);
+  });
+}
+
+/** Read an array of group message events into MLSMessages and an array of unreadable events */
+export async function readGroupMessages(
+  events: NostrEvent[],
+  state: ClientState,
+  ciphersuite: CiphersuiteImpl,
+): Promise<{ read: GroupMessagePair[]; unreadable: NostrEvent[] }> {
+  const read: GroupMessagePair[] = [];
+  const unreadable: NostrEvent[] = [];
+
+  for (const event of events) {
+    try {
+      const message = await decryptGroupMessageEvent(event, state, ciphersuite);
+      read.push({ event, message });
+    } catch {
+      // Ignore reading errors, this is either a message or a past / future epoch or spam
+      unreadable.push(event);
+    }
+  }
+
+  return { read, unreadable };
 }

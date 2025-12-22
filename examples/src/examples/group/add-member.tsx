@@ -1,19 +1,68 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
-import { decodePointer, NostrEvent } from "applesauce-core/helpers";
-import { useState } from "react";
-import { of, switchMap } from "rxjs";
+import { defined, mapEventsToTimeline } from "applesauce-core";
+import { NostrEvent, relaySet } from "applesauce-core/helpers";
+import {
+  BehaviorSubject,
+  combineLatest,
+  from,
+  of,
+  shareReplay,
+  startWith,
+  switchMap,
+} from "rxjs";
+import { map } from "rxjs/operators";
 import { ClientState } from "ts-mls/clientState.js";
+import { getCiphersuiteNameFromId } from "ts-mls/crypto/ciphersuite.js";
+import { MarmotGroup } from "../../../../src/client/group/marmot-group";
+import { proposeInviteUser } from "../../../../src/client/group/proposals/invite-user.js";
 import {
   extractMarmotGroupData,
   getMemberCount,
 } from "../../../../src/core/client-state";
-import { MarmotGroupData } from "../../../../src/core/protocol.js";
+import { getKeyPackageCipherSuiteId } from "../../../../src/core/key-package.js";
+import {
+  KEY_PACKAGE_KIND,
+  MarmotGroupData,
+} from "../../../../src/core/protocol.js";
+import CipherSuiteBadge from "../../components/cipher-suite-badge";
+import UserSearch from "../../components/form/user-search";
 import { withSignIn } from "../../components/with-signIn";
-import { useObservableMemo } from "../../hooks/use-observable";
-import accounts from "../../lib/accounts";
+import { useObservable, useObservableMemo } from "../../hooks/use-observable";
+import accounts, { keyPackageRelays$ } from "../../lib/accounts";
 import { groupStore$ } from "../../lib/group-store";
-import { getMarmotClient } from "../../lib/marmot-client";
-import { eventStore } from "../../lib/nostr";
+import { marmotClient$ } from "../../lib/marmot-client";
+import { pool } from "../../lib/nostr";
+import { extraRelays$ } from "../../lib/settings";
+
+// ============================================================================
+// State Subjects
+// ============================================================================
+
+const selectedGroupKey$ = new BehaviorSubject<string>("");
+const selectedUserPubkey$ = new BehaviorSubject<string | null>(null);
+const selectedKeyPackage$ = new BehaviorSubject<NostrEvent | null>(null);
+const error$ = new BehaviorSubject<string | null>(null);
+const result$ = new BehaviorSubject<{
+  state: ClientState;
+  actionType: "propose" | "commit";
+} | null>(null);
+const isAdding$ = new BehaviorSubject<boolean>(false);
+
+// Observable for the currently selected group
+// Derives the MarmotGroup from the selectedGroupKey$ and marmotClient$
+const group$ = combineLatest([
+  selectedGroupKey$,
+  marmotClient$.pipe(defined()),
+]).pipe(
+  switchMap(([groupId, client]) => {
+    if (!groupId) {
+      return of<MarmotGroup | null>(null);
+    }
+    return from(client.getGroup(groupId));
+  }),
+  startWith<MarmotGroup | null>(null),
+  shareReplay(1),
+);
 
 // ============================================================================
 // Component: ErrorAlert
@@ -43,6 +92,75 @@ function ErrorAlert({ error }: { error: string | null }) {
 }
 
 // ============================================================================
+// Component: KeyPackageListItem
+// ============================================================================
+
+function KeyPackageListItem({
+  event,
+  isSelected,
+  onSelect,
+}: {
+  event: NostrEvent;
+  isSelected: boolean;
+  onSelect: (event: NostrEvent) => void;
+}) {
+  const cipherSuiteId = getKeyPackageCipherSuiteId(event);
+  const cipherSuiteName = cipherSuiteId
+    ? getCiphersuiteNameFromId(cipherSuiteId)
+    : "Unknown";
+
+  return (
+    <div
+      className={`card bg-base-100 border-2 cursor-pointer transition-all ${
+        isSelected
+          ? "border-primary shadow-lg"
+          : "border-base-300 hover:border-base-content/20"
+      }`}
+      onClick={() => onSelect(event)}
+    >
+      <div className="card-body p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              {cipherSuiteId && (
+                <CipherSuiteBadge cipherSuite={cipherSuiteId} />
+              )}
+              <span className="text-sm text-base-content/60">
+                {cipherSuiteName}
+              </span>
+            </div>
+            <div className="text-xs font-mono text-base-content/60">
+              {event.id.slice(0, 16)}...
+            </div>
+            <div className="text-xs text-base-content/60 mt-1">
+              Created: {new Date(event.created_at * 1000).toLocaleString()}
+            </div>
+          </div>
+          {isSelected && (
+            <div className="text-primary">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Component: ConfigurationForm
 // ============================================================================
 
@@ -58,23 +176,29 @@ interface GroupOption {
 interface ConfigurationFormProps {
   groups: GroupOption[];
   selectedGroupKey: string;
-  keyPackageEventId: string;
-  hasKeyPackageEvent: boolean;
+  selectedUserPubkey: string | null;
+  keyPackages: NostrEvent[];
+  selectedKeyPackage: NostrEvent | null;
   isAdding: boolean;
   onGroupSelect: (key: string) => void;
-  onKeyPackageEventIdChange: (id: string) => void;
-  onSubmit: () => void;
+  onUserSelect: (pubkey: string) => void;
+  onKeyPackageSelect: (event: NostrEvent) => void;
+  onPropose: () => void;
+  onCommit: () => void;
 }
 
 function ConfigurationForm({
   groups,
   selectedGroupKey,
-  keyPackageEventId,
-  hasKeyPackageEvent,
+  selectedUserPubkey,
+  keyPackages,
+  selectedKeyPackage,
   isAdding,
   onGroupSelect,
-  onKeyPackageEventIdChange,
-  onSubmit,
+  onUserSelect,
+  onKeyPackageSelect,
+  onPropose,
+  onCommit,
 }: ConfigurationFormProps) {
   const selectedGroup = groups.find((g) => g.groupId === selectedGroupKey);
 
@@ -154,52 +278,86 @@ function ConfigurationForm({
             </div>
           )}
 
-          {/* Key Package Selection */}
+          {/* User Search */}
           <div className="form-control">
             <label className="label">
-              <span className="label-text font-semibold">
-                Key Package nevent (NIP-19)
-              </span>
+              <span className="label-text font-semibold">Select User</span>
             </label>
-            <input
-              type="text"
-              placeholder="nevent1..."
-              className="input input-bordered w-full"
-              value={keyPackageEventId}
-              onChange={(e) => onKeyPackageEventIdChange(e.target.value)}
-              disabled={isAdding}
+            <UserSearch
+              onSelect={onUserSelect}
+              placeholder="Search for a user to invite..."
             />
-            {keyPackageEventId && !hasKeyPackageEvent && (
-              <label className="label">
-                <span className="label-text-alt text-warning">
-                  Waiting for key package event in event store...
-                </span>
-              </label>
-            )}
-            {keyPackageEventId && hasKeyPackageEvent && (
-              <label className="label">
-                <span className="label-text-alt text-success">
-                  Key package event loaded.
-                </span>
-              </label>
-            )}
           </div>
 
-          {/* Add Member Button */}
-          {hasKeyPackageEvent && (
-            <div className="card-actions justify-end mt-6">
+          {/* Key Packages List */}
+          {selectedUserPubkey && (
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-semibold">
+                  Select Key Package
+                </span>
+              </label>
+              {keyPackages.length === 0 ? (
+                <div className="alert alert-info">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-6 w-6 shrink-0 stroke-current"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>Loading key packages...</span>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {keyPackages.map((event) => (
+                    <KeyPackageListItem
+                      key={event.id}
+                      event={event}
+                      isSelected={selectedKeyPackage?.id === event.id}
+                      onSelect={onKeyPackageSelect}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          {selectedKeyPackage && selectedGroupKey && (
+            <div className="card-actions justify-end mt-6 gap-2">
               <button
-                className="btn btn-primary btn-lg"
-                onClick={onSubmit}
-                disabled={isAdding || !selectedGroupKey}
+                className="btn btn-outline btn-lg"
+                onClick={onPropose}
+                disabled={isAdding}
               >
                 {isAdding ? (
                   <>
                     <span className="loading loading-spinner"></span>
-                    Adding Member...
+                    Proposing...
                   </>
                 ) : (
-                  "Add Member"
+                  "Propose"
+                )}
+              </button>
+              <button
+                className="btn btn-primary btn-lg"
+                onClick={onCommit}
+                disabled={isAdding}
+              >
+                {isAdding ? (
+                  <>
+                    <span className="loading loading-spinner"></span>
+                    Committing...
+                  </>
+                ) : (
+                  "Commit"
                 )}
               </button>
             </div>
@@ -216,10 +374,11 @@ function ConfigurationForm({
 
 interface ResultsDisplayProps {
   result: { state: ClientState };
+  actionType: "propose" | "commit";
   onReset: () => void;
 }
 
-function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
+function ResultsDisplay({ result, actionType, onReset }: ResultsDisplayProps) {
   return (
     <div className="space-y-4">
       {/* Success Alert */}
@@ -238,9 +397,14 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
           />
         </svg>
         <div>
-          <div className="font-bold">Member added successfully!</div>
+          <div className="font-bold">
+            {actionType === "propose"
+              ? "Proposal sent successfully!"
+              : "Member added successfully!"}
+          </div>
           <div className="text-sm">
-            Group epoch advanced to {result.state.groupContext.epoch}
+            {actionType === "commit" &&
+              `Group epoch advanced to ${result.state.groupContext.epoch}`}
           </div>
         </div>
       </div>
@@ -307,52 +471,58 @@ function ResultsDisplay({ result, onReset }: ResultsDisplayProps) {
 }
 
 // ============================================================================
-// Hook: useAddMember
+// Actions
 // ============================================================================
 
-function useAddMember() {
-  const [isAdding, setIsAdding] = useState(false);
-  const [result, setResult] = useState<{ state: ClientState } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+async function proposeMember(
+  group: MarmotGroup,
+  selectedKeyPackageEvent: NostrEvent,
+) {
+  try {
+    isAdding$.next(true);
+    error$.next(null);
+    result$.next(null);
 
-  const addMember = async (
-    selectedClientState: ClientState,
-    selectedKeyPackageEvent: NostrEvent,
-  ) => {
-    try {
-      setIsAdding(true);
-      setError(null);
-      setResult(null);
+    const proposalAction = proposeInviteUser(selectedKeyPackageEvent);
+    await group.propose(proposalAction);
 
-      const client = await getMarmotClient();
-      const group = await client.getGroup(
-        selectedClientState.groupContext.groupId,
-      );
-      await group.addMember(selectedKeyPackageEvent);
+    result$.next({ state: group.state, actionType: "propose" });
+    console.log("✅ Proposal sent successfully!");
+  } catch (err) {
+    console.error("Error proposing member:", err);
+    error$.next(err instanceof Error ? err.message : String(err));
+  } finally {
+    isAdding$.next(false);
+  }
+}
 
-      setResult({ state: group.state });
-      console.log("✅ Member added successfully!");
-    } catch (err) {
-      console.error("Error adding member:", err);
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsAdding(false);
-    }
-  };
+async function commitMember(
+  group: MarmotGroup,
+  selectedKeyPackageEvent: NostrEvent,
+) {
+  try {
+    isAdding$.next(true);
+    error$.next(null);
+    result$.next(null);
 
-  const reset = () => {
-    setResult(null);
-    setError(null);
-  };
+    const proposalAction = proposeInviteUser(selectedKeyPackageEvent);
+    await group.commit({ extraProposals: [proposalAction] });
 
-  return {
-    isAdding,
-    result,
-    error,
-    setError,
-    addMember,
-    reset,
-  };
+    result$.next({ state: group.state, actionType: "commit" });
+    console.log("✅ Member added successfully!");
+  } catch (err) {
+    console.error("Error committing member:", err);
+    error$.next(err instanceof Error ? err.message : String(err));
+  } finally {
+    isAdding$.next(false);
+  }
+}
+
+function reset() {
+  result$.next(null);
+  error$.next(null);
+  selectedUserPubkey$.next(null);
+  selectedKeyPackage$.next(null);
 }
 
 // ============================================================================
@@ -386,38 +556,71 @@ export default withSignIn(function AddMember() {
     };
   });
 
-  const [selectedGroupKey, setSelectedGroupKey] = useState("");
-  const [keyPackageEventId, setKeyPackageEventId] = useState("");
+  const selectedGroupKey = useObservable(selectedGroupKey$) as string;
+  const selectedGroup = useObservable(group$) as MarmotGroup | null;
+  const selectedUserPubkey = useObservable(selectedUserPubkey$) as
+    | string
+    | null;
+  const selectedKeyPackage = useObservable(
+    selectedKeyPackage$,
+  ) as NostrEvent | null;
+  const isAdding = useObservable(isAdding$) as boolean;
+  const error = useObservable(error$) as string | null;
+  const result = useObservable(result$) as {
+    state: ClientState;
+    actionType: "propose" | "commit";
+  } | null;
 
-  const keyPackageEvent =
-    useObservableMemo(() => {
-      if (!keyPackageEventId) return of(null);
+  // Fetch key packages for the selected user
+  const keyPackages =
+    useObservableMemo(
+      () =>
+        combineLatest([
+          selectedUserPubkey$,
+          keyPackageRelays$,
+          extraRelays$,
+        ]).pipe(
+          switchMap(([pubkey, keyPackageRelays, extraRelays]) => {
+            if (!pubkey) return of([]);
 
-      try {
-        const result = decodePointer(keyPackageEventId);
-        // Expecting an nevent pointer; other pointer types are ignored
-        if (result.type !== "nevent") throw new Error("Invalid pointer type");
+            const relays = relaySet(
+              keyPackageRelays && keyPackageRelays.length > 0
+                ? keyPackageRelays
+                : [],
+              extraRelays,
+            );
 
-        // Subscribe to the event via the event store so it will be
-        return eventStore.event(result.data);
-      } catch (err) {
-        console.error("Failed to decode NIP-19 pointer:", err);
-        return of(null);
-      }
-    }, [keyPackageEventId]) ?? null;
-
-  const { isAdding, result, error, setError, addMember, reset } =
-    useAddMember();
+            return pool
+              .request(relays, {
+                kinds: [KEY_PACKAGE_KIND],
+                authors: [pubkey],
+                limit: 50,
+              })
+              .pipe(
+                mapEventsToTimeline(),
+                map((arr) => [...arr]),
+              );
+          }),
+        ),
+      [],
+    ) ?? [];
 
   const handleGroupSelect = (key: string) => {
-    setSelectedGroupKey(key);
+    selectedGroupKey$.next(key);
   };
 
-  const handleAddMember = async () => {
-    if (!selectedGroupKey || !keyPackageEvent) {
-      console.error(
-        "Please select a group and provide a valid key package event ID",
-      );
+  const handleUserSelect = (pubkey: string) => {
+    selectedUserPubkey$.next(pubkey);
+    selectedKeyPackage$.next(null);
+  };
+
+  const handleKeyPackageSelect = (event: NostrEvent) => {
+    selectedKeyPackage$.next(event);
+  };
+
+  const handlePropose = async () => {
+    if (!selectedGroupKey || !selectedKeyPackage || !selectedGroup) {
+      console.error("Please select a group and key package");
       return;
     }
 
@@ -429,26 +632,60 @@ export default withSignIn(function AddMember() {
       return;
     }
 
-    // Verify admin status using MarmotGroupData from ClientState
     const account = accounts.active;
     if (!account) {
-      setError("No active account");
+      error$.next("No active account");
       return;
     }
 
-    // Check if current user is an admin by comparing their pubkey with adminPubkeys
     const currentUserPubkey = await account.signer.getPublicKey();
     const isAdmin =
       selectedGroupData.marmotData?.adminPubkeys?.includes(currentUserPubkey) ||
       false;
 
     if (!isAdmin) {
-      setError("You must be an admin to add members to this group");
+      error$.next(
+        "You must be an admin to propose adding members to this group",
+      );
       return;
     }
 
-    // Use the already deserialized ClientState from the groups array
-    addMember(selectedGroupData.state, keyPackageEvent);
+    await proposeMember(selectedGroup, selectedKeyPackage);
+  };
+
+  const handleCommit = async () => {
+    if (!selectedGroupKey || !selectedKeyPackage || !selectedGroup) {
+      console.error("Please select a group and key package");
+      return;
+    }
+
+    const selectedGroupData = groups.find(
+      (g) => g.groupId === selectedGroupKey,
+    );
+    if (!selectedGroupData) {
+      console.error("Selected group not found");
+      return;
+    }
+
+    const account = accounts.active;
+    if (!account) {
+      error$.next("No active account");
+      return;
+    }
+
+    const currentUserPubkey = await account.signer.getPublicKey();
+    const isAdmin =
+      selectedGroupData.marmotData?.adminPubkeys?.includes(currentUserPubkey) ||
+      false;
+
+    if (!isAdmin) {
+      error$.next(
+        "You must be an admin to commit adding members to this group",
+      );
+      return;
+    }
+
+    await commitMember(selectedGroup, selectedKeyPackage);
   };
 
   return (
@@ -466,12 +703,15 @@ export default withSignIn(function AddMember() {
         <ConfigurationForm
           groups={groups}
           selectedGroupKey={selectedGroupKey}
-          keyPackageEventId={keyPackageEventId}
-          hasKeyPackageEvent={!!keyPackageEvent}
+          selectedUserPubkey={selectedUserPubkey}
+          keyPackages={keyPackages}
+          selectedKeyPackage={selectedKeyPackage}
           isAdding={isAdding}
           onGroupSelect={handleGroupSelect}
-          onKeyPackageEventIdChange={setKeyPackageEventId}
-          onSubmit={handleAddMember}
+          onUserSelect={handleUserSelect}
+          onKeyPackageSelect={handleKeyPackageSelect}
+          onPropose={handlePropose}
+          onCommit={handleCommit}
         />
       )}
 
@@ -479,7 +719,13 @@ export default withSignIn(function AddMember() {
       <ErrorAlert error={error} />
 
       {/* Results Display */}
-      {result && <ResultsDisplay result={result} onReset={reset} />}
+      {result && (
+        <ResultsDisplay
+          result={result}
+          actionType={result.actionType}
+          onReset={reset}
+        />
+      )}
     </div>
   );
 });

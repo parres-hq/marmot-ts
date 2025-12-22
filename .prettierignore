@@ -1,5 +1,6 @@
 marmot/
 dist/
 node_modules/
+ts-mls/
 examples/node_modules/
 examples/dist/

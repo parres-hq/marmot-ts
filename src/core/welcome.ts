@@ -7,8 +7,8 @@ import {
   encodeContent,
   getEncodingTag,
 } from "../utils/encoding.js";
-import { WELCOME_EVENT_KIND } from "./protocol.js";
 import { unixNow } from "../utils/nostr.js";
+import { WELCOME_EVENT_KIND } from "./protocol.js";
 
 /**
  * Creates a welcome rumor (kind 444) for a welcome message.
@@ -19,14 +19,19 @@ import { unixNow } from "../utils/nostr.js";
  * @param groupRelays - Array of relay URLs for the group
  * @returns Welcome rumor with precomputed ID
  */
-export function createWelcomeRumor(
-  welcomeMessage: Welcome,
-  keyPackageEventId: string,
-  author: string,
-  groupRelays: string[],
-): Rumor {
+export function createWelcomeRumor({
+  welcome,
+  author,
+  groupRelays,
+  keyPackageEventId,
+}: {
+  welcome: Welcome;
+  author: string;
+  keyPackageEventId?: string;
+  groupRelays: string[];
+}): Rumor {
   // Serialize the welcome message according to RFC 9420
-  const serializedWelcome = encodeWelcome(welcomeMessage);
+  const serializedWelcome = encodeWelcome(welcome);
   const content = encodeContent(serializedWelcome, "base64");
 
   const draft = {
@@ -35,11 +40,13 @@ export function createWelcomeRumor(
     created_at: unixNow(),
     content,
     tags: [
-      ["e", keyPackageEventId],
       ["relays", ...groupRelays],
       ["encoding", "base64"],
     ],
   };
+
+  // Add the key package event ID if known
+  if (keyPackageEventId) draft.tags.push(["e", keyPackageEventId]);
 
   // Calculate the event ID for the rumor
   const id = getEventHash(draft);

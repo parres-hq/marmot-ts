@@ -18,7 +18,7 @@ import { createSimpleGroup, SimpleGroupOptions } from "../core/group.js";
 import { generateKeyPackage } from "../core/key-package.js";
 import { GroupStore } from "../store/group-store.js";
 import { KeyPackageStore } from "../store/key-package-store.js";
-import { NostrPool } from "./nostr-interface.js";
+import { NostrNetworkInterface } from "./nostr-interface.js";
 import { MarmotGroup } from "./group/marmot-group.js";
 
 export type MarmotClientOptions = {
@@ -32,8 +32,8 @@ export type MarmotClientOptions = {
   keyPackageStore: KeyPackageStore;
   /** The crypto provider to use for cryptographic operations */
   cryptoProvider?: CryptoProvider;
-  /** The nostr relay pool to use for the client */
-  pool: NostrPool;
+  /** The nostr relay pool to use for the client. Should implement GroupNostrInterface for group operations. */
+  network: NostrNetworkInterface;
 };
 
 export class MarmotClient {
@@ -46,7 +46,7 @@ export class MarmotClient {
   /** The backend to store and load the key packages from */
   readonly keyPackageStore: KeyPackageStore;
   /** The nostr relay pool to use for the client */
-  readonly pool: NostrPool;
+  readonly network: NostrNetworkInterface;
 
   /** Crypto provider for cryptographic operations */
   public cryptoProvider?: CryptoProvider;
@@ -59,7 +59,7 @@ export class MarmotClient {
     this.capabilities = options.capabilities ?? defaultCapabilities();
     this.groupStore = options.groupStore;
     this.keyPackageStore = options.keyPackageStore;
-    this.pool = options.pool;
+    this.network = options.network;
     this.cryptoProvider = options.cryptoProvider;
   }
 
@@ -75,15 +75,16 @@ export class MarmotClient {
   }
 
   /** Gets a group from the cache or loads it from the store */
-  async getGroup(groupId: Uint8Array) {
-    const groupIdHex = bytesToHex(groupId);
+  async getGroup(groupId: Uint8Array | string) {
+    const groupIdHex =
+      typeof groupId === "string" ? groupId : bytesToHex(groupId);
     let group = this.groups.get(groupIdHex);
     if (!group) {
       group = await MarmotGroup.load(groupId, {
         store: this.groupStore,
         signer: this.signer,
         cryptoProvider: this.cryptoProvider,
-        pool: this.pool,
+        network: this.network,
       });
 
       // Save group to cache
@@ -105,7 +106,7 @@ export class MarmotClient {
       ciphersuite: cipherSuite,
       store: this.groupStore,
       signer: this.signer,
-      pool: this.pool,
+      network: this.network,
     });
 
     // Save the group to the store
