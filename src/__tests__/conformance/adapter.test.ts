@@ -10,12 +10,9 @@ import { describe, expect, it } from "vitest";
 import { createCredential } from "../../core/credential.js";
 import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
-import {
-  deserializeClientState,
-  serializeClientState,
-} from "../../core/client-state.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { MarmotGroup } from "../../client/group/marmot-group.js";
+import { GroupRegistry } from "../../client/group-registry.js";
 import { MockNetwork } from "../helpers/mock-network.js";
 import {
   resolveManifestArtifact,
@@ -158,10 +155,27 @@ describe("conformance adapter", () => {
     const network = new MockNetwork();
     network.autoDeliver = false;
     const store = new InMemoryKeyValueStore();
+    const ingestStateStore = new InMemoryKeyValueStore<Uint8Array>();
+    const rewindStore = new InMemoryKeyValueStore<Uint8Array>();
     const signer = { getPublicKey: async () => pubkey } as never;
     const makeGroup = (state = clientState) =>
-      new MarmotGroup(state, { store, signer, ciphersuite: impl, network });
+      new MarmotGroup(state, {
+        store,
+        ingestStateStore,
+        rewindStore,
+        signer,
+        ciphersuite: impl,
+        network,
+      });
     const groups = new Map([["alice", makeGroup()]]);
+    await groups.get("alice")!.save(true);
+    const registry = new GroupRegistry({
+      store,
+      ingestStateStore,
+      rewindStore,
+      signer,
+      network,
+    });
     let now = 100;
     const subject = new MarmotConformanceSubject({
       scenarioId: "adapter-smoke/v1",
@@ -178,8 +192,9 @@ describe("conformance adapter", () => {
         now += milliseconds;
       },
       restart: async (_client, group) => {
-        const persisted = serializeClientState(group.state);
-        return makeGroup(await deserializeClientState(persisted));
+        const groupId = group.id.slice();
+        group.dispose();
+        return registry.load(groupId);
       },
     });
     const result = await runConformanceScenario(
