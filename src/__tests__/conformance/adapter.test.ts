@@ -37,7 +37,7 @@ describe("conformance adapter", () => {
       scenarioId: "operation-handler/v1",
       groups: new Map(),
       network: new MockNetwork(),
-      capabilities: new Set(["semantic_transport_faults"]),
+      capabilities: new Set(["application_messaging"]),
       now: () => 0,
       advanceTime: () => {},
       restart: async () => {
@@ -45,7 +45,7 @@ describe("conformance adapter", () => {
       },
       executeScenarioOperation,
     });
-    const step = { type: "set_partition", allow: ["alice", "bob"] };
+    const step = { type: "probe_bidirectional_decryptability" };
     const result = await subject.execute(parseMdkScenarioStep(step));
     expect(result.kind).toBe("supported");
     expect(executeScenarioOperation).toHaveBeenCalledWith(step, subject);

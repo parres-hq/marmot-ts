@@ -69,6 +69,7 @@ describe("portable MDK conformance smoke corpus", () => {
             "virtual_time",
             "observation",
             "crash_reopen",
+            "semantic_transport_faults",
           ]),
           now: () => 0,
           advanceTime: () => {},

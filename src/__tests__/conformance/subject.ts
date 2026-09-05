@@ -9,6 +9,8 @@ import {
 } from "../../client/group/application-message.js";
 import { deserializeApplicationRumor } from "../../core/application-rumor.js";
 import { proposeUpdateMetadata } from "../../client/group/proposals/update-metadata.js";
+import { proposeInviteUser } from "../../client/group/proposals/invite-user.js";
+import type { KeyPackage } from "ts-mls";
 
 export type ConformanceAction =
   | { type: "send_application"; client: string; input: string; payload: string }
@@ -19,6 +21,14 @@ export type ConformanceAction =
   | { type: "clear_events"; clients: string[] }
   | { type: "acknowledge_outbound"; client: string; publication: string }
   | { type: "update_group_data"; client: string; name: string }
+  | { type: "invite_members"; inviter: string; invitees: string[] }
+  | { type: "update_admin_policy"; client: string; admins: string[] }
+  | { type: "observe_admin_policy"; clients: string[] }
+  | { type: "set_partition" }
+  | { type: "withhold_message"; label: string }
+  | { type: "release_withheld"; label: string }
+  | { type: "duplicate_message" }
+  | { type: "reorder_messages" }
   | { type: "observe_exact"; clients: string[] }
   | { type: "restart"; client: string }
   | { type: "snapshot"; client: string }
@@ -56,6 +66,7 @@ export interface MarmotConformanceSubjectOptions {
     subject: MarmotConformanceSubject,
   ) => Promise<void>;
   identities?: ReadonlyMap<string, string>;
+  keyPackages?: ReadonlyMap<string, KeyPackage>;
 }
 
 const ACTION_CAPABILITY: Record<
@@ -70,6 +81,14 @@ const ACTION_CAPABILITY: Record<
   clear_events: "observation",
   acknowledge_outbound: "transport_delivery",
   update_group_data: "group_mutation",
+  invite_members: "group_mutation",
+  update_admin_policy: "group_mutation",
+  observe_admin_policy: "observation",
+  set_partition: "semantic_transport_faults",
+  withhold_message: "semantic_transport_faults",
+  release_withheld: "semantic_transport_faults",
+  duplicate_message: "semantic_transport_faults",
+  reorder_messages: "semantic_transport_faults",
   observe_exact: "observation",
   restart: "crash_reopen",
   snapshot: "transport_delivery",
@@ -154,6 +173,35 @@ export function parseMdkScenarioStep(value: unknown): ConformanceAction {
     return { type: "observe_exact", clients: step.clients as string[] };
   if (step.type === "observe" && Array.isArray(step.clients))
     return { type: "observe_exact", clients: step.clients as string[] };
+  if (
+    step.type === "invite_members" &&
+    typeof step.inviter === "string" &&
+    Array.isArray(step.invitees)
+  )
+    return {
+      type: "invite_members",
+      inviter: step.inviter,
+      invitees: step.invitees as string[],
+    };
+  if (
+    step.type === "update_admin_policy" &&
+    typeof step.client === "string" &&
+    Array.isArray(step.admins)
+  )
+    return {
+      type: "update_admin_policy",
+      client: step.client,
+      admins: step.admins as string[],
+    };
+  if (step.type === "observe_admin_policy" && Array.isArray(step.clients))
+    return { type: "observe_admin_policy", clients: step.clients as string[] };
+  if (step.type === "set_partition") return { type: "set_partition" };
+  if (step.type === "withhold_message" && typeof step.label === "string")
+    return { type: "withhold_message", label: step.label };
+  if (step.type === "release_withheld" && typeof step.label === "string")
+    return { type: "release_withheld", label: step.label };
+  if (step.type === "duplicate_message") return { type: "duplicate_message" };
+  if (step.type === "reorder_messages") return { type: "reorder_messages" };
   if (step.type === "restart_client" && typeof step.client === "string")
     return { type: "restart", client: step.client };
   if (
@@ -187,6 +235,10 @@ export class MarmotConformanceSubject {
       value: string;
       observed: boolean;
     }>
+  >();
+  readonly #withheld = new Map<
+    string,
+    (typeof this.options.network.queuedEvents)[number]
   >();
 
   constructor(readonly options: MarmotConformanceSubjectOptions) {}
@@ -320,6 +372,74 @@ export class MarmotConformanceSubject {
         });
         return { kind: "supported", action: action.type };
       }
+      case "invite_members": {
+        const group = this.requireGroup(action.inviter);
+        const actorPubkey = this.options.identities?.get(action.inviter);
+        if (!actorPubkey)
+          throw new Error(`missing identity for ${action.inviter}`);
+        const proposals = action.invitees.map((invitee) => {
+          const keyPackage = this.options.keyPackages?.get(invitee);
+          if (!keyPackage)
+            throw new Error(`missing key package for ${invitee}`);
+          return proposeInviteUser(keyPackage);
+        });
+        await group.submitIntent({
+          kind: "commit",
+          actorPubkey,
+          extraProposals: proposals,
+        });
+        return { kind: "supported", action: action.type };
+      }
+      case "update_admin_policy": {
+        if (action.admins.length === 0) throw new Error("admin_policy");
+        const group = this.requireGroup(action.client);
+        const actorPubkey = this.options.identities?.get(action.client);
+        if (
+          !actorPubkey ||
+          !group.groupData?.adminPubkeys.includes(actorPubkey)
+        )
+          throw new Error("not_group_admin");
+        const adminPubkeys = action.admins.map((client) => {
+          const pubkey = this.options.identities?.get(client);
+          if (!pubkey) throw new Error(`missing identity for ${client}`);
+          return pubkey;
+        });
+        const proposals = await proposeUpdateMetadata({ adminPubkeys })(
+          group.session.proposalContext(),
+        );
+        await group.submitIntent({
+          kind: "commit",
+          actorPubkey,
+          extraProposals: proposals,
+        });
+        return { kind: "supported", action: action.type };
+      }
+      case "observe_admin_policy":
+        for (const client of action.clients)
+          this.requireGroup(client).groupData;
+        return { kind: "supported", action: action.type };
+      case "set_partition":
+        this.options.network.autoDeliver = false;
+        return { kind: "supported", action: action.type };
+      case "withhold_message": {
+        const event = this.options.network.queuedEvents.pop();
+        if (!event) throw new Error(`nothing to withhold as ${action.label}`);
+        this.#withheld.set(action.label, event);
+        return { kind: "supported", action: action.type };
+      }
+      case "release_withheld": {
+        const event = this.#withheld.get(action.label);
+        if (!event) throw new Error(`unknown withheld label ${action.label}`);
+        this.options.network.queuedEvents.push(event);
+        this.#withheld.delete(action.label);
+        return { kind: "supported", action: action.type };
+      }
+      case "duplicate_message":
+        this.options.network.duplicateQueued(0);
+        return { kind: "supported", action: action.type };
+      case "reorder_messages":
+        this.options.network.queuedEvents.reverse();
+        return { kind: "supported", action: action.type };
       case "observe_exact": {
         const snapshots: Record<string, CanonicalConformanceSnapshot> = {};
         for (const client of action.clients)
