@@ -15,6 +15,8 @@ import type {
   WelcomeRecipient,
 } from "../../transport/nostr/welcome-delivery.js";
 import { GroupRuntime, type GroupRuntimeOptions } from "../group-runtime.js";
+import publishFailFixture from "../../../../refs/mdk/crates/cgka-conformance-simulator/vectors/publish-fail.v1.json";
+import invitePublishFailFixture from "../../../../refs/mdk/crates/cgka-conformance-simulator/vectors/invite-publish-fail.v1.json";
 
 const RELAYS = ["wss://relay.test"];
 
@@ -223,6 +225,54 @@ describe("GroupRuntime publish acknowledgement", () => {
 });
 
 describe("GroupRuntime publish failure", () => {
+  it("executes the pinned publish-fail rollback outcome", async () => {
+    const step = publishFailFixture.scenario.steps.find(
+      (candidate) => candidate.type === "acknowledge_outbound",
+    );
+    expect(step).toMatchObject({ outcome: "reached_no_endpoint" });
+    const publish = vi.fn(async () => noAckResponse());
+    const { runtime, confirmPublished, publishFailed, save } = makeRuntime({
+      getNetwork: () => makeNetwork(publish),
+    });
+
+    await expect(runtime.publishWork(commitWork())).rejects.toThrow(
+      /Failed to publish commit/,
+    );
+    expect(publishFailed).toHaveBeenCalledWith(pending);
+    expect(confirmPublished).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(publishFailFixture.expected_trace.observations[0]).toMatchObject({
+      epoch: 0,
+      member_count: 1,
+    });
+  });
+
+  it("executes the pinned invite-publish-fail rollback before Welcome delivery", async () => {
+    const failed = invitePublishFailFixture.scenario.steps.find(
+      (candidate) =>
+        candidate.type === "acknowledge_outbound" &&
+        candidate.outcome === "reached_no_endpoint",
+    );
+    expect(failed).toBeDefined();
+    const publish = vi.fn(async () => noAckResponse());
+    const { runtime, confirmPublished, publishFailed, save, deliver } =
+      makeRuntime({ getNetwork: () => makeNetwork(publish) });
+
+    await expect(
+      runtime.publishWork(
+        commitWork({ welcome: {} as Welcome, welcomeRecipients: [recipient] }),
+      ),
+    ).rejects.toThrow(/Failed to publish commit/);
+    expect(publishFailed).toHaveBeenCalledWith(pending);
+    expect(confirmPublished).not.toHaveBeenCalled();
+    expect(deliver).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+    expect(invitePublishFailFixture.expected_outcomes.at(-1)).toMatchObject({
+      type: "client_state",
+      epoch: 1,
+      member_count: 2,
+    });
+  });
   it("throws when no relay acknowledges a proposal and never confirms", async () => {
     const publish = vi.fn(async () => noAckResponse());
     const { runtime, confirmPublished, publishFailed, save } = makeRuntime({
