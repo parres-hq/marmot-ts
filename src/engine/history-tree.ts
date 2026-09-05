@@ -394,8 +394,9 @@ export class GroupHistoryTree {
       );
 
     const childTag = bytesToHex(childState.confirmationTag);
-    if (!this.#nodes.has(childTag)) {
-      const bytes = encode(mlsMessageEncoder, commitMessage);
+    const bytes = encode(mlsMessageEncoder, commitMessage);
+    const existing = this.#nodes.get(childTag);
+    if (!existing) {
       this.#nodes.set(childTag, {
         tag: childTag,
         epoch: Number(childState.groupContext.epoch),
@@ -410,6 +411,30 @@ export class GroupHistoryTree {
           : bytes,
       });
       this.#dirty.add(childTag);
+    } else {
+      if (
+        existing.parentTag !== parentTag ||
+        !existing.edge ||
+        bytesToHex(existing.edge.commitDigest) !== bytesToHex(commitDigest(bytes))
+      )
+        throw new Error(
+          "GroupHistoryTree: existing child has conflicting parent or commit",
+        );
+
+      // Confirmation can follow an earlier observation of the same edge. In
+      // that case preserve idempotence while upgrading the bare wire record to
+      // durable confirmation-time evidence. Never replace an existing stamp.
+      const cached = this.#heavy.get(childTag);
+      const decoded = cached?.commit
+        ? decodeOwnCommitRecord(cached.commit)
+        : undefined;
+      if (ownCommitStamp && decoded?.kind === "legacy") {
+        this.#putHeavy(childTag, {
+          snapshot: cached!.snapshot,
+          commit: encodeOwnCommitRecord({ wireBytes: bytes, stamp: ownCommitStamp }),
+        });
+        this.#dirty.add(childTag);
+      }
     }
     if (!parent.childTags.includes(childTag)) parent.childTags.push(childTag);
     return childTag;

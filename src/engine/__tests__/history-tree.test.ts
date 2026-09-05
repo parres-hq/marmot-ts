@@ -152,6 +152,35 @@ describe("GroupHistoryTree", () => {
     expect(tree.childrenOf(rootTag)).toEqual([first]);
   });
 
+  it("upgrades a previously observed bare edge with confirmation-time own-commit evidence", async () => {
+    const { memberE1, commitA, childA } = await buildFork(impl);
+    const tree = new GroupHistoryTree(memberE1);
+    const rootTag = bytesToHex(memberE1.confirmationTag);
+    const childTag = tree.recordCommit(rootTag, commitA, childA);
+    const stamp = {
+      committer: ADMIN,
+      priority: "privileged" as const,
+      consumedProposalRefs: [Uint8Array.of(2), Uint8Array.of(1)],
+    };
+
+    expect(await tree.ownCommitStampOf(childTag)).toBeUndefined();
+    expect(tree.recordCommit(rootTag, commitA, childA, undefined, stamp)).toBe(
+      childTag,
+    );
+
+    const store = new InMemoryKeyValueStore<Uint8Array>();
+    tree.bindStore(store);
+    await tree.flush();
+    const restored = (await GroupHistoryTree.load(
+      store,
+      bytesToHex(memberE1.groupContext.groupId),
+    ))!;
+    expect(await restored.ownCommitStampOf(childTag)).toEqual({
+      ...stamp,
+      consumedProposalRefs: [Uint8Array.of(1), Uint8Array.of(2)],
+    });
+  });
+
   it("rehydrates a fresh, independent state per stateAt call", async () => {
     const { memberE1, commitA, childA } = await buildFork(impl);
     const tree = new GroupHistoryTree(memberE1);
