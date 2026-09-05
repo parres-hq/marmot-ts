@@ -9,8 +9,10 @@ import {
   createCommit,
   defaultCryptoProvider,
   defaultProposalTypes,
+  encode,
   getCiphersuiteImpl,
   joinGroup,
+  mlsMessageEncoder,
   unsafeTestingAuthenticationService,
   type ClientState,
   type KeyPackageWithPrivateKey,
@@ -22,7 +24,9 @@ import { MarmotGroup } from "../../client/group/marmot-group.js";
 import { proposeInviteUser } from "../../client/group/proposals/invite-user.js";
 import { proposeUpdateMetadata } from "../../client/group/proposals/update-metadata.js";
 import { createCredential } from "../../core/credential.js";
+import { commitDigest } from "../../core/convergence.js";
 import { createSimpleGroup } from "../../core/group.js";
+import { getGroupMemberPubkeys } from "../../core/group-members.js";
 import { generateKeyPackage } from "../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { MockNetwork } from "../helpers/mock-network.js";
@@ -41,6 +45,43 @@ const FIXTURES = [
 const ACTORS = ["alice", "bob", "carol", "david", "eve"] as const;
 
 type Fixture = (typeof FIXTURES)[number];
+
+type AuthoredCandidate = {
+  publication: string;
+  branchId: string;
+  tipDigest: string;
+  committer: string;
+  committerPubkey: string;
+  memberPubkeys: string[];
+  observedProfileName?: string;
+  invitedMember?: string;
+  profileName?: string;
+};
+
+function candidateIdentity(
+  publication: string,
+  committer: string,
+  committerPubkey: string,
+  group: MarmotGroup,
+  commitMessage: NonNullable<
+    Extract<
+      Awaited<ReturnType<MarmotGroup["submitIntent"]>>[number]["work"],
+      { kind: "groupEvolution" }
+    >["pending"]["commitMessage"]
+  >,
+): AuthoredCandidate {
+  return {
+    publication,
+    committer,
+    committerPubkey,
+    branchId: bytesToHex(group.state.confirmationTag),
+    memberPubkeys: getGroupMemberPubkeys(group.state),
+    observedProfileName: group.groupData?.name,
+    tipDigest: bytesToHex(
+      commitDigest(encode(mlsMessageEncoder, commitMessage)),
+    ),
+  };
+}
 
 async function executeFixture(fixture: Fixture) {
   const create = fixture.scenario.steps[0] as {
@@ -169,6 +210,18 @@ async function executeFixture(fixture: Fixture) {
       extraProposals: proposals,
     });
     await group.runtime.publishEffects(effects);
+    const work = effects.publish.find(
+      (candidate) => candidate.kind === "groupEvolution",
+    );
+    if (work?.kind !== "groupEvolution" || !work.pending.commitMessage)
+      throw new Error("metadata update did not author a commit");
+    return candidateIdentity(
+      "",
+      client,
+      identities.get(client)!,
+      group,
+      work.pending.commitMessage,
+    );
   };
   const subject = new MarmotConformanceSubject({
     scenarioId: fixture.scenario.name,
@@ -207,7 +260,7 @@ async function executeFixture(fixture: Fixture) {
   });
   const held = new Map<string, (typeof network.queuedEvents)[number]>();
   const publications = new Map<string, (typeof network.queuedEvents)[number]>();
-  const candidateTags = new Set<string>();
+  const authoredCandidates = new Map<string, AuthoredCandidate>();
   const expectedErrors: Array<{ client: string; error: string }> = [];
   let snapshots: Record<string, CanonicalConformanceSnapshot> = {};
 
@@ -228,12 +281,23 @@ async function executeFixture(fixture: Fixture) {
         ),
       });
       const publication = network.queuedEvents[before]!;
-      candidateTags.add(bytesToHex(group.state.confirmationTag));
       publications.set(String(raw.pending), publication);
       const welcome = results.find(
         (result) => result.work.kind === "groupEvolution",
       )?.work;
       if (welcome?.kind === "groupEvolution" && welcome.welcome) {
+        if (!welcome.pending.commitMessage)
+          throw new Error("invite did not author a commit");
+        authoredCandidates.set(String(raw.pending), {
+          ...candidateIdentity(
+            String(raw.pending),
+            inviter,
+            identities.get(inviter)!,
+            group,
+            welcome.pending.commitMessage,
+          ),
+          invitedMember: invitees[0],
+        });
         for (const actor of invitees) {
           const kp = packages.get(actor)!;
           const state = await joinGroup({
@@ -277,21 +341,28 @@ async function executeFixture(fixture: Fixture) {
       continue;
     }
     if (raw.type === "update_group_data") {
-      await publishMetadata(String(raw.client), { name: String(raw.name) });
-      candidateTags.add(
-        bytesToHex(groups.get(String(raw.client))!.state.confirmationTag),
-      );
+      const publication = String(raw.pending);
+      const candidate = await publishMetadata(String(raw.client), {
+        name: String(raw.name),
+      });
+      authoredCandidates.set(publication, {
+        ...candidate,
+        publication,
+        profileName: String(raw.name),
+      });
       continue;
     }
     if (raw.type === "update_admin_policy") {
-      await publishMetadata(String(raw.client), {
+      const publication = String(raw.pending);
+      const candidate = await publishMetadata(String(raw.client), {
         adminPubkeys: (raw.admins as string[]).map((actor) =>
           identities.get(actor)!,
         ),
       });
-      candidateTags.add(
-        bytesToHex(groups.get(String(raw.client))!.state.confirmationTag),
-      );
+      authoredCandidates.set(publication, {
+        ...candidate,
+        publication,
+      });
       continue;
     }
     const result = await subject.execute(parseMdkScenarioStep(raw));
@@ -306,7 +377,7 @@ async function executeFixture(fixture: Fixture) {
     identities,
     auditEvents,
     expectedErrors,
-    candidateTags,
+    authoredCandidates,
   };
 }
 
@@ -320,14 +391,18 @@ type DecisionExpectation = {
 function assertDecision(
   decision: Extract<MarmotAuditEvent["kind"], { type: "convergence_decision" }>,
   expected: DecisionExpectation,
-  selectedConfirmationTag: string,
+  expectedWinner: AuthoredCandidate,
 ): void {
   if (decision.selected_tip_epoch !== expected.selected_tip_epoch)
     throw new Error("selected tip epoch mismatch");
-  if (decision.selected_branch_id !== selectedConfirmationTag)
-    throw new Error("selected branch identity mismatch");
-  if (!decision.selected_tip_digest || !decision.selected_tip_committer)
-    throw new Error("selected tip identity missing");
+  if (decision.selected_branch_id !== expectedWinner.branchId)
+    throw new Error(
+      `selected branch identity mismatch: expected ${expectedWinner.publication}/${expectedWinner.committer} ${expectedWinner.branchId}, got ${decision.selected_branch_id}/${decision.selected_tip_committer}`,
+    );
+  if (decision.selected_tip_digest !== expectedWinner.tipDigest)
+    throw new Error("selected tip digest mismatch");
+  if (decision.selected_tip_committer !== expectedWinner.committerPubkey)
+    throw new Error("selected tip committer mismatch");
   if (
     expected.decisive_rule !== undefined &&
     decision.decisive_rule !== expected.decisive_rule
@@ -345,6 +420,52 @@ function assertDecision(
     throw new Error("application witness score mismatch");
 }
 
+function fixtureExpectedWinner(
+  fixture: Fixture,
+  candidates: Map<string, AuthoredCandidate>,
+): AuthoredCandidate {
+  if (fixture.scenario.name === "convergence-witness-selected/v1") {
+    const witnessed = candidates.get("invite-a");
+    if (!witnessed) throw new Error("witness fixture did not author invite-a");
+    return witnessed;
+  }
+  const forkCandidates = [...candidates.values()];
+  if (forkCandidates.length !== 2)
+    throw new Error("fixture did not author exactly two fork candidates");
+  // MDK's authenticated-committer tie break selects the lexicographically
+  // lower basic-credential identity. This expectation is derived from the
+  // fixture actors' signed credentials before ForkRecovery selects a branch.
+  return forkCandidates.sort((a, b) =>
+    a.committerPubkey.localeCompare(b.committerPubkey),
+  )[0]!;
+}
+
+function convergenceDecision(
+  auditEvents: Map<string, MarmotAuditEvent[]>,
+  clients: string[],
+  candidates: Map<string, AuthoredCandidate>,
+) {
+  const branchIds = new Set([...candidates.values()].map((c) => c.branchId));
+  return clients
+    .flatMap((client) => auditEvents.get(client) ?? [])
+    .map((event) => event.kind)
+    .filter(
+      (
+        kind,
+      ): kind is Extract<
+        MarmotAuditEvent["kind"],
+        { type: "convergence_decision" }
+      > => kind.type === "convergence_decision",
+    )
+    .findLast(
+      (decision) =>
+        decision.selected_branch_id !== undefined &&
+        decision.selected_tip_digest !== undefined &&
+        decision.selected_tip_committer !== undefined &&
+        branchIds.has(decision.selected_branch_id),
+    );
+}
+
 describe("named MDK scenarios against real Marmot actors", () => {
   it.each(FIXTURES.map((fixture) => [fixture.scenario.name, fixture] as const))(
     "%s executes every step and matches its terminal outcomes",
@@ -356,7 +477,7 @@ describe("named MDK scenarios against real Marmot actors", () => {
         identities,
         auditEvents,
         expectedErrors,
-        candidateTags,
+        authoredCandidates,
       } = await executeFixture(fixture);
       const observedClients = new Set(
         fixture.expected_outcomes
@@ -406,32 +527,32 @@ describe("named MDK scenarios against real Marmot actors", () => {
         if (expected.type === "convergence_decision") {
           const clients =
             "client" in expected ? [expected.client] : [...groups.keys()];
-          const decisions = clients
-            .flatMap((client) => auditEvents.get(client) ?? [])
-            .map((event) => event.kind)
-            .filter(
-              (
-                kind,
-              ): kind is Extract<
-                MarmotAuditEvent["kind"],
-                { type: "convergence_decision" }
-              > =>
-                kind.type === "convergence_decision" &&
-                kind.selected_branch_id !== undefined &&
-                kind.selected_tip_digest !== undefined,
-            );
-          const liveTags = new Set([
-            ...candidateTags,
-            ...[...groups.values()].map((group) =>
-              bytesToHex(group.state.confirmationTag),
-            ),
-          ]);
-          const decision = decisions.findLast((candidate) =>
-            liveTags.has(candidate.selected_branch_id!),
+          const expectedWinner = fixtureExpectedWinner(
+            fixture,
+            authoredCandidates,
+          );
+          const decision = convergenceDecision(
+            auditEvents,
+            clients,
+            authoredCandidates,
           );
           expect(decision).toBeDefined();
-          expect(candidateTags).toContain(decision!.selected_branch_id);
-          assertDecision(decision!, expected, decision!.selected_branch_id!);
+          assertDecision(decision!, expected, expectedWinner);
+          const loser = [...authoredCandidates.values()].find(
+            (candidate) => candidate.branchId !== expectedWinner.branchId,
+          )!;
+          if (expectedWinner.profileName)
+            expect(expectedWinner.observedProfileName).toBe(
+              expectedWinner.profileName,
+            );
+          if (expectedWinner.invitedMember) {
+            expect(expectedWinner.memberPubkeys).toContain(
+              identities.get(expectedWinner.invitedMember),
+            );
+            expect(expectedWinner.memberPubkeys).not.toContain(
+              identities.get(loser.invitedMember!),
+            );
+          }
         }
         if (expected.type === "clients_converged") {
           const converged = expected.clients.map(
@@ -476,45 +597,34 @@ describe("named MDK scenarios against real Marmot actors", () => {
     60_000,
   );
 
-  it("rejects wrong same-epoch branch identity and decision telemetry", () => {
-    const correct = {
-      type: "convergence_decision" as const,
-      current_tip_epoch: 1,
-      max_rewind_commits: 5,
-      candidates: [],
-      selected_branch_id: "winner",
-      selected_tip_epoch: 2,
-      selected_tip_digest: "11",
-      selected_tip_committer: "22",
-      decisive_rule: "tip_committer",
-      witness_quorum_met: true,
-      app_witness_score: 2,
-    };
-    const expected = {
-      selected_tip_epoch: 2,
-      decisive_rule: "tip_committer",
-      witness_quorum_met: true,
-      min_app_witness_score: 2,
-    };
-    expect(() => assertDecision(correct, expected, "loser")).toThrow(
-      "selected branch identity mismatch",
+  it("rejects a swapped production outcome through the fixture oracle", async () => {
+    const result = await executeFixture(committerFixture);
+    const expected = committerFixture.expected_outcomes.find(
+      (outcome) => outcome.type === "convergence_decision",
+    )!;
+    const winner = fixtureExpectedWinner(
+      committerFixture,
+      result.authoredCandidates,
     );
+    const loser = [...result.authoredCandidates.values()].find(
+      (candidate) => candidate.branchId !== winner.branchId,
+    )!;
+    const decision = convergenceDecision(
+      result.auditEvents,
+      [expected.client],
+      result.authoredCandidates,
+    )!;
     expect(() =>
       assertDecision(
-        { ...correct, decisive_rule: "tip_digest" },
+        {
+          ...decision,
+          selected_branch_id: loser.branchId,
+          selected_tip_digest: loser.tipDigest,
+          selected_tip_committer: loser.committerPubkey,
+        },
         expected,
-        "winner",
+        winner,
       ),
-    ).toThrow("decisive rule mismatch");
-    expect(() =>
-      assertDecision(
-        { ...correct, witness_quorum_met: false },
-        expected,
-        "winner",
-      ),
-    ).toThrow("witness quorum mismatch");
-    expect(() =>
-      assertDecision({ ...correct, app_witness_score: 1 }, expected, "winner"),
-    ).toThrow("application witness score mismatch");
+    ).toThrow("selected branch identity mismatch");
   });
 });
