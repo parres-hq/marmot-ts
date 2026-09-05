@@ -25,6 +25,7 @@ import {
   verifyLeafAccountIdentityProof,
 } from "../account-identity-proof.js";
 import { AGENT_TEXT_STREAM_QUIC_RECEIVE_EXTENSION_TYPE } from "../components/agent-text-stream.js";
+import proofV2Rust from "../../__tests__/fixtures/proof-v2-rust.json";
 import { getAppComponents } from "../components/dictionary.js";
 import {
   AGENT_TEXT_STREAM_QUIC_COMPONENT_ID,
@@ -172,6 +173,9 @@ describe("darkmatter invite compatibility", () => {
  * `01-CONTEXT.md` Deferred Ideas.
  */
 describe("Rust MDK proof-v2 round-trip fixture (generated once, pinned)", () => {
+  it("loads the repository-local immutable Rust fixture", () => {
+    expect(proofV2Rust.version).toBe(2);
+  });
   // Fixed inputs used to generate the fixture (see comment above).
   const RUST_FIXTURE_ACCOUNT_IDENTITY_HEX =
     "67d3ed702d55d4c049de6e43ead43a9b9cf1b4976f40a7357673b1acbf8f34b0";
