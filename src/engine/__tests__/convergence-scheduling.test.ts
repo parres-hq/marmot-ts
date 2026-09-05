@@ -84,6 +84,11 @@ async function fixture(now: () => number) {
 }
 
 describe("bounded convergence scheduling", () => {
+  it("starts Settled even when the monotonic clock is near its origin", async () => {
+    const { engine } = await fixture(() => 0);
+    expect(engine.convergenceStatus).toBe("Settled");
+  });
+
   it("defaults older policy input to the immutable v1 pass bound", () => {
     const { maxConvergencePassMs: _, ...legacy } = DEFAULT_CONVERGENCE_POLICY;
     expect(normalizeConvergencePolicy(legacy).maxConvergencePassMs).toBe(5_000);

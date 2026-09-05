@@ -46,6 +46,7 @@ import {
 import { decideAutoCommit } from "./auto-committer.js";
 import {
   type ConvergenceStatus,
+  convergenceStatuses,
   deriveConvergenceStatus,
 } from "../core/convergence-status.js";
 import {
@@ -300,7 +301,7 @@ export class MarmotGroupEngine<TEnvelope> {
   /** Quiescence window (ms) before a convergence pass may be treated as settled. */
   readonly #settlementQuiescenceMs: number;
   /** Wall-clock (ms) of the most recent convergence-relevant inbound input. */
-  #lastConvergenceRelevantInputMs = 0;
+  #lastConvergenceRelevantInputMs: number | undefined;
   /** Whether the last convergence pass left a non-proposal input undispositioned. */
   #lastPassUnresolved = false;
   /** Whether the last convergence pass hit a blocking (missing-anchor) error. */
@@ -506,6 +507,12 @@ export class MarmotGroupEngine<TEnvelope> {
    * `Settled` as wall-clock time passes even with no new input.
    */
   get convergenceStatus(): ConvergenceStatus {
+    // A fresh engine has no pass and is settled regardless of the monotonic
+    // clock's process-relative origin. Treating an absent timestamp as `0`
+    // makes the first quiescence interval after process start spuriously
+    // Syncing and queues outbound forever because no pass exists to arm a wake.
+    if (this.#lastConvergenceRelevantInputMs === undefined)
+      return convergenceStatuses.settled;
     return deriveConvergenceStatus({
       nowMs: this.#now(),
       lastConvergenceRelevantInputMs: this.#lastConvergenceRelevantInputMs,
@@ -1549,6 +1556,7 @@ export class MarmotGroupEngine<TEnvelope> {
       this.#settleTimer = undefined;
     }
     const nowMs = this.#now();
+    if (this.#lastConvergenceRelevantInputMs === undefined) return;
     const quiescenceAt =
       this.#lastConvergenceRelevantInputMs + this.#settlementQuiescenceMs;
     const cutoffAt = this.#convergencePass
@@ -1566,10 +1574,11 @@ export class MarmotGroupEngine<TEnvelope> {
 
   #closeConvergencePass(): void {
     this.#convergencePass = undefined;
-    this.#lastConvergenceRelevantInputMs = Math.min(
-      this.#lastConvergenceRelevantInputMs,
-      this.#now() - this.#settlementQuiescenceMs,
-    );
+    if (this.#lastConvergenceRelevantInputMs !== undefined)
+      this.#lastConvergenceRelevantInputMs = Math.min(
+        this.#lastConvergenceRelevantInputMs,
+        this.#now() - this.#settlementQuiescenceMs,
+      );
     if (this.#settleTimer !== undefined) {
       this.#scheduler.clearTimer(this.#settleTimer);
       this.#settleTimer = undefined;
