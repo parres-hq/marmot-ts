@@ -162,7 +162,6 @@ export class MarmotConformanceSubject {
         return { kind: "supported", action: action.type };
       case "restart": {
         const group = this.requireGroup(action.client);
-        await group.save(true);
         this.options.groups.set(
           action.client,
           await this.options.restart(action.client, group),

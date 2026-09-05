@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { createCredential } from "../../core/credential.js";
 import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
+import { serializeClientState } from "../../core/client-state.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { MarmotGroup } from "../../client/group/marmot-group.js";
 import { GroupRegistry } from "../../client/group-registry.js";
@@ -169,6 +170,9 @@ describe("conformance adapter", () => {
       });
     const groups = new Map([["alice", makeGroup()]]);
     await groups.get("alice")!.save(true);
+    const durableBeforeCrash = await store.getItem(
+      bytesToHex(clientState.groupContext.groupId),
+    );
     const registry = new GroupRegistry({
       store,
       ingestStateStore,
@@ -219,6 +223,9 @@ describe("conformance adapter", () => {
     expect(network.queuedEvents).toHaveLength(0);
     expect(network.events).toHaveLength(1);
     expect(now).toBe(150);
+    expect(serializeClientState(groups.get("alice")!.state)).toEqual(
+      durableBeforeCrash,
+    );
     expect(result.results.at(-1)).toMatchObject({
       kind: "supported",
       action: "snapshot",
