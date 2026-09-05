@@ -7,6 +7,7 @@ import {
   encode,
 } from "ts-mls";
 import { describe, expect, it } from "vitest";
+import { vi } from "vitest";
 import { createCredential } from "../../core/credential.js";
 import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
@@ -24,11 +25,31 @@ import {
   validateCanonicalConformanceSnapshot,
 } from "./snapshot.js";
 import { MarmotConformanceSubject } from "./subject.js";
+import { parseMdkScenarioStep } from "./subject.js";
 import { runConformanceScenario } from "./runner.js";
 
 const VECTORS_ROOT = "refs/mdk/crates/cgka-conformance-simulator/vectors";
 
 describe("conformance adapter", () => {
+  it("executes declared Scenario IR operation handlers instead of false support", async () => {
+    const executeScenarioOperation = vi.fn(async () => {});
+    const subject = new MarmotConformanceSubject({
+      scenarioId: "operation-handler/v1",
+      groups: new Map(),
+      network: new MockNetwork(),
+      capabilities: new Set(["semantic_transport_faults"]),
+      now: () => 0,
+      advanceTime: () => {},
+      restart: async () => {
+        throw new Error("not used");
+      },
+      executeScenarioOperation,
+    });
+    const step = { type: "set_partition", allow: ["alice", "bob"] };
+    const result = await subject.execute(parseMdkScenarioStep(step));
+    expect(result.kind).toBe("supported");
+    expect(executeScenarioOperation).toHaveBeenCalledWith(step, subject);
+  });
   it("strictly validates the pinned manifest and confines artifact paths", () => {
     const manifest = validateConformanceManifest(manifestJson, VECTORS_ROOT);
     expect(manifest.entries[0]?.id).toBe("three-client-message-exchange/v1");

@@ -26,6 +26,7 @@ export type ConformanceAction =
       type: "scenario_operation";
       operation: string;
       capability: ConformanceCapability;
+      step: Readonly<Record<string, unknown>>;
     };
 
 export type ConformanceActionResult =
@@ -50,6 +51,10 @@ export interface MarmotConformanceSubjectOptions {
   now: () => number;
   advanceTime: (milliseconds: number) => void;
   restart: (client: string, group: MarmotGroup) => Promise<MarmotGroup>;
+  executeScenarioOperation?: (
+    step: Readonly<Record<string, unknown>>,
+    subject: MarmotConformanceSubject,
+  ) => Promise<void>;
   identities?: ReadonlyMap<string, string>;
 }
 
@@ -166,6 +171,7 @@ export function parseMdkScenarioStep(value: unknown): ConformanceAction {
     type: "scenario_operation",
     operation: step.type,
     capability,
+    step,
   };
 }
 
@@ -191,8 +197,9 @@ export class MarmotConformanceSubject {
         ? action.capability
         : ACTION_CAPABILITY[action.type];
     if (
-      action.type !== "scenario_operation" &&
-      this.options.capabilities.has(capability)
+      this.options.capabilities.has(capability) &&
+      (action.type !== "scenario_operation" ||
+        this.options.executeScenarioOperation !== undefined)
     )
       return undefined;
     return {
@@ -336,6 +343,7 @@ export class MarmotConformanceSubject {
         };
       }
       case "scenario_operation":
+        await this.options.executeScenarioOperation!(action.step, this);
         return {
           kind: "supported",
           action: action.type,
