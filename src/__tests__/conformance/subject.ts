@@ -281,7 +281,7 @@ export class MarmotConformanceSubject {
       case "send_application": {
         const group = this.requireGroup(action.client);
         const identity = this.options.identities?.get(action.client);
-        await group.submitIntent(
+        const effects = await group.session.send(
           identity
             ? createApplicationMessageIntent(
                 createChatRumor({
@@ -295,6 +295,7 @@ export class MarmotConformanceSubject {
                 payload: new TextEncoder().encode(action.payload),
               },
         );
+        await group.runtime.publishEffects(effects);
         this.#dispositions.push({
           input: action.input,
           disposition: "accepted",
@@ -365,11 +366,12 @@ export class MarmotConformanceSubject {
         const proposals = await proposeUpdateMetadata({ name: action.name })(
           group.session.proposalContext(),
         );
-        await group.submitIntent({
+        const effects = await group.session.send({
           kind: "commit",
           actorPubkey,
           extraProposals: proposals,
         });
+        await group.runtime.publishEffects(effects);
         return { kind: "supported", action: action.type };
       }
       case "invite_members": {
