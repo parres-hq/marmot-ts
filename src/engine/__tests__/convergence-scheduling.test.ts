@@ -16,6 +16,7 @@ import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
 import { marmotAuthService } from "../../core/auth-service.js";
 import { MarmotGroupEngine } from "../group-engine.js";
+import { selectFairQueuedStateIntent } from "../../client/group/marmot-group.js";
 
 type Envelope = { id: string };
 
@@ -135,5 +136,24 @@ describe("bounded convergence scheduling", () => {
     expect(results).toHaveLength(0);
     expect(engine.convergencePass).toBeUndefined();
     expect(engine.retainedConvergenceInputCount).toBe(1);
+  });
+
+  it("selects exactly one pre-existing group-state intent for fairness", () => {
+    const queue = [
+      { intent: { kind: "applicationMessage" as const } },
+      { intent: { kind: "commit" as const } },
+      { intent: { kind: "commit" as const } },
+    ];
+    expect(selectFairQueuedStateIntent(queue, 3)).toBe(1);
+    expect(selectFairQueuedStateIntent(queue, 1)).toBeUndefined();
+  });
+
+  it("does not let a newly queued intent steal the settlement slot", () => {
+    const queue = [{ intent: { kind: "applicationMessage" as const } }];
+    const settledQueueLength = queue.length;
+    queue.push({ intent: { kind: "commit" as const } });
+    expect(
+      selectFairQueuedStateIntent(queue, settledQueueLength),
+    ).toBeUndefined();
   });
 });
