@@ -34,6 +34,8 @@ function matchesFilters(event: NostrEvent, filters: Filter[]): boolean {
 export class MockNetwork implements NostrNetworkInterface {
   // Shared events array - simulates relay storage
   public events: NostrEvent[] = [];
+  public queuedEvents: NostrEvent[] = [];
+  public autoDeliver = true;
 
   /** Live subscriptions, notified per-event on subsequent publishes. */
   #subscribers = new Set<{
@@ -51,10 +53,10 @@ export class MockNetwork implements NostrNetworkInterface {
     relays: string[],
     event: NostrEvent,
   ): Promise<Record<string, PublishResponse>> {
-    this.events.push(event);
-
-    for (const sub of this.#subscribers) {
-      if (matchesFilters(event, sub.filters)) sub.observer.next?.(event);
+    if (!this.autoDeliver) {
+      this.queuedEvents.push(event);
+    } else {
+      this.deliver(event);
     }
 
     // Return success for all requested relays
@@ -63,6 +65,39 @@ export class MockNetwork implements NostrNetworkInterface {
       result[relay] = { from: relay, ok: true };
     }
     return result;
+  }
+
+  private deliver(event: NostrEvent): void {
+    this.events.push(event);
+
+    for (const sub of this.#subscribers) {
+      if (matchesFilters(event, sub.filters)) sub.observer.next?.(event);
+    }
+  }
+
+  /** Delivers queued publications in their current deterministic order. */
+  deliverQueued(): void {
+    for (const event of this.queuedEvents.splice(0)) this.deliver(event);
+  }
+
+  dropQueued(index: number): void {
+    this.queuedEvents.splice(index, 1);
+  }
+
+  duplicateQueued(index: number): void {
+    const event = this.queuedEvents[index];
+    if (event) this.queuedEvents.splice(index + 1, 0, event);
+  }
+
+  reorderQueued(order: number[]): void {
+    if (order.length !== this.queuedEvents.length || new Set(order).size !== order.length)
+      throw new Error("queue order must be a complete permutation");
+    const current = [...this.queuedEvents];
+    this.queuedEvents = order.map((index) => {
+      const event = current[index];
+      if (!event) throw new Error("queue order index out of range");
+      return event;
+    });
   }
 
   /**
@@ -117,5 +152,6 @@ export class MockNetwork implements NostrNetworkInterface {
    */
   clear(): void {
     this.events = [];
+    this.queuedEvents = [];
   }
 }

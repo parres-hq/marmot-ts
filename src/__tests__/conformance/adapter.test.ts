@@ -10,6 +10,10 @@ import { describe, expect, it } from "vitest";
 import { createCredential } from "../../core/credential.js";
 import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
+import { deserializeClientState, serializeClientState } from "../../core/client-state.js";
+import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
+import { MarmotGroup } from "../../client/group/marmot-group.js";
+import { MockNetwork } from "../helpers/mock-network.js";
 import {
   resolveManifestArtifact,
   validateConformanceManifest,
@@ -18,6 +22,8 @@ import {
   projectCanonicalConformanceSnapshot,
   validateCanonicalConformanceSnapshot,
 } from "./snapshot.js";
+import { MarmotConformanceSubject } from "./subject.js";
+import { runConformanceScenario } from "./runner.js";
 
 const VECTORS_ROOT = "refs/mdk/crates/cgka-conformance-simulator/vectors";
 
@@ -64,5 +70,63 @@ describe("conformance adapter", () => {
     const { epoch: _epoch, ...missing } = snapshot;
     expect(() => validateCanonicalConformanceSnapshot(missing)).toThrow();
     expect(() => validateCanonicalConformanceSnapshot({ ...snapshot, local_queue_id: "nope" })).toThrow();
+  });
+
+  it("drives production groups with deterministic delivery, time, restart, and explicit support", async () => {
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const pubkey = "a".repeat(64);
+    const keyPackage = await generateKeyPackage({ credential: createCredential(pubkey), ciphersuiteImpl: impl });
+    const { clientState } = await createSimpleGroup(keyPackage, impl, "subject", {
+      adminPubkeys: [pubkey],
+      relays: ["wss://mock-relay.test"],
+    });
+    const network = new MockNetwork();
+    network.autoDeliver = false;
+    const store = new InMemoryKeyValueStore();
+    const signer = { getPublicKey: async () => pubkey } as never;
+    const makeGroup = (state = clientState) => new MarmotGroup(state, { store, signer, ciphersuite: impl, network });
+    const groups = new Map([["alice", makeGroup()]]);
+    let now = 100;
+    const subject = new MarmotConformanceSubject({
+      scenarioId: "adapter-smoke/v1",
+      groups,
+      network,
+      capabilities: new Set(["application_messaging", "transport_delivery", "virtual_time", "crash_reopen"]),
+      now: () => now,
+      advanceTime: (milliseconds) => { now += milliseconds; },
+      restart: async (_client, group) => {
+        const persisted = serializeClientState(group.state);
+        return makeGroup(await deserializeClientState(persisted));
+      },
+    });
+    const result = await runConformanceScenario({
+      id: "adapter-smoke/v1",
+      actions: [
+        { type: "send_application", client: "alice", input: "hello", payload: "hello" },
+        { type: "deliver_all" },
+        { type: "advance_time", milliseconds: 50 },
+        { type: "restart", client: "alice" },
+        { type: "snapshot", client: "alice" },
+      ],
+    }, subject);
+    expect(result.supported).toBe(true);
+    expect(network.queuedEvents).toHaveLength(0);
+    expect(network.events).toHaveLength(1);
+    expect(now).toBe(150);
+    expect(result.results.at(-1)).toMatchObject({ kind: "supported", action: "snapshot" });
+
+    const unsupported = new MarmotConformanceSubject({
+      ...subject.options,
+      capabilities: new Set(["transport_delivery"]),
+    });
+    expect(await unsupported.execute({ type: "restart", client: "alice" })).toEqual({
+      kind: "unsupported",
+      scenarioId: "adapter-smoke/v1",
+      capability: "crash_reopen",
+      reason: "subject does not support crash_reopen",
+    });
   });
 });
