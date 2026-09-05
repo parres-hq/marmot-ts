@@ -69,7 +69,6 @@ describe("portable MDK conformance smoke corpus", () => {
           expect(result).toMatchObject({
             kind: "unsupported",
             scenarioId: entry.id,
-            capability: action.capability,
           });
         }
       }

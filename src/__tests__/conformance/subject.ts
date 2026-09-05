@@ -92,6 +92,21 @@ export function parseMdkScenarioStep(value: unknown): ConformanceAction {
   const capability = STEP_CAPABILITY[step.type];
   if (!capability)
     throw new Error(`Unsupported Scenario IR operation ${step.type}`);
+  if (step.type === "deliver_all") return { type: "deliver_all" };
+  if (step.type === "tick") return { type: "advance_time", milliseconds: 1 };
+  if (step.type === "restart_client" && typeof step.client === "string")
+    return { type: "restart", client: step.client };
+  if (
+    step.type === "send_app_message" &&
+    typeof step.sender === "string" &&
+    typeof step.payload === "string"
+  )
+    return {
+      type: "send_application",
+      client: step.sender,
+      input: step.payload,
+      payload: step.payload,
+    };
   return {
     type: "scenario_operation",
     operation: step.type,
@@ -110,7 +125,11 @@ export class MarmotConformanceSubject {
       action.type === "scenario_operation"
         ? action.capability
         : ACTION_CAPABILITY[action.type];
-    if (this.options.capabilities.has(capability)) return undefined;
+    if (
+      action.type !== "scenario_operation" &&
+      this.options.capabilities.has(capability)
+    )
+      return undefined;
     return {
       kind: "unsupported",
       scenarioId: this.options.scenarioId,
