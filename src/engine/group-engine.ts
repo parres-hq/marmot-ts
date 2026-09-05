@@ -311,6 +311,8 @@ export class MarmotGroupEngine<TEnvelope> {
   #nextPassGeneration = 1;
   /** Input retained while lifecycle gates admission or a prior pass reaches cutoff. */
   readonly #retainedPassInput: TEnvelope[] = [];
+  /** Capacity-refused input retained independently so a full pool cannot deadlock it. */
+  readonly #capacityRefusedInput = new Map<string, TEnvelope>();
 
   /** Injectable timer for the settle-check (B5). */
   readonly #scheduler: ConvergenceScheduler;
@@ -359,7 +361,7 @@ export class MarmotGroupEngine<TEnvelope> {
 
   /** Number of undecryptable events currently held in the ingestion pool. */
   get pendingCount(): number {
-    return this.#pool.size;
+    return this.#pool.size + this.#capacityRefusedInput.size;
   }
 
   /**
@@ -370,7 +372,10 @@ export class MarmotGroupEngine<TEnvelope> {
    * that never clears is a received event the unlocking state never arrived for.
    */
   pendingEnvelopes(): TEnvelope[] {
-    return this.#pool.envelopes();
+    return [
+      ...this.#pool.envelopes(),
+      ...this.#capacityRefusedInput.values(),
+    ];
   }
 
   /**
@@ -1289,32 +1294,54 @@ export class MarmotGroupEngine<TEnvelope> {
         options,
       )) {
         if (result.kind === "unreadable" && result.decryptFailure) {
-          // Hold for retry rather than dropping; suppress the terminal yield.
-          this.#pool.add(this.peeler.idOf(result.envelope), result.envelope);
+          const id = this.peeler.idOf(result.envelope);
+          const admission = this.#pool.add(id, result.envelope);
+          if (admission.kind === "refused") {
+            this.#capacityRefusedInput.set(id, result.envelope);
+            yield {
+              kind: "refused",
+              envelope: result.envelope,
+              reason: "capacity",
+            };
+          }
           continue;
         }
         if (result.kind === "deferred") {
-          this.#pool.add(
-            this.peeler.idOf(result.envelope),
+          const id = this.peeler.idOf(result.envelope);
+          const admission = this.#pool.add(
+            id,
             result.envelope,
             result.sourceEpoch,
           );
+          if (admission.kind === "refused") {
+            this.#capacityRefusedInput.set(id, result.envelope);
+            yield {
+              kind: "refused",
+              envelope: result.envelope,
+              reason: "capacity",
+            };
+            continue;
+          }
           // Both retained and capacity-refused work remains visibly retryable;
           // neither path enters terminal wrapper deduplication.
           yield result;
           continue;
         }
-        if (result.kind === "processed" || result.kind === "removed")
-          this.#pool.remove(this.peeler.idOf(result.envelope));
+        if (result.kind === "processed" || result.kind === "removed") {
+          const id = this.peeler.idOf(result.envelope);
+          this.#pool.remove(id);
+          this.#capacityRefusedInput.delete(id);
+        }
         yield result;
       }
       const tipAfter = bytesToHex(this.#state.confirmationTag);
       // Re-feed the pool only when the tip advanced — an unchanged tip would
       // reproduce the same failures. Bounded by MAX_SWEEPS per ingest call.
-      pass =
-        tipAfter !== tipBefore && this.#pool.size > 0 && ++sweeps < MAX_SWEEPS
-          ? this.#pool.envelopes()
-          : [];
+      if (tipAfter !== tipBefore && ++sweeps < MAX_SWEEPS) {
+        const refused = [...this.#capacityRefusedInput.values()];
+        this.#capacityRefusedInput.clear();
+        pass = [...refused, ...this.#pool.envelopes()];
+      } else pass = [];
     }
 
     // Tree-targeted sweep: read/apply pooled events against any retained fork or
@@ -1523,6 +1550,7 @@ export class MarmotGroupEngine<TEnvelope> {
       case "rejected":
         return framedContentType(result.message) === contentTypes.commit;
       case "deferred":
+      case "refused":
       case "invalidated":
       case "removed":
         return true;
@@ -2493,6 +2521,7 @@ function auditStaleReason<TEnvelope>(
       return "removed";
     case "processed":
     case "deferred":
+    case "refused":
     case "invalidated":
     case "autoCommit":
     case "appliedNotifications":
@@ -2514,6 +2543,7 @@ function auditResultEpoch<TEnvelope>(
     case "stateRevalidated":
       return undefined;
     case "deferred":
+    case "refused":
     case "processed":
     case "rejected":
     case "skipped":

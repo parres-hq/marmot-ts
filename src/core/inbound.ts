@@ -74,6 +74,8 @@ export const deferredReasons = {
   missingParent: "missing_parent",
   /** Input received while the group is in PendingPublish or Merging. */
   groupBusy: "group_busy",
+  /** Local admission capacity is full; retry without transport redelivery. */
+  capacity: "capacity",
 } as const;
 
 /** A deferred-input reason. */

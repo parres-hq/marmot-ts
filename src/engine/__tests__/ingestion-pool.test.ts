@@ -112,6 +112,11 @@ describe("MarmotGroupEngine ingestion pool", () => {
       state: commit12.newState,
       extraProposals: [],
     });
+    const commit34 = await createCommit({
+      context: ctx,
+      state: commit23.newState,
+      extraProposals: [],
+    });
     const event12 = await createGroupEvent({
       message: commit12.commit,
       state: adminE1,
@@ -122,29 +127,44 @@ describe("MarmotGroupEngine ingestion pool", () => {
       state: commit12.newState,
       ciphersuite: impl,
     });
+    const event34 = await createGroupEvent({
+      message: commit34.commit,
+      state: commit23.newState,
+      ciphersuite: impl,
+    });
 
     const engine = new MarmotGroupEngine<NostrEvent>({
       state: memberE1,
       ciphersuite: impl,
       peeler: testPeeler(impl),
+      ingestionPool: { maxSize: 1 },
     });
 
-    // Deliver the epoch-2 commit FIRST (out of order, as a relay would stream
-    // it). The member cannot decrypt it yet → it is pooled, not dropped, and no
-    // terminal result is surfaced.
-    const first = await drain(engine.ingest([event23]));
+    // Fill the bounded pool with a farther-future commit, then submit the
+    // nearer future commit. Capacity refusal is surfaced as retryable and the
+    // wrapper is retained outside the pool rather than relying on redelivery.
+    const first = await drain(engine.ingest([event34]));
     expect(first.some((r) => r.kind === "processed")).toBe(false);
     expect(first.some((r) => r.kind === "unreadable")).toBe(false);
     expect(engine.pendingCount).toBe(1);
+    const refused = await drain(engine.ingest([event23]));
+    expect(refused).toMatchObject([
+      {
+        kind: "refused",
+        reason: "capacity",
+        disposition: { kind: "deferred", reason: "capacity" },
+      },
+    ]);
+    expect(engine.pendingCount).toBe(2);
     expect(Number(engine.state.groupContext.epoch)).toBe(1);
 
-    // The unlocking commit arrives in a later batch → the member advances to
-    // epoch 2, the pool is swept, and the previously-undecryptable commit is now
-    // read and applied, reaching epoch 3.
+    // The unlocking commit arrives once. Advancing the tip retries the refused
+    // wrapper from the admission queue, which then unlocks the pooled wrapper.
+    // Neither future commit is redelivered by the transport.
     const second = await drain(engine.ingest([event12]));
-    expect(second.filter((r) => r.kind === "processed")).toHaveLength(2);
+    expect(second.filter((r) => r.kind === "processed")).toHaveLength(3);
     expect(engine.pendingCount).toBe(0);
-    expect(Number(engine.state.groupContext.epoch)).toBe(3);
+    expect(Number(engine.state.groupContext.epoch)).toBe(4);
   });
 
   it("sweeps a late fork commit against a retained node, growing the fork in the tree", async () => {

@@ -214,6 +214,13 @@ export type DeferredIngestResult<TEnvelope> = {
   sourceEpoch: number;
 };
 
+/** An envelope retained outside the bounded pool until admission capacity frees. */
+export type CapacityRefusedIngestResult<TEnvelope> = {
+  kind: "refused";
+  envelope: TEnvelope;
+  reason: "capacity";
+};
+
 /**
  * An MLS application message that decrypted only on a losing/abandoned branch
  * (`protocol-core/inbound-processing.md`, `convergence.md`). Either it was
@@ -327,6 +334,7 @@ export type IngestResult<TEnvelope> =
   | RejectedIngestResult<TEnvelope>
   | SkippedIngestResult<TEnvelope>
   | DeferredIngestResult<TEnvelope>
+  | CapacityRefusedIngestResult<TEnvelope>
   | InvalidatedIngestResult<TEnvelope>
   | AutoCommitIngestResult<TEnvelope>
   | RemovedIngestResult<TEnvelope>
