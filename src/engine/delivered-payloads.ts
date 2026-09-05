@@ -54,6 +54,14 @@ export class DeliveredPayloadLedger<TEnvelope> {
     return this.#entries.get(stateTag)?.has(message) ?? false;
   }
 
+  /** Retained transport envelopes used as witnesses by later fork passes. */
+  envelopes(): TEnvelope[] {
+    const envelopes: TEnvelope[] = [];
+    for (const branch of this.#entries.values())
+      for (const entry of branch.values()) envelopes.push(entry.envelope);
+    return envelopes;
+  }
+
   /** Remembers a delivered application payload. */
   record(entry: DeliveredAppPayload<TEnvelope>): void {
     let branch = this.#entries.get(entry.stateTag);

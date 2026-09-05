@@ -16,6 +16,7 @@ import {
   type KeyPackageWithPrivateKey,
 } from "ts-mls";
 import { describe, expect, it } from "vitest";
+import { bytesToHex } from "@noble/hashes/utils.js";
 
 import { MarmotGroup } from "../../client/group/marmot-group.js";
 import { proposeInviteUser } from "../../client/group/proposals/invite-user.js";
@@ -27,6 +28,7 @@ import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js"
 import { MockNetwork } from "../helpers/mock-network.js";
 import { MarmotConformanceSubject, parseMdkScenarioStep } from "./subject.js";
 import type { CanonicalConformanceSnapshot } from "./snapshot.js";
+import type { MarmotAuditEvent } from "../../audit/types.js";
 
 const FIXTURES = [
   committerFixture,
@@ -130,6 +132,7 @@ async function executeFixture(fixture: Fixture) {
   const network = new MockNetwork();
   network.autoDeliver = false;
   const groups = new Map<string, MarmotGroup>();
+  const auditEvents = new Map<string, MarmotAuditEvent[]>();
   const makeGroup = (actor: string, state: ClientState) =>
     new MarmotGroup(state, {
       store: new InMemoryKeyValueStore(),
@@ -138,6 +141,14 @@ async function executeFixture(fixture: Fixture) {
       signer: accounts.get(actor)!.signer,
       ciphersuite,
       network,
+      audit: {
+        record(event) {
+          const events = auditEvents.get(actor) ?? [];
+          events.push(event);
+          auditEvents.set(actor, events);
+        },
+      },
+      auditContext: { engineId: `${fixture.scenario.name}:${actor}` },
     });
   for (const [actor, state] of states) {
     const group = makeGroup(actor, state);
@@ -196,6 +207,8 @@ async function executeFixture(fixture: Fixture) {
   });
   const held = new Map<string, (typeof network.queuedEvents)[number]>();
   const publications = new Map<string, (typeof network.queuedEvents)[number]>();
+  const candidateTags = new Set<string>();
+  const expectedErrors: Array<{ client: string; error: string }> = [];
   let snapshots: Record<string, CanonicalConformanceSnapshot> = {};
 
   for (const raw of fixture.scenario.steps as readonly Record<
@@ -215,6 +228,7 @@ async function executeFixture(fixture: Fixture) {
         ),
       });
       const publication = network.queuedEvents[before]!;
+      candidateTags.add(bytesToHex(group.state.confirmationTag));
       publications.set(String(raw.pending), publication);
       const welcome = results.find(
         (result) => result.work.kind === "groupEvolution",
@@ -256,10 +270,17 @@ async function executeFixture(fixture: Fixture) {
     }
     if (raw.type === "expect_update_admin_policy_error") {
       await subject.execute(parseMdkScenarioStep(raw));
+      expectedErrors.push({
+        client: String(raw.client),
+        error: String(raw.error),
+      });
       continue;
     }
     if (raw.type === "update_group_data") {
       await publishMetadata(String(raw.client), { name: String(raw.name) });
+      candidateTags.add(
+        bytesToHex(groups.get(String(raw.client))!.state.confirmationTag),
+      );
       continue;
     }
     if (raw.type === "update_admin_policy") {
@@ -268,6 +289,9 @@ async function executeFixture(fixture: Fixture) {
           identities.get(actor)!,
         ),
       });
+      candidateTags.add(
+        bytesToHex(groups.get(String(raw.client))!.state.confirmationTag),
+      );
       continue;
     }
     const result = await subject.execute(parseMdkScenarioStep(raw));
@@ -275,15 +299,65 @@ async function executeFixture(fixture: Fixture) {
     if (result.kind === "supported" && result.snapshots)
       snapshots = result.snapshots;
   }
-  return { groups, snapshots, subject, identities };
+  return {
+    groups,
+    snapshots,
+    subject,
+    identities,
+    auditEvents,
+    expectedErrors,
+    candidateTags,
+  };
+}
+
+type DecisionExpectation = {
+  selected_tip_epoch: number;
+  decisive_rule?: string;
+  witness_quorum_met?: boolean;
+  min_app_witness_score?: number;
+};
+
+function assertDecision(
+  decision: Extract<MarmotAuditEvent["kind"], { type: "convergence_decision" }>,
+  expected: DecisionExpectation,
+  selectedConfirmationTag: string,
+): void {
+  if (decision.selected_tip_epoch !== expected.selected_tip_epoch)
+    throw new Error("selected tip epoch mismatch");
+  if (decision.selected_branch_id !== selectedConfirmationTag)
+    throw new Error("selected branch identity mismatch");
+  if (!decision.selected_tip_digest || !decision.selected_tip_committer)
+    throw new Error("selected tip identity missing");
+  if (
+    expected.decisive_rule !== undefined &&
+    decision.decisive_rule !== expected.decisive_rule
+  )
+    throw new Error("decisive rule mismatch");
+  if (
+    expected.witness_quorum_met !== undefined &&
+    decision.witness_quorum_met !== expected.witness_quorum_met
+  )
+    throw new Error("witness quorum mismatch");
+  if (
+    expected.min_app_witness_score !== undefined &&
+    (decision.app_witness_score ?? -1) < expected.min_app_witness_score
+  )
+    throw new Error("application witness score mismatch");
 }
 
 describe("named MDK scenarios against real Marmot actors", () => {
   it.each(FIXTURES.map((fixture) => [fixture.scenario.name, fixture] as const))(
     "%s executes every step and matches its terminal outcomes",
     async (_name, fixture) => {
-      const { groups, snapshots, subject, identities } =
-        await executeFixture(fixture);
+      const {
+        groups,
+        snapshots,
+        subject,
+        identities,
+        auditEvents,
+        expectedErrors,
+        candidateTags,
+      } = await executeFixture(fixture);
       const observedClients = new Set(
         fixture.expected_outcomes
           .filter((outcome) => "client" in outcome)
@@ -291,7 +365,27 @@ describe("named MDK scenarios against real Marmot actors", () => {
       );
       for (const client of observedClients)
         snapshots[client] ??= await subject.snapshot(client);
+      let asserted = 0;
       for (const expected of fixture.expected_outcomes) {
+        asserted++;
+        if (expected.type === "pending_resolution") {
+          const step = fixture.scenario.steps[expected.step_index];
+          expect(step).toMatchObject({
+            type: "acknowledge_outbound",
+            client: expected.client,
+            publication: expected.pending,
+            outcome:
+              expected.resolution === "confirmed"
+                ? "accepted"
+                : "reached_no_endpoint",
+          });
+          expect(groups.get(expected.client)!.lifecycle).toBe("Stable");
+        }
+        if (expected.type === "expected_error")
+          expect(expectedErrors).toContainEqual({
+            client: expected.client,
+            error: expected.error,
+          });
         if (expected.type === "client_state") {
           const snapshot = snapshots[expected.client]!;
           expect(snapshot.epoch).toBe(String(expected.epoch));
@@ -310,12 +404,57 @@ describe("named MDK scenarios against real Marmot actors", () => {
             expected.admins.map((actor) => identities.get(actor)),
           );
         if (expected.type === "convergence_decision") {
-          const client = "client" in expected ? expected.client : "alice";
-          expect(Number(groups.get(client)!.state.groupContext.epoch)).toBe(
-            expected.selected_tip_epoch,
+          const clients =
+            "client" in expected ? [expected.client] : [...groups.keys()];
+          const decisions = clients
+            .flatMap((client) => auditEvents.get(client) ?? [])
+            .map((event) => event.kind)
+            .filter(
+              (
+                kind,
+              ): kind is Extract<
+                MarmotAuditEvent["kind"],
+                { type: "convergence_decision" }
+              > =>
+                kind.type === "convergence_decision" &&
+                kind.selected_branch_id !== undefined &&
+                kind.selected_tip_digest !== undefined,
+            );
+          const liveTags = new Set([
+            ...candidateTags,
+            ...[...groups.values()].map((group) =>
+              bytesToHex(group.state.confirmationTag),
+            ),
+          ]);
+          const decision = decisions.findLast((candidate) =>
+            liveTags.has(candidate.selected_branch_id!),
+          );
+          expect(decision).toBeDefined();
+          expect(candidateTags).toContain(decision!.selected_branch_id);
+          assertDecision(decision!, expected, decision!.selected_branch_id!);
+        }
+        if (expected.type === "clients_converged") {
+          const converged = expected.clients.map(
+            (client) => snapshots[client]!,
+          );
+          expect(
+            converged.every(
+              (snapshot) => snapshot.epoch === String(expected.epoch),
+            ),
+          ).toBe(true);
+          expect(
+            converged.every(
+              (snapshot) => snapshot.leaves.length === expected.member_count,
+            ),
+          ).toBe(true);
+          expect(
+            converged.slice(1).map((snapshot) => snapshot.group_context_sha256),
+          ).toEqual(
+            converged.slice(1).map(() => converged[0]!.group_context_sha256),
           );
         }
       }
+      expect(asserted).toBe(fixture.expected_outcomes.length);
       const clientStates = fixture.expected_outcomes.filter(
         (outcome) => outcome.type === "client_state",
       );
@@ -336,4 +475,46 @@ describe("named MDK scenarios against real Marmot actors", () => {
     },
     60_000,
   );
+
+  it("rejects wrong same-epoch branch identity and decision telemetry", () => {
+    const correct = {
+      type: "convergence_decision" as const,
+      current_tip_epoch: 1,
+      max_rewind_commits: 5,
+      candidates: [],
+      selected_branch_id: "winner",
+      selected_tip_epoch: 2,
+      selected_tip_digest: "11",
+      selected_tip_committer: "22",
+      decisive_rule: "tip_committer",
+      witness_quorum_met: true,
+      app_witness_score: 2,
+    };
+    const expected = {
+      selected_tip_epoch: 2,
+      decisive_rule: "tip_committer",
+      witness_quorum_met: true,
+      min_app_witness_score: 2,
+    };
+    expect(() => assertDecision(correct, expected, "loser")).toThrow(
+      "selected branch identity mismatch",
+    );
+    expect(() =>
+      assertDecision(
+        { ...correct, decisive_rule: "tip_digest" },
+        expected,
+        "winner",
+      ),
+    ).toThrow("decisive rule mismatch");
+    expect(() =>
+      assertDecision(
+        { ...correct, witness_quorum_met: false },
+        expected,
+        "winner",
+      ),
+    ).toThrow("witness quorum mismatch");
+    expect(() =>
+      assertDecision({ ...correct, app_witness_score: 1 }, expected, "winner"),
+    ).toThrow("application witness score mismatch");
+  });
 });

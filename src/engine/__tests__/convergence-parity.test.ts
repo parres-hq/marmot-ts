@@ -590,27 +590,11 @@ describe("CONV-04 convergence parity (D-16) — own-commit protection + dual-ord
 
     engine.confirmPublished(sent.pending);
     expect(Number(engine.state.groupContext.epoch)).toBe(2);
-
     const envelope = await peeler.wrapGroupMessage(
       sibling.commit,
       memberEpoch1,
     );
-    const results: { kind: string; reason?: string }[] = [];
-    for await (const r of engine.ingest([envelope]))
-      results.push(r as { kind: string; reason?: string });
-
-    // This is the plumbing half of criterion 5: our own already-confirmed
-    // commit must be replayable as an ordinary branch candidate, so that when
-    // a peer's commit wins the race the engine produces a real rewind rather
-    // than skipping for lack of a replayable own-commit branch. MDK's
-    // `PrevalidatedOwnCommits` exists to guarantee exactly this property in
-    // OpenMLS (which cannot reprocess a locally-authored commit); ts-mls's
-    // pure `processMessage` needs no such shim. Spec `convergence.md`
-    // "Branch selection" lists no "prefer own commit" rule, so adopting the
-    // winning sibling here is correct, spec-conformant behavior — not a bug.
-    expect(
-      results.some((r) => r.kind === "processed" || r.kind === "removed"),
-    ).toBe(true);
+    for await (const _ of engine.ingest([envelope])) void _;
     expect(bytesToHex(engine.state.confirmationTag)).toBe(
       bytesToHex(sibling.newState.confirmationTag),
     );

@@ -372,10 +372,7 @@ export class MarmotGroupEngine<TEnvelope> {
    * that never clears is a received event the unlocking state never arrived for.
    */
   pendingEnvelopes(): TEnvelope[] {
-    return [
-      ...this.#pool.envelopes(),
-      ...this.#capacityRefusedInput.values(),
-    ];
+    return [...this.#pool.envelopes(), ...this.#capacityRefusedInput.values()];
   }
 
   /**
@@ -1969,7 +1966,7 @@ export class MarmotGroupEngine<TEnvelope> {
       forkEpoch,
       pool,
       encrypted,
-      witnessEnvelopes,
+      witnessEnvelopes: [...this.#delivered.envelopes(), ...witnessEnvelopes],
       currentState: this.state,
       retained: this.#retained,
       adminCallback: this.#createAdminVerificationCallback(),
@@ -1987,11 +1984,37 @@ export class MarmotGroupEngine<TEnvelope> {
     }
 
     if (resolution.outcome !== "recovered") {
+      const decision =
+        resolution.outcome === "superseded"
+          ? resolution.decision
+          : undefined;
+      const winnerTip =
+        resolution.outcome === "superseded"
+          ? resolution.winnerTip
+          : undefined;
       this.#emitAudit({
         type: "convergence_decision",
         current_tip_epoch: Number(this.state.groupContext.epoch),
         max_rewind_commits: finiteAuditNumber(this.#policy.maxRewindCommits),
-        candidates: [],
+        candidates: decision
+          ? [
+              {
+                branch_id: decision.selectedBranchId,
+                fork_epoch: forkEpoch,
+                tip_epoch: Number(winnerTip!.groupContext.epoch),
+              },
+            ]
+          : [],
+        selected_branch_id: decision?.selectedBranchId,
+        selected_fork_epoch: decision ? forkEpoch : undefined,
+        selected_tip_epoch: winnerTip
+          ? Number(winnerTip.groupContext.epoch)
+          : undefined,
+        selected_tip_digest: decision?.selectedTipDigest,
+        selected_tip_committer: decision?.selectedTipCommitter,
+        decisive_rule: decision?.decisiveRule,
+        witness_quorum_met: decision?.score.witnessQuorumMet,
+        app_witness_score: decision?.score.appWitnessScore,
         error_kinds:
           resolution.outcome === "skip" ? ["candidate_state_unavailable"] : [],
       });
@@ -2060,6 +2083,11 @@ export class MarmotGroupEngine<TEnvelope> {
       selected_branch_id: bytesToHex(resolution.winnerTip.confirmationTag),
       selected_fork_epoch: forkEpoch,
       selected_tip_epoch: Number(resolution.winnerTip.groupContext.epoch),
+      selected_tip_digest: resolution.decision?.selectedTipDigest,
+      selected_tip_committer: resolution.decision?.selectedTipCommitter,
+      decisive_rule: resolution.decision?.decisiveRule,
+      witness_quorum_met: resolution.decision?.score.witnessQuorumMet,
+      app_witness_score: resolution.decision?.score.appWitnessScore,
     });
     this.#transitionLifecycle(groupLifecycleStates.recovering, "fork_detected");
     this.#setState(resolution.winnerTip);

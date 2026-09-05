@@ -267,6 +267,11 @@ export type AuditEventKind =
       selected_branch_id?: string;
       selected_fork_epoch?: number;
       selected_tip_epoch?: number;
+      selected_tip_digest?: string;
+      selected_tip_committer?: string;
+      decisive_rule?: string;
+      witness_quorum_met?: boolean;
+      app_witness_score?: number;
       losing_branch_ids?: string[];
       error_kinds?: string[];
     }

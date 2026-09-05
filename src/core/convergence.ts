@@ -147,6 +147,8 @@ export interface BranchCandidate {
   tipEpoch: number;
   /** SHA-256 (32 bytes) of the branch's tip commit MLS message bytes. */
   tipDigest: Uint8Array;
+  /** Authenticated account identity of the tip commit's member sender. */
+  tipCommitter?: Uint8Array;
   /** App-payload witnesses that decrypt on candidate states in the branch. */
   appWitnesses: AppWitness[];
 }
@@ -158,6 +160,7 @@ export interface BranchScore {
   witnessQuorumMet: boolean;
   appWitnessScore: number;
   tipDigest: Uint8Array;
+  tipCommitter: Uint8Array;
 }
 
 function witnessesByEpoch(witnesses: AppWitness[]): Map<number, Set<string>> {
@@ -221,6 +224,7 @@ export function scoreBranch(
     witnessQuorumMet: witnessQuorumMet(branch.appWitnesses, policy),
     appWitnessScore: appWitnessScore(branch.appWitnesses, policy),
     tipDigest: branch.tipDigest,
+    tipCommitter: branch.tipCommitter ?? new Uint8Array(),
   };
 }
 
@@ -250,6 +254,8 @@ export function compareBranchScores(a: BranchScore, b: BranchScore): number {
     cmpNum(Number(a.witnessQuorumMet), Number(b.witnessQuorumMet)) ||
     cmpNum(a.validCommitDepth, b.validCommitDepth) ||
     cmpNum(a.appWitnessScore, b.appWitnessScore) ||
+    // Lower authenticated account identity wins, matching MDK.
+    compareBytes(b.tipCommitter, a.tipCommitter) ||
     // Lower tip digest wins, so invert the byte comparison.
     compareBytes(b.tipDigest, a.tipDigest)
   );

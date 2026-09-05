@@ -13,6 +13,7 @@ import {
   processMessage,
   type ProcessMessageResult,
   wireformats,
+  senderTypes,
 } from "ts-mls";
 
 import { marmotAuthService } from "../core/auth-service.js";
@@ -21,10 +22,13 @@ import {
   type AppWitness,
   type BranchCandidate,
   commitDigest,
+  compareBranchScores,
   type ConvergencePolicy,
   DEFAULT_CONVERGENCE_POLICY,
   isWitnessEligible,
+  scoreBranch,
   selectCanonicalBranch,
+  type BranchScore,
 } from "../core/convergence.js";
 import { getCredentialPubkey } from "../core/credential.js";
 import {
@@ -153,8 +157,26 @@ export type ForkResolution =
       result: ProcessMessageResult;
       /** Every branch edge built while resolving (for history retention). */
       edges: EdgeSnapshot[];
+      decision?: {
+        selectedBranchId: string;
+        selectedTipDigest: string;
+        selectedTipCommitter: string;
+        decisiveRule: string;
+        score: BranchScore;
+      };
     }
-  | { outcome: "superseded"; edges: EdgeSnapshot[] }
+  | {
+      outcome: "superseded";
+      edges: EdgeSnapshot[];
+      winnerTip?: ClientState;
+      decision?: {
+        selectedBranchId: string;
+        selectedTipDigest: string;
+        selectedTipCommitter: string;
+        decisiveRule: string;
+        score: BranchScore;
+      };
+    }
   | { outcome: "skip" };
 
 /** Inputs needed to access retained history during fork resolution. */
@@ -354,6 +376,29 @@ export class ForkRecovery<TEnvelope> {
           forkEpoch,
           tipEpoch,
           tipDigest: this.#commitDigestOf(tipMessage),
+          tipCommitter: (() => {
+            const parent = chain.at(-1)?.parent;
+            if (!parent) return new Uint8Array();
+            const sender =
+              tipMessage.wireformat === wireformats.mls_public_message &&
+              tipMessage.publicMessage.content.sender.senderType ===
+                senderTypes.member
+                ? tipMessage.publicMessage.content.sender.leafIndex
+                : undefined;
+            if (sender === undefined) return new Uint8Array();
+            try {
+              return hexToBytes(
+                getCredentialPubkey(
+                  getCredentialFromLeafIndex(
+                    parent.ratchetTree,
+                    sender as LeafIndex,
+                  ),
+                ),
+              );
+            } catch {
+              return new Uint8Array();
+            }
+          })(),
           // Drop witnesses at/before the fork epoch or outside the retained
           // app-payload window for this candidate's tip, so stale or pre-fork
           // app payloads cannot influence branch scores.
@@ -469,17 +514,42 @@ export class ForkRecovery<TEnvelope> {
     const winnerTip = winner ? tips.get(winner) : undefined;
     if (!winner || !winnerTip) return { outcome: "superseded", edges };
 
+    const winnerScore = scoreBranch(winner, this.#policy);
+    const runner = branches
+      .filter((candidate) => candidate !== winner)
+      .map((candidate) => scoreBranch(candidate, this.#policy))
+      .sort((a, b) => compareBranchScores(b, a))[0];
+    const decisiveRule = runner
+      ? winnerScore.effectiveCommitDepth !== runner.effectiveCommitDepth
+        ? "effective_commit_depth"
+        : winnerScore.witnessQuorumMet !== runner.witnessQuorumMet
+          ? "witness_quorum_met"
+          : winnerScore.appWitnessScore !== runner.appWitnessScore
+            ? "app_witness_score"
+            : bytesToHex(winnerScore.tipCommitter) !==
+                bytesToHex(runner.tipCommitter)
+              ? "tip_committer"
+              : "tip_digest"
+      : "only_candidate";
+    const decision = {
+      selectedBranchId: bytesToHex(winnerTip.confirmationTag),
+      selectedTipDigest: bytesToHex(winner.tipDigest),
+      selectedTipCommitter: bytesToHex(winnerScore.tipCommitter),
+      decisiveRule,
+      score: winnerScore,
+    };
     if (
       bytesToHex(winnerTip.confirmationTag) ===
       bytesToHex(currentState.confirmationTag)
     )
-      return { outcome: "superseded", edges };
+      return { outcome: "superseded", edges, winnerTip, decision };
 
     return {
       outcome: "recovered",
       winnerTip,
       winnerChain: chains.get(winner) ?? [],
       edges,
+      decision,
       result: {
         kind: "newState",
         newState: winnerTip,
