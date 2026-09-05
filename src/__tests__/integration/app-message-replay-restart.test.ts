@@ -11,12 +11,14 @@ import {
   unsafeTestingAuthenticationService,
 } from "ts-mls";
 import { describe, expect, it } from "vitest";
+import { PrivateKeyAccount } from "applesauce-accounts/accounts";
 
 import { createChatRumor } from "../../client/group/application-message.js";
 import { MarmotGroup } from "../../client/group/marmot-group.js";
 import type { NostrNetworkInterface } from "../../client/nostr-interface.js";
 import {
   deserializeClientState,
+  serializeClientState,
   SerializedClientState,
 } from "../../core/client-state.js";
 import { createCredential } from "../../core/credential.js";
@@ -28,6 +30,8 @@ import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { TerminalWrapperLedger } from "../../client/group/wrapper-ledger.js";
+import restartFaultFixture from "../../../refs/mdk/crates/cgka-conformance-simulator/vectors/restart-delivery-faults.v1.json";
+import { projectCanonicalConformanceSnapshot } from "../conformance/snapshot.js";
 
 const NETWORK: NostrNetworkInterface = {
   request: async () => {
@@ -55,6 +59,111 @@ async function collectKinds(gen: AsyncIterable<{ kind: string }>) {
  * wrapper is persisted independently of MLS state and suppressed on restart.
  */
 describe("application message replay across restart", () => {
+  it("executes the pinned withheld/restarted/reordered duplicate delivery exactly once", async () => {
+    const payload = restartFaultFixture.scenario.steps.find(
+      (step) => step.type === "send_app_message",
+    )?.payload;
+    expect(payload).toBe("bob:restart-delivery");
+    const expected = restartFaultFixture.expected_outcomes.find(
+      (outcome) => outcome.type === "client_state",
+    );
+
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const aliceAccount = PrivateKeyAccount.generateNew();
+    const bobAccount = PrivateKeyAccount.generateNew();
+    const carolAccount = PrivateKeyAccount.generateNew();
+    const alice = await aliceAccount.signer.getPublicKey();
+    const bob = await bobAccount.signer.getPublicKey();
+    const carol = await carolAccount.signer.getPublicKey();
+    const ctx = {
+      cipherSuite: impl,
+      authService: unsafeTestingAuthenticationService,
+    };
+    const aliceKp = await generateKeyPackage({
+      credential: createCredential(alice),
+      ciphersuiteImpl: impl,
+    });
+    const bobKp = await generateKeyPackage({
+      credential: createCredential(bob),
+      ciphersuiteImpl: impl,
+    });
+    const carolKp = await generateKeyPackage({
+      credential: createCredential(carol),
+      ciphersuiteImpl: impl,
+    });
+    const { clientState: created } = await createSimpleGroup(
+      aliceKp,
+      impl,
+      "restart-delivery-faults",
+      { adminPubkeys: [alice], relays: ["wss://relay.test"] },
+    );
+    const add = await createCommit({
+      context: ctx,
+      state: created,
+      wireAsPublicMessage: false,
+      ratchetTreeExtension: true,
+      extraProposals: [
+        {
+          proposalType: defaultProposalTypes.add,
+          add: { keyPackage: bobKp.publicPackage },
+        },
+        {
+          proposalType: defaultProposalTypes.add,
+          add: { keyPackage: carolKp.publicPackage },
+        },
+      ],
+    });
+    const bobState = await joinGroup({
+      context: ctx,
+      welcome: add.welcome!.welcome!,
+      keyPackage: bobKp.publicPackage,
+      privateKeys: bobKp.privatePackage,
+      ratchetTree: undefined,
+    });
+    const app = await createApplicationMessage({
+      context: ctx,
+      state: bobState,
+      message: serializeApplicationRumor(
+        createChatRumor({ pubkey: bob, content: payload! }),
+      ),
+    });
+    const withheld = await createGroupEvent({
+      message: app.message,
+      state: bobState,
+      ciphersuite: impl,
+    });
+    const store = new InMemoryKeyValueStore<SerializedClientState>();
+    const ingestStateStore = new InMemoryKeyValueStore<Uint8Array>();
+    const groupId = bytesToHex(add.newState.groupContext.groupId);
+    await store.setItem(groupId, serializeClientState(add.newState));
+    const restarted = new MarmotGroup(
+      deserializeClientState((await store.getItem(groupId))!),
+      {
+        store,
+        ingestStateStore,
+        signer: { getPublicKey: async () => alice } as EventSigner,
+        ciphersuite: impl,
+        network: NETWORK,
+      },
+    );
+    const results = [];
+    for await (const result of restarted.ingest([withheld, withheld]))
+      results.push(result);
+    expect(
+      results.filter((result) => result.kind === "processed"),
+    ).toHaveLength(1);
+    expect(Number(restarted.state.groupContext.epoch)).toBe(expected?.epoch);
+    const snapshot = await projectCanonicalConformanceSnapshot({
+      state: restarted.state,
+      ciphersuite: impl,
+      lifecycle: restarted.lifecycle,
+      convergenceStatus: restarted.convergenceStatus,
+    });
+    expect(snapshot.leaves).toHaveLength(expected?.member_count);
+  });
   it("recovers a prepared wrapper on either side of the canonical-state write", async () => {
     const ingestStateStore = new InMemoryKeyValueStore<Uint8Array>();
     const ledger = new TerminalWrapperLedger(ingestStateStore, "group");
