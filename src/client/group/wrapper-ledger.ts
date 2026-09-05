@@ -13,6 +13,17 @@ type StoredWrapperV2 =
   | { version: 2; state: "prepared"; priorStateHash: string }
   | { version: 2; state: "terminal"; outcome: TerminalWrapperOutcome };
 
+type StoredWrapperV3 =
+  | { version: 3; state: "prepared"; priorStateHash: string }
+  | {
+      version: 3;
+      state: "applied";
+      priorStateHash: string;
+      resultingStateHash: string;
+      outcome: TerminalWrapperOutcome;
+    }
+  | { version: 3; state: "terminal"; outcome: TerminalWrapperOutcome };
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -44,16 +55,18 @@ export class TerminalWrapperLedger {
           value.outcome === "invalidated")
       )
         return value.outcome;
-      const current = value as unknown as StoredWrapperV2;
+      const current = value as unknown as StoredWrapperV2 | StoredWrapperV3;
       if (current.version === 2 && current.state === "terminal")
         return current.outcome;
+      if (current.version === 3 && current.state === "terminal")
+        return current.outcome;
       if (
-        current.version === 2 &&
-        current.state === "prepared" &&
-        currentStateHash !== undefined &&
-        current.priorStateHash !== currentStateHash
+        current.version === 3 &&
+        current.state === "applied" &&
+        currentStateHash === current.resultingStateHash &&
+        current.resultingStateHash !== current.priorStateHash
       )
-        return "accepted";
+        return current.outcome;
     } catch {
       // Corrupt evidence is ignored; the verified wrapper remains processable.
     }
@@ -65,10 +78,30 @@ export class TerminalWrapperLedger {
     if (await this.get(eventId, priorStateHash)) return;
     const existing = await this.store.getItem(this.#key(eventId));
     if (existing) return;
-    const value: StoredWrapperV2 = {
-      version: 2,
+    const value: StoredWrapperV3 = {
+      version: 3,
       state: "prepared",
       priorStateHash,
+    };
+    await this.store.setItem(
+      this.#key(eventId),
+      encoder.encode(JSON.stringify(value)),
+    );
+  }
+
+  /** Binds recoverable application evidence to this wrapper's exact result. */
+  async stageApplied(
+    eventId: string,
+    priorStateHash: string,
+    resultingStateHash: string,
+    outcome: TerminalWrapperOutcome,
+  ): Promise<void> {
+    const value: StoredWrapperV3 = {
+      version: 3,
+      state: "applied",
+      priorStateHash,
+      resultingStateHash,
+      outcome,
     };
     await this.store.setItem(
       this.#key(eventId),
@@ -80,7 +113,7 @@ export class TerminalWrapperLedger {
     eventId: string,
     outcome: TerminalWrapperOutcome,
   ): Promise<void> {
-    const value: StoredWrapperV2 = { version: 2, state: "terminal", outcome };
+    const value: StoredWrapperV3 = { version: 3, state: "terminal", outcome };
     await this.store.setItem(
       this.#key(eventId),
       encoder.encode(JSON.stringify(value)),

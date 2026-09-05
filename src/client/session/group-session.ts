@@ -563,7 +563,6 @@ export class GroupSession<
         mapped.result.kind === "applicationMessage"
       ) {
         await this.#saveHistory(mapped.result.message);
-        this.#onApplicationMessage?.(mapped.result.message);
       }
 
       const retryableUnreadable =
@@ -573,18 +572,28 @@ export class GroupSession<
         mapped.disposition.kind !== "deferred" &&
         !retryableUnreadable;
       if (terminal) {
-        // Canonical state and fork material must be durable before terminal
-        // wrapper evidence can suppress replay after a crash.
-        await this.save(true);
-        await this.#wrapperLedger?.record(
-          mapped.event.id,
+        const outcome =
           mapped.disposition.kind === "accepted"
             ? "accepted"
             : mapped.disposition.kind === "invalidated"
               ? "invalidated"
-              : "stale",
+              : "stale";
+        await this.#wrapperLedger?.stageApplied(
+          mapped.event.id,
+          stateHash,
+          bytesToHex(sha256(serializeClientState(this.state))),
+          outcome,
         );
+        // Canonical state and fork material must be durable before terminal
+        // wrapper evidence can suppress replay after a crash.
+        await this.save(true);
+        await this.#wrapperLedger?.record(mapped.event.id, outcome);
       }
+      if (
+        mapped.kind === "processed" &&
+        mapped.result.kind === "applicationMessage"
+      )
+        this.#onApplicationMessage?.(mapped.result.message);
       for (const reconciled of await this.#reconcile(mapped)) yield reconciled;
     }
 

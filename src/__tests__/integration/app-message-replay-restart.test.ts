@@ -62,8 +62,18 @@ describe("application message replay across restart", () => {
     await ledger.begin("event", "state-before");
     // Crash before canonical state: the identical durable state retries.
     expect(await ledger.get("event", "state-before")).toBeUndefined();
-    // Crash after canonical state but before terminalization: the changed
-    // durable state proves application completed and suppresses replay.
+    // An unrelated durable state change is not evidence that this wrapper was
+    // applied and must never suppress it.
+    expect(await ledger.get("event", "unrelated-state")).toBeUndefined();
+    await ledger.stageApplied(
+      "event",
+      "state-before",
+      "state-after",
+      "accepted",
+    );
+    expect(await ledger.get("event", "unrelated-state")).toBeUndefined();
+    // Only this wrapper's exact bound result state suppresses replay after a
+    // crash between canonical persistence and terminalization.
     expect(await ledger.get("event", "state-after")).toBe("accepted");
     await ledger.record("event", "accepted");
     expect(await ledger.get("event", "state-before")).toBe("accepted");
