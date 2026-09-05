@@ -75,6 +75,7 @@ status: complete
 5. **Regression: public export snapshot** - `a4ca2ea`
 6. **Coverage: unsafe lifecycle pass gates** - `af34b3e`
 7. **Regression: resume retained input after publish lifecycle** - `d38408a`
+8. **Regression: fresh monotonic engines start settled** - `2768a20`
 
 ## Files Created/Modified
 
@@ -113,7 +114,15 @@ status: complete
 - **Verification:** focused group-engine and scheduling suites (15/15) plus strict compile.
 - **Committed in:** `d38408a`
 
-**Total deviations:** 2 auto-fixed (1 blocking regression, 1 scheduler bug). **Impact on plan:** Both fixes enforce the planned scheduling contract; no feature scope expansion.
+**3. [Rule 1 - Bug] Distinguished a fresh engine from a pass opened at monotonic time zero**
+- **Found during:** Sequential full-suite regression verification
+- **Issue:** Initializing the last-input timestamp to zero made a fresh engine appear Syncing during the first process-relative quiescence interval under `performance.now()`. Outbound calls queued with no active pass or timer to wake them, causing exact five-second test timeouts.
+- **Fix:** Represent "no convergence pass has opened" as `undefined` and derive Settled directly until the first relevant input records a monotonic timestamp.
+- **Files modified:** `src/engine/group-engine.ts`, `src/engine/__tests__/convergence-scheduling.test.ts`
+- **Verification:** sequential full suite: 83 files and 807 tests passed; focused scheduling/group-engine suites and strict compile also passed.
+- **Committed in:** `2768a20`
+
+**Total deviations:** 3 auto-fixed (1 blocking regression, 2 scheduler bugs). **Impact on plan:** All fixes enforce the planned scheduling contract; no feature scope expansion.
 
 ## Issues Encountered
 
@@ -131,8 +140,8 @@ None - no external service configuration required.
 ## Self-Check: PASSED
 
 - All key files exist.
-- All seven task/regression commits exist.
-- Focused group-engine and scheduling suites (15/15), broader convergence/client regressions, root export tests, and strict compile passed.
+- All eight task/regression commits exist.
+- Sequential full suite passed (83 files, 807 tests), along with focused scheduler checks and strict compile.
 
 ---
 *Phase: 04-feature-parity-conformance-vectors*
