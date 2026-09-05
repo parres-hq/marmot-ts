@@ -1096,6 +1096,7 @@ export class MarmotGroupEngine<TEnvelope> {
           pending.kind,
         );
         this.#stagedCommitParentEpoch = undefined;
+        this.#scheduleRetainedContinuation();
       }
     }
 
@@ -1133,6 +1134,7 @@ export class MarmotGroupEngine<TEnvelope> {
       pending.kind,
     );
     this.#stagedCommitParentEpoch = undefined;
+    this.#scheduleRetainedContinuation();
   }
 
   /**
@@ -1572,6 +1574,17 @@ export class MarmotGroupEngine<TEnvelope> {
       this.#scheduler.clearTimer(this.#settleTimer);
       this.#settleTimer = undefined;
     }
+  }
+
+  /** Wakes the owner after an unsafe publish lifecycle returns to Stable. */
+  #scheduleRetainedContinuation(): void {
+    if (!this.#onSettleCheck || this.#retainedPassInput.length === 0) return;
+    if (this.#settleTimer !== undefined)
+      this.#scheduler.clearTimer(this.#settleTimer);
+    this.#settleTimer = this.#scheduler.setTimer(0, () => {
+      this.#settleTimer = undefined;
+      void this.#onSettleCheck?.();
+    });
   }
 
   /**

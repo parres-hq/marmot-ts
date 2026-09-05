@@ -466,17 +466,25 @@ describe("MarmotGroupEngine retained-history pruning (retained-history.md)", () 
       for await (const _ of engine.ingest([envelope])) void _;
     };
 
-    // Two inbound commits advance the tip 1 -> 2 -> 3. With horizon 1 the tip at
-    // epoch 3 would normally drop epoch 1, but the staged commit pins it.
+    // PendingPublish retains inbound commits without admitting a convergence
+    // pass or mutating the canonical state.
     await memberSelfUpdate();
     await memberSelfUpdate();
-    expect(Number(engine.state.groupContext.epoch)).toBe(3);
+    expect(Number(engine.state.groupContext.epoch)).toBe(1);
+    expect(engine.retainedConvergenceInputCount).toBe(2);
     expect(retained.hasState(1)).toBe(true);
 
-    // Abandon the staged commit: the pin is released. A further inbound commit
-    // advances the tip to 4 and epoch 1, now unpinned, is pruned past the horizon.
+    // Abandon the staged commit: returning to Stable permits one deterministic
+    // continuation edge to apply the retained input. With horizon 1, epoch 1 is
+    // then unpinned and pruned once the tip reaches epoch 3.
     engine.publishFailed(staged.pending);
     expect(engine.lifecycle).toBe("Stable");
+    await engine.driveConvergence();
+    expect(Number(engine.state.groupContext.epoch)).toBe(3);
+    expect(engine.retainedConvergenceInputCount).toBe(0);
+    expect(retained.hasState(1)).toBe(false);
+
+    // A further inbound commit advances normally from the resumed tip.
     await memberSelfUpdate();
     expect(Number(engine.state.groupContext.epoch)).toBe(4);
     expect(retained.hasState(1)).toBe(false);
