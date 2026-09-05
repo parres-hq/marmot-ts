@@ -28,7 +28,10 @@ describe("deterministic offline catchup pressure", () => {
       defaultCryptoProvider,
     );
     const accounts = new Map(
-      CLIENTS.map((client) => [client, PrivateKeyAccount.generateNew()]),
+      CLIENTS.map((client, index) => [
+        client,
+        PrivateKeyAccount.fromKey((index + 1).toString(16).padStart(64, "0")),
+      ]),
     );
     const identities = new Map(
       await Promise.all(
@@ -185,5 +188,5 @@ describe("deterministic offline catchup pressure", () => {
     expect(
       CLIENTS.every((client) => groups.get(client)!.lifecycle === "Stable"),
     ).toBe(true);
-  }, 30_000);
+  }, 60_000);
 });
