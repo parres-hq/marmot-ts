@@ -89,6 +89,29 @@ export class TerminalWrapperLedger {
 }
 
 type StoredEffectVerdictV1 = { version: 1; state: "withdrawn" | "active" };
+type StoredEffectV2 = {
+  version: 2;
+  state: "pending" | "observed";
+  direction: "withdrawal" | "adoption";
+  forkEpoch?: number;
+  notifications: Array<
+    Omit<StateNotification, "commitDigest"> & { commitDigest: string }
+  >;
+};
+
+export type PendingConvergenceEffect =
+  | {
+      kind: "stateInvalidated";
+      commitDigest: Uint8Array;
+      forkEpoch: number;
+      withdrawn: StateNotification[];
+    }
+  | {
+      kind: "stateRevalidated";
+      commitDigest: Uint8Array;
+      effectId: Uint8Array;
+      notifications: StateNotification[];
+    };
 
 /** Durable observation verdicts for branch-selection withdrawal/re-adoption. */
 export class ConvergenceEffectLedger {
@@ -101,14 +124,24 @@ export class ConvergenceEffectLedger {
     return `${this.groupId}/ingest/effect/v1/${bytesToHex(digest)}`;
   }
 
-  async #read(digest: Uint8Array): Promise<StoredEffectVerdictV1 | undefined> {
-    const bytes = await this.store.getItem(this.#key(digest));
+  async #readKey(
+    key: string,
+  ): Promise<StoredEffectVerdictV1 | StoredEffectV2 | undefined> {
+    const bytes = await this.store.getItem(key);
     if (!bytes) return undefined;
     try {
-      const value = JSON.parse(decoder.decode(bytes)) as StoredEffectVerdictV1;
+      const value = JSON.parse(decoder.decode(bytes)) as
+        StoredEffectVerdictV1 | StoredEffectV2;
       if (
         value.version === 1 &&
         (value.state === "withdrawn" || value.state === "active")
+      )
+        return value;
+      if (
+        value.version === 2 &&
+        (value.state === "pending" || value.state === "observed") &&
+        (value.direction === "withdrawal" || value.direction === "adoption") &&
+        Array.isArray(value.notifications)
       )
         return value;
     } catch {
@@ -117,25 +150,117 @@ export class ConvergenceEffectLedger {
     return undefined;
   }
 
-  async #write(digest: Uint8Array, state: StoredEffectVerdictV1["state"]) {
+  async #read(digest: Uint8Array) {
+    return this.#readKey(this.#key(digest));
+  }
+
+  async #write(digest: Uint8Array, value: StoredEffectV2) {
     await this.store.setItem(
       this.#key(digest),
-      encoder.encode(JSON.stringify({ version: 1, state })),
+      encoder.encode(JSON.stringify(value)),
     );
   }
 
-  async recordWithdrawal(
+  async prepareWithdrawal(
     digest: Uint8Array,
-    _notifications: readonly StateNotification[],
+    forkEpoch: number,
+    notifications: readonly StateNotification[],
   ): Promise<boolean> {
-    if ((await this.#read(digest))?.state === "withdrawn") return false;
-    await this.#write(digest, "withdrawn");
+    const existing = await this.#read(digest);
+    if (existing?.version === 1 && existing.state === "withdrawn") return false;
+    if (existing?.version === 2 && existing.direction === "withdrawal")
+      return existing.state === "pending";
+    await this.#write(digest, {
+      version: 2,
+      state: "pending",
+      direction: "withdrawal",
+      forkEpoch,
+      notifications: notifications.map((notification) => ({
+        ...notification,
+        commitDigest: bytesToHex(notification.commitDigest),
+      })),
+    });
     return true;
   }
 
-  async recordAdoption(digest: Uint8Array): Promise<boolean> {
-    if ((await this.#read(digest))?.state !== "withdrawn") return false;
-    await this.#write(digest, "active");
+  async prepareAdoption(
+    digest: Uint8Array,
+    notifications: readonly StateNotification[],
+  ): Promise<boolean> {
+    const existing = await this.#read(digest);
+    const withdrawn =
+      (existing?.version === 1 && existing.state === "withdrawn") ||
+      (existing?.version === 2 &&
+        existing.direction === "withdrawal" &&
+        existing.state === "observed");
+    if (!withdrawn) {
+      if (existing?.version === 2 && existing.direction === "adoption")
+        return existing.state === "pending";
+      return false;
+    }
+    await this.#write(digest, {
+      version: 2,
+      state: "pending",
+      direction: "adoption",
+      notifications: notifications.map((notification) => ({
+        ...notification,
+        commitDigest: bytesToHex(notification.commitDigest),
+      })),
+    });
     return true;
+  }
+
+  async acknowledge(
+    digest: Uint8Array,
+    direction: StoredEffectV2["direction"],
+  ): Promise<void> {
+    const existing = await this.#read(digest);
+    if (
+      existing?.version !== 2 ||
+      existing.direction !== direction ||
+      existing.state !== "pending"
+    )
+      return;
+    await this.#write(digest, { ...existing, state: "observed" });
+  }
+
+  async pending(): Promise<PendingConvergenceEffect[]> {
+    const prefix = `${this.groupId}/ingest/effect/v1/`;
+    const pending: PendingConvergenceEffect[] = [];
+    for (const key of await this.store.keys()) {
+      if (!key.startsWith(prefix)) continue;
+      const value = await this.#readKey(key);
+      if (value?.version !== 2 || value.state !== "pending") continue;
+      const digest = Uint8Array.from(
+        key
+          .slice(prefix.length)
+          .match(/.{2}/g)
+          ?.map((byte) => Number.parseInt(byte, 16)) ?? [],
+      );
+      const notifications = value.notifications.map((notification) => ({
+        ...notification,
+        commitDigest: Uint8Array.from(
+          notification.commitDigest
+            .match(/.{2}/g)
+            ?.map((byte) => Number.parseInt(byte, 16)) ?? [],
+        ),
+      })) as StateNotification[];
+      pending.push(
+        value.direction === "withdrawal"
+          ? {
+              kind: "stateInvalidated",
+              commitDigest: digest,
+              forkEpoch: value.forkEpoch!,
+              withdrawn: notifications,
+            }
+          : {
+              kind: "stateRevalidated",
+              commitDigest: digest,
+              effectId: digest,
+              notifications,
+            },
+      );
+    }
+    return pending;
   }
 }

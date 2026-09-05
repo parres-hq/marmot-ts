@@ -524,6 +524,8 @@ export class GroupSession<
     events: NostrEvent[],
     options?: { maxRetries?: number },
   ): AsyncGenerator<DispositionedIngestResult> {
+    for (const pending of (await this.#effectLedger?.pending()) ?? [])
+      yield { ...pending, disposition: ingestResultDisposition(pending) };
     const selfEcho: NostrEvent[] = [];
     const rest: NostrEvent[] = [];
     const stateHash = bytesToHex(sha256(serializeClientState(this.state)));
@@ -594,8 +596,9 @@ export class GroupSession<
   ): Promise<DispositionedIngestResult[]> {
     if (!this.#effectLedger) return [result];
     if (result.kind === "stateInvalidated") {
-      return (await this.#effectLedger.recordWithdrawal(
+      return (await this.#effectLedger.prepareWithdrawal(
         result.commitDigest,
+        result.forkEpoch,
         result.withdrawn,
       ))
         ? [result]
@@ -615,7 +618,7 @@ export class GroupSession<
     const output: DispositionedIngestResult[] = [result];
     for (const group of groups.values()) {
       const digest = group[0]!.commitDigest;
-      if (await this.#effectLedger.recordAdoption(digest))
+      if (await this.#effectLedger.prepareAdoption(digest, group))
         output.push({
           kind: "stateRevalidated",
           commitDigest: digest,
@@ -625,6 +628,19 @@ export class GroupSession<
         });
     }
     return output;
+  }
+
+  /** Establishes the durable application-observation boundary for an effect. */
+  async acknowledgeConvergenceEffect(
+    result: Extract<
+      DispositionedIngestResult,
+      { kind: "stateInvalidated" | "stateRevalidated" }
+    >,
+  ): Promise<void> {
+    await this.#effectLedger?.acknowledge(
+      result.commitDigest,
+      result.kind === "stateInvalidated" ? "withdrawal" : "adoption",
+    );
   }
 
   async #saveHistory(message: Uint8Array): Promise<void> {

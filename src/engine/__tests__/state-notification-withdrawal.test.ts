@@ -175,12 +175,28 @@ describe("state notification derivation + withdrawal (CONV-03, D-10/D-11)", () =
     };
     const first = new ConvergenceEffectLedger(store, "group");
 
-    expect(await first.recordWithdrawal(digest, [notification])).toBe(true);
-    expect(await first.recordWithdrawal(digest, [notification])).toBe(false);
+    expect(await first.prepareWithdrawal(digest, 1, [notification])).toBe(true);
+    expect(await first.prepareWithdrawal(digest, 1, [notification])).toBe(true);
 
     const restarted = new ConvergenceEffectLedger(store, "group");
-    expect(await restarted.recordAdoption(digest)).toBe(true);
-    expect(await restarted.recordAdoption(digest)).toBe(false);
+    expect(await restarted.pending()).toEqual([
+      {
+        kind: "stateInvalidated",
+        commitDigest: digest,
+        forkEpoch: 1,
+        withdrawn: [notification],
+      },
+    ]);
+    await restarted.acknowledge(digest, "withdrawal");
+    expect(await restarted.pending()).toEqual([]);
+    expect(await restarted.prepareAdoption(digest, [notification])).toBe(true);
+    expect(await restarted.prepareAdoption(digest, [notification])).toBe(true);
+    expect((await restarted.pending())[0]).toMatchObject({
+      kind: "stateRevalidated",
+      commitDigest: digest,
+    });
+    await restarted.acknowledge(digest, "adoption");
+    expect(await restarted.prepareAdoption(digest, [notification])).toBe(false);
   });
   it("attributes notifications for locally confirmed commit and selfUpdate", async () => {
     const { impl, adminPubkey, adminEpoch1 } = await twoMemberEpoch1Group();
