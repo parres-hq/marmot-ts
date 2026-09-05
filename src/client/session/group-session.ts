@@ -366,6 +366,15 @@ export class GroupSession<
     return results;
   }
 
+  /** Runs one retained-input scheduler edge through the normal reconciliation seam. */
+  async driveConvergence(): Promise<DispositionedIngestResult[]> {
+    const results: DispositionedIngestResult[] = [];
+    for (const result of await this.#engine.driveConvergence())
+      results.push(...(await this.#reconcile(mapEngineIngestResult(result))));
+    await this.save();
+    return results;
+  }
+
   async destroyLocalState(): Promise<void> {
     await this.history?.purgeMessages();
     const idHex = bytesToHex(this.id);

@@ -1564,6 +1564,10 @@ export class MarmotGroupEngine<TEnvelope> {
 
   #closeConvergencePass(): void {
     this.#convergencePass = undefined;
+    this.#lastConvergenceRelevantInputMs = Math.min(
+      this.#lastConvergenceRelevantInputMs,
+      this.#now() - this.#settlementQuiescenceMs,
+    );
     if (this.#settleTimer !== undefined) {
       this.#scheduler.clearTimer(this.#settleTimer);
       this.#settleTimer = undefined;

@@ -88,6 +88,21 @@ export type {
 export { ingestResultDisposition } from "../session/group-session.js";
 
 /**
+ * Finds the first group-state commit that existed at settlement. The caller
+ * still executes it through the engine's exact authorization gate; this helper
+ * only assigns the bounded scheduling opportunity.
+ */
+export function selectFairQueuedStateIntent(
+  queue: readonly { intent: { kind: string } }[],
+  settledQueueLength: number,
+): number | undefined {
+  const limit = Math.min(queue.length, Math.max(0, settledQueueLength));
+  for (let index = 0; index < limit; index++)
+    if (queue[index]!.intent.kind === "commit") return index;
+  return undefined;
+}
+
+/**
  * The minimum interface for a group to store them MLS messages
  * Implementations should extend this with methods for querying and loading stored messages
  */
@@ -317,7 +332,9 @@ export class MarmotGroup<
 
   private log: Debugger;
 
-  override on<T extends EventEmitter.EventNames<MarmotGroupEvents<THistory, TMedia>>>(
+  override on<
+    T extends EventEmitter.EventNames<MarmotGroupEvents<THistory, TMedia>>,
+  >(
     event: T,
     fn: EventEmitter.EventListener<MarmotGroupEvents<THistory, TMedia>, T>,
     context?: unknown,
@@ -332,7 +349,9 @@ export class MarmotGroup<
     return super.on(event, fn, context);
   }
 
-  override once<T extends EventEmitter.EventNames<MarmotGroupEvents<THistory, TMedia>>>(
+  override once<
+    T extends EventEmitter.EventNames<MarmotGroupEvents<THistory, TMedia>>,
+  >(
     event: T,
     fn: EventEmitter.EventListener<MarmotGroupEvents<THistory, TMedia>, T>,
     context?: unknown,
@@ -359,9 +378,7 @@ export class MarmotGroup<
       if (!fn) {
         this.#removedListeners.length = 0;
       } else {
-        const removedFn = fn as (
-          group: MarmotGroup<THistory, TMedia>,
-        ) => void;
+        const removedFn = fn as (group: MarmotGroup<THistory, TMedia>) => void;
         for (let i = this.#removedListeners.length - 1; i >= 0; i--) {
           const listener = this.#removedListeners[i];
           if (
@@ -377,7 +394,9 @@ export class MarmotGroup<
     return super.removeListener(event, fn, context, once);
   }
 
-  override off<T extends EventEmitter.EventNames<MarmotGroupEvents<THistory, TMedia>>>(
+  override off<
+    T extends EventEmitter.EventNames<MarmotGroupEvents<THistory, TMedia>>,
+  >(
     event: T,
     fn?: EventEmitter.EventListener<MarmotGroupEvents<THistory, TMedia>, T>,
     context?: unknown,
@@ -547,7 +566,7 @@ export class MarmotGroup<
       audit: options.audit,
       auditContext: options.auditContext,
       // When the quiescence window elapses, release any queued outbound (B5).
-      onSettleCheck: () => this.#drainOutbound(),
+      onSettleCheck: () => this.#settleAndDrive(),
       onStateChanged: (newState) => this.emit("stateChanged", newState),
       onStateSaved: () => this.emit("stateSaved", this),
       onApplicationMessage: (message) =>
@@ -783,6 +802,35 @@ export class MarmotGroup<
     }
   }
 
+  /** Gives one pre-existing state intent a preparation attempt, then resumes inbound. */
+  async #settleAndDrive(): Promise<void> {
+    const settledQueueLength = this.#outboundQueue.length;
+    const fairIndex = selectFairQueuedStateIntent(
+      this.#outboundQueue,
+      settledQueueLength,
+    );
+    if (
+      fairIndex !== undefined &&
+      mayReleaseOutbound(this.session.convergenceStatus, this.lifecycle)
+    ) {
+      const [item] = this.#outboundQueue.splice(fairIndex, 1);
+      try {
+        item!.resolve(await this.#sendNow(item!.intent));
+      } catch (error) {
+        // The attempt is consumed even when authorization/signing/preparation
+        // fails; reject its caller and continue rather than pinning liveness.
+        item!.reject(error);
+      }
+    }
+
+    const resumed = await this.session.driveConvergence();
+    for (const result of resumed) {
+      await this.#applyRemovalWithdrawal(result);
+      if (result.kind === "removed") await this.#realizeRemovalIfNeeded();
+    }
+    if (resumed.length === 0) await this.#drainOutbound();
+  }
+
   /** Rejects and clears every queued outbound intent (teardown / removal). */
   #rejectQueuedOutbound(reason: string): void {
     if (this.#outboundQueue.length === 0) return;
@@ -844,8 +892,7 @@ export class MarmotGroup<
   #emitRemovedSafely(): void {
     for (const listener of [...this.#removedListeners]) {
       // EventEmitter3 removes one-shot listeners before invoking them.
-      if (listener.once)
-        this.off("removed", listener.fn, undefined, true);
+      if (listener.once) this.off("removed", listener.fn, undefined, true);
       try {
         listener.fn.call(listener.context, this);
       } catch (error) {
