@@ -2,6 +2,7 @@ import manifestJson from "../../../refs/mdk/crates/cgka-conformance-simulator/ve
 import { readFileSync } from "node:fs";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { describe, expect, it } from "vitest";
+import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
 
 import { decodeNostrRoutingV1 } from "../../core/components/nostr-routing.js";
 import {
@@ -9,6 +10,11 @@ import {
   validateConformanceManifest,
 } from "./manifest.js";
 import { MockNetwork } from "../helpers/mock-network.js";
+import { createCredential } from "../../core/credential.js";
+import { createSimpleGroup } from "../../core/group.js";
+import { generateKeyPackage } from "../../core/key-package.js";
+import { MarmotGroup } from "../../client/group/marmot-group.js";
+import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { MarmotConformanceSubject, parseMdkScenarioStep } from "./subject.js";
 
 const VECTORS_ROOT = "refs/mdk/crates/cgka-conformance-simulator/vectors";
@@ -56,7 +62,14 @@ describe("portable MDK conformance smoke corpus", () => {
           scenarioId: entry.id,
           groups: new Map(),
           network: new MockNetwork(),
-          capabilities: new Set(),
+          capabilities: new Set([
+            "group_mutation",
+            "application_messaging",
+            "transport_delivery",
+            "virtual_time",
+            "observation",
+            "crash_reopen",
+          ]),
           now: () => 0,
           advanceTime: () => {},
           restart: async () => {
@@ -65,6 +78,10 @@ describe("portable MDK conformance smoke corpus", () => {
         });
         for (const rawStep of fixture.scenario.steps) {
           const action = parseMdkScenarioStep(rawStep);
+          if (action.type !== "scenario_operation") {
+            expect(subject.support(action)).toBeUndefined();
+            continue;
+          }
           const result = await subject.execute(action);
           expect(result).toMatchObject({
             kind: "unsupported",
@@ -81,5 +98,63 @@ describe("portable MDK conformance smoke corpus", () => {
     expect([...represented].sort()).toEqual(
       portable.map((entry) => entry.id).sort(),
     );
+  });
+
+  it("advertises and executes the supported behavioral Scenario IR surface", async () => {
+    const ciphersuite = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const pubkey = "a".repeat(64);
+    const keyPackage = await generateKeyPackage({
+      credential: createCredential(pubkey),
+      ciphersuiteImpl: ciphersuite,
+    });
+    const { clientState } = await createSimpleGroup(
+      keyPackage,
+      ciphersuite,
+      "behavioral-smoke",
+      { adminPubkeys: [pubkey], relays: ["wss://mock-relay.test"] },
+    );
+    const network = new MockNetwork();
+    network.autoDeliver = false;
+    const group = new MarmotGroup(clientState, {
+      store: new InMemoryKeyValueStore(),
+      ingestStateStore: new InMemoryKeyValueStore<Uint8Array>(),
+      signer: { getPublicKey: async () => pubkey } as never,
+      ciphersuite,
+      network,
+    });
+    const subject = new MarmotConformanceSubject({
+      scenarioId: "behavioral-smoke/v1",
+      groups: new Map([["alice", group]]),
+      identities: new Map([["alice", pubkey]]),
+      network,
+      capabilities: new Set([
+        "group_mutation",
+        "application_messaging",
+        "transport_delivery",
+        "observation",
+      ]),
+      now: () => 1_000,
+      advanceTime: () => {},
+      restart: async () => group,
+    });
+    const steps = [
+      {
+        type: "create_group",
+        creator: "alice",
+        name: "behavioral-smoke",
+        invitees: [],
+      },
+      { type: "send_app_message", sender: "alice", payload: "hello" },
+      { type: "deliver_all" },
+      { type: "tick", clients: ["alice"] },
+      { type: "observe_exact", clients: ["alice"] },
+    ];
+    for (const step of steps)
+      expect(await subject.execute(parseMdkScenarioStep(step))).toMatchObject({
+        kind: "supported",
+      });
   });
 });
