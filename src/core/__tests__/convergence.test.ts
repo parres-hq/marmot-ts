@@ -45,6 +45,7 @@ describe("convergence policy", () => {
       maxRewindCommits: 5,
       appPayloadPastEpochLimit: 5,
       settlementQuiescenceMs: 1000,
+      maxConvergencePassMs: 5000,
       witnessQuorumSendersPerEpoch: 2,
       witnessQuorumEpochs: 1,
       maxWitnessOverrideDepth: 1,
@@ -61,6 +62,7 @@ describe("convergence policy", () => {
     expect(policy.policyVersion).toBe(1);
     expect(policy.appPayloadPastEpochLimit).toBe(5);
     expect(policy.settlementQuiescenceMs).toBe(1000);
+    expect(policy.maxConvergencePassMs).toBe(5000);
   });
 });
 

@@ -8,6 +8,36 @@ import type {
   Proposal,
 } from "ts-mls";
 
+/** Immutable timing identity for one bounded convergence collection pass. */
+export interface ConvergencePassState {
+  readonly generation: number;
+  readonly openedAtMs: number;
+  readonly deadlineMs: number;
+  readonly lastRelevantInputMs: number;
+}
+
+/** Opens a pass from one monotonic-clock sample. */
+export function openConvergencePass(
+  nowMs: number,
+  maxDurationMs: number,
+  generation: number,
+): ConvergencePassState {
+  return {
+    generation,
+    openedAtMs: nowMs,
+    deadlineMs: nowMs + maxDurationMs,
+    lastRelevantInputMs: nowMs,
+  };
+}
+
+/** Restarts quiescence without changing a pass's identity or absolute deadline. */
+export function refreshConvergencePass(
+  pass: ConvergencePassState,
+  nowMs: number,
+): ConvergencePassState {
+  return { ...pass, lastRelevantInputMs: nowMs };
+}
+
 import type { MarmotGroupView } from "../core/client-state.js";
 import type { DeferredReason, Disposition } from "../core/inbound.js";
 import type { StateNotification } from "./state-notifications.js";

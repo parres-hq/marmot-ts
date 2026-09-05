@@ -43,6 +43,8 @@ export interface ConvergencePolicy {
    * state machine itself (B5) is not yet wired.
    */
   settlementQuiescenceMs: number;
+  /** Maximum duration (ms) of one immutable convergence collection window. */
+  maxConvergencePassMs: number;
   /** Distinct senders needed for one branch epoch to count toward witness quorum. */
   witnessQuorumSendersPerEpoch: number;
   /** Number of branch epochs that MUST meet sender quorum. */
@@ -60,10 +62,30 @@ export const DEFAULT_CONVERGENCE_POLICY: ConvergencePolicy = {
   maxRewindCommits: 5,
   appPayloadPastEpochLimit: 5,
   settlementQuiescenceMs: 1000,
+  maxConvergencePassMs: 5000,
   witnessQuorumSendersPerEpoch: 2,
   witnessQuorumEpochs: 1,
   maxWitnessOverrideDepth: 1,
 };
+
+/** Input accepted from pre-bounded-pass callers that omit the v1 field. */
+export type CompatibleConvergencePolicy = Omit<
+  ConvergencePolicy,
+  "maxConvergencePassMs"
+> &
+  Partial<Pick<ConvergencePolicy, "maxConvergencePassMs">>;
+
+/** Supplies the pinned v1 pass bound when decoding/configuring older policy input. */
+export function normalizeConvergencePolicy(
+  policy: CompatibleConvergencePolicy,
+): ConvergencePolicy {
+  return {
+    ...policy,
+    maxConvergencePassMs:
+      policy.maxConvergencePassMs ??
+      DEFAULT_CONVERGENCE_POLICY.maxConvergencePassMs,
+  };
+}
 
 /**
  * Validates the witness-override invariant: a witness-quorum boost must never be

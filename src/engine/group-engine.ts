@@ -55,6 +55,7 @@ import {
   type ConvergencePolicy,
   DEFAULT_CONVERGENCE_POLICY,
   isWitnessEligible,
+  normalizeConvergencePolicy,
   selectCanonicalBranch,
   validateConvergencePolicy,
 } from "../core/convergence.js";
@@ -62,6 +63,7 @@ import {
   canTransitionLifecycle,
   type GroupLifecycleState,
   groupLifecycleStates,
+  mayApplyRetainedInbound,
   mayPrepareLocalCommit,
   transitionLifecycle,
 } from "../core/group-lifecycle.js";
@@ -112,6 +114,7 @@ import type {
 } from "./own-commit-stamp.js";
 import type {
   AutoCommitIngestResult,
+  ConvergencePassState,
   DispositionedIngestResult,
   GroupPeeler,
   IngestResult,
@@ -120,6 +123,7 @@ import type {
   SendIntent,
   SendResult,
 } from "./types.js";
+import { openConvergencePass, refreshConvergencePass } from "./types.js";
 
 /**
  * Thrown by {@link MarmotGroupEngine.send} (`case "commit"`) when a removal
@@ -194,7 +198,7 @@ export type MarmotGroupEngineOptions<TEnvelope> = {
    * Set `maxRewindCommits` to `Infinity` to never expire old forks (the full
    * history tree retains everything regardless). Validated on construction.
    */
-  convergencePolicy?: ConvergencePolicy;
+  convergencePolicy?: import("../core/convergence.js").CompatibleConvergencePolicy;
   /**
    * Tuning for the persistent ingestion pool — undecryptable events held and
    * retried as the history tree grows, instead of being dropped. Defaults to a
@@ -202,8 +206,8 @@ export type MarmotGroupEngineOptions<TEnvelope> = {
    */
   ingestionPool?: IngestionPoolOptions;
   /**
-   * Injectable wall-clock (ms) for the convergence-status quiescence window
-   * (B5). Defaults to `Date.now`; tests pass a fake clock for determinism.
+   * Injectable monotonic clock (ms) for bounded convergence passes. Defaults
+   * to `performance.now()`; tests pass a fake clock for determinism.
    */
   now?: () => number;
   /**
@@ -301,6 +305,11 @@ export class MarmotGroupEngine<TEnvelope> {
   #lastPassUnresolved = false;
   /** Whether the last convergence pass hit a blocking (missing-anchor) error. */
   #lastPassBlocked = false;
+  /** Active immutable collection pass, retained until its cutoff. */
+  #convergencePass: ConvergencePassState | undefined;
+  #nextPassGeneration = 1;
+  /** Input retained while lifecycle gates admission or a prior pass reaches cutoff. */
+  readonly #retainedPassInput: TEnvelope[] = [];
 
   /** Injectable timer for the settle-check (B5). */
   readonly #scheduler: ConvergenceScheduler;
@@ -315,14 +324,16 @@ export class MarmotGroupEngine<TEnvelope> {
     this.ciphersuite = options.ciphersuite;
     this.peeler = options.peeler;
     this.#onStateChanged = options.onStateChanged;
-    this.#now = options.now ?? (() => Date.now());
+    this.#now = options.now ?? (() => performance.now());
     this.#settlementQuiescenceMs =
       options.settlementQuiescenceMs ??
       DEFAULT_CONVERGENCE_POLICY.settlementQuiescenceMs;
     this.#scheduler = options.scheduler ?? DEFAULT_SCHEDULER;
     this.#onSettleCheck = options.onSettleCheck;
 
-    this.#policy = options.convergencePolicy ?? DEFAULT_CONVERGENCE_POLICY;
+    this.#policy = normalizeConvergencePolicy(
+      options.convergencePolicy ?? DEFAULT_CONVERGENCE_POLICY,
+    );
     validateConvergencePolicy(this.#policy);
     this.#retained =
       options.retained ?? new RetainedHistoryStore(options.state, this.#policy);
@@ -502,6 +513,29 @@ export class MarmotGroupEngine<TEnvelope> {
       hasUnresolvedInput: this.#lastPassUnresolved,
       hasBlockingError: this.#lastPassBlocked,
     });
+  }
+
+  /** Snapshot of the active immutable pass, exposed for scheduler diagnostics. */
+  get convergencePass(): ConvergencePassState | undefined {
+    return this.#convergencePass && { ...this.#convergencePass };
+  }
+
+  /** Number of envelopes retained but not yet admitted to a convergence pass. */
+  get retainedConvergenceInputCount(): number {
+    return this.#retainedPassInput.length;
+  }
+
+  /** Opens or refreshes the current collection pass from the monotonic clock. */
+  admitConvergencePass(): ConvergencePassState {
+    const nowMs = this.#now();
+    this.#convergencePass = this.#convergencePass
+      ? refreshConvergencePass(this.#convergencePass, nowMs)
+      : openConvergencePass(
+          nowMs,
+          this.#policy.maxConvergencePassMs,
+          this.#nextPassGeneration++,
+        );
+    return { ...this.#convergencePass };
   }
 
   /** Executes a local send intent and returns the wrapped transport envelope. */
@@ -1111,6 +1145,18 @@ export class MarmotGroupEngine<TEnvelope> {
     envelopes: TEnvelope[],
     options?: { maxRetries?: number },
   ): AsyncGenerator<DispositionedIngestResult<TEnvelope>> {
+    if (!mayApplyRetainedInbound(this.#lifecycle)) {
+      this.#retainedPassInput.push(...envelopes);
+      return;
+    }
+    if (
+      this.#convergencePass &&
+      this.#now() >= this.#convergencePass.deadlineMs
+    ) {
+      this.#retainedPassInput.push(...envelopes);
+      this.#closeConvergencePass();
+      return;
+    }
     // Track this batch's convergence signal (B5): whether it carried any
     // convergence-relevant input (commits / fork material), whether anything was
     // left undispositioned (a deferred commit ⇒ Resolving), and whether it hit a
@@ -1161,7 +1207,9 @@ export class MarmotGroupEngine<TEnvelope> {
     // of pure application messages or lone proposals MUST NOT reset the
     // quiescence window or overwrite the last pass's status inputs.
     if (convergenceRelevant) {
-      this.#lastConvergenceRelevantInputMs = this.#now();
+      const nowMs = this.#now();
+      this.#lastConvergenceRelevantInputMs = nowMs;
+      this.admitConvergencePass();
       this.#lastPassUnresolved = unresolved;
       this.#lastPassBlocked = blocked;
       // The window just reset; arm the settle-check so queued outbound is
@@ -1182,6 +1230,29 @@ export class MarmotGroupEngine<TEnvelope> {
       this.#emitIngestOutcome(dispositioned);
       yield dispositioned;
     }
+  }
+
+  /**
+   * Admits retained input into a later pass once lifecycle and the prior fixed
+   * deadline permit it. Each call is a deterministic one-shot scheduler edge.
+   */
+  async driveConvergence(): Promise<DispositionedIngestResult<TEnvelope>[]> {
+    if (!mayApplyRetainedInbound(this.#lifecycle)) return [];
+    if (this.#convergencePass) {
+      const cutoffMs = Math.min(
+        this.#convergencePass.deadlineMs,
+        this.#convergencePass.lastRelevantInputMs +
+          this.#settlementQuiescenceMs,
+      );
+      if (this.#now() < cutoffMs) return [];
+      this.#closeConvergencePass();
+    }
+    if (this.#retainedPassInput.length === 0) return [];
+    const retained = this.#retainedPassInput.splice(0);
+    this.admitConvergencePass();
+    const results: DispositionedIngestResult<TEnvelope>[] = [];
+    for await (const result of this.ingest(retained)) results.push(result);
+    return results;
   }
 
   /**
@@ -1475,13 +1546,28 @@ export class MarmotGroupEngine<TEnvelope> {
       this.#scheduler.clearTimer(this.#settleTimer);
       this.#settleTimer = undefined;
     }
-    const elapsed = this.#now() - this.#lastConvergenceRelevantInputMs;
-    const delay = Math.max(0, this.#settlementQuiescenceMs - elapsed);
+    const nowMs = this.#now();
+    const quiescenceAt =
+      this.#lastConvergenceRelevantInputMs + this.#settlementQuiescenceMs;
+    const cutoffAt = this.#convergencePass
+      ? Math.min(quiescenceAt, this.#convergencePass.deadlineMs)
+      : quiescenceAt;
+    const delay = Math.max(0, cutoffAt - nowMs);
     this.#settleTimer = this.#scheduler.setTimer(delay, () => {
       this.#settleTimer = undefined;
+      if (this.#convergencePass && this.#now() >= cutoffAt)
+        this.#closeConvergencePass();
       // Fire-and-forget; the owner's drain handles and logs its own errors.
       void this.#onSettleCheck?.();
     });
+  }
+
+  #closeConvergencePass(): void {
+    this.#convergencePass = undefined;
+    if (this.#settleTimer !== undefined) {
+      this.#scheduler.clearTimer(this.#settleTimer);
+      this.#settleTimer = undefined;
+    }
   }
 
   /**
