@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 2
+open_count: 3
 waived_count: 0
 fixed_count: 0
-total_count: 2
-last_updated: 2026-09-02T16:32:47.191Z
+total_count: 3
+last_updated: 2026-09-05T15:54:48.522Z
 ---
 
 # Broken Windows Ledger
@@ -17,6 +17,7 @@ last_updated: 2026-09-02T16:32:47.191Z
 |----|-------|------|------|------|-------------|--------|--------|-------------|-------------|
 | 1 | 03.1 | unrun-verify | src/__tests__/exports.test.ts |  | Full suite otherwise passed; pre-existing export snapshot drift remains assigned to plan 03.1-08 | open |  | 2026-09-02T14:52:14.235Z |  |
 | 2 | 03.1 | deviation | .planning/STATE.md |  | Corrected stale 11/11 state position to 12/14 after state.advance-plan misclassified the phase as complete | open |  | 2026-09-02T16:32:47.191Z |  |
+| 3 | 04 | deviation | src/__tests__/conformance/manifest.ts |  | Executable vector path validation distinguishes scenario vectors from inventory-only formal records | open |  | 2026-09-05T15:54:48.522Z |  |
 
 ````json
 [
@@ -42,6 +43,18 @@ last_updated: 2026-09-02T16:32:47.191Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-02T16:32:47.191Z",
+    "resolved_at": null
+  },
+  {
+    "id": 3,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "src/__tests__/conformance/manifest.ts",
+    "line": null,
+    "description": "Executable vector path validation distinguishes scenario vectors from inventory-only formal records",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-05T15:54:48.522Z",
     "resolved_at": null
   }
 ]

@@ -5,15 +5,15 @@ milestone_name: Phase 1)
 current_phase: 04
 current_phase_name: Feature Parity & Conformance Vectors
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-09-05T15:38:16.593Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-09-05T15:54:49.337Z"
 last_activity: 2026-09-05
 last_activity_desc: Phase 04 execution started
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 39
-  completed_plans: 37
+  completed_plans: 38
   percent: 57
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-21)
 ## Current Position
 
 Phase: 04 (Feature Parity & Conformance Vectors) — EXECUTING
-Plan: 6 of 7
+Plan: 7 of 7
 Status: Ready to execute
 Last activity: 2026-09-05 — Phase 04 execution started
 
-Progress: [██████████] 95% (7 phases)
+Progress: [██████████] 97% (7 phases)
 
 **Next recommended run:** `/gsd-execute-phase 03.1`
 
@@ -100,6 +100,7 @@ _Updated after each plan completion_
 | Phase 04 P03 | 10min | 2 tasks | 9 files |
 | Phase 04 P04 | 14min | 2 tasks | 13 files |
 | Phase 04 P05 | 8min | 2 tasks | 8 files |
+| Phase 04 P06 | 7min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04-04]: Use the producing commit digest as both revalidation identity and durable effect-ledger key.
 - [Phase ?]: [Phase 04-05]: Use performance.now as the default monotonic clock and sample it once when a convergence pass opens.
 - [Phase ?]: [Phase 04-05]: Give the fairness slot only to commit intents already queued at settlement; reuse the engine authorization seam.
+- [Phase ?]: [Phase 04-06]: Only scenario_vector records expose loadable root-contained artifacts; other upstream manifest records remain strict inventory.
+- [Phase ?]: [Phase 04-06]: Canonical snapshots hash public GroupContext encoder bytes and a domain-separated MLS exporter commitment.
 
 ### Pending Todos
 
@@ -229,7 +232,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-05T15:38:16.573Z
-Stopped at: Completed 04-05-PLAN.md
+Last session: 2026-09-05T15:54:49.314Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file:
 None
