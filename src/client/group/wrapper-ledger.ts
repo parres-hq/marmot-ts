@@ -9,6 +9,10 @@ type StoredTerminalWrapperV1 = {
   outcome: TerminalWrapperOutcome;
 };
 
+type StoredWrapperV2 =
+  | { version: 2; state: "prepared"; priorStateHash: string }
+  | { version: 2; state: "terminal"; outcome: TerminalWrapperOutcome };
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -23,7 +27,10 @@ export class TerminalWrapperLedger {
     return `${this.groupId}/ingest/wrapper/v1/${eventId}`;
   }
 
-  async get(eventId: string): Promise<TerminalWrapperOutcome | undefined> {
+  async get(
+    eventId: string,
+    currentStateHash?: string,
+  ): Promise<TerminalWrapperOutcome | undefined> {
     const bytes = await this.store.getItem(this.#key(eventId));
     if (!bytes) return undefined;
     try {
@@ -37,17 +44,43 @@ export class TerminalWrapperLedger {
           value.outcome === "invalidated")
       )
         return value.outcome;
+      const current = value as unknown as StoredWrapperV2;
+      if (current.version === 2 && current.state === "terminal")
+        return current.outcome;
+      if (
+        current.version === 2 &&
+        current.state === "prepared" &&
+        currentStateHash !== undefined &&
+        current.priorStateHash !== currentStateHash
+      )
+        return "accepted";
     } catch {
       // Corrupt evidence is ignored; the verified wrapper remains processable.
     }
     return undefined;
   }
 
+  /** Records the durable pre-apply side of the ingest transaction. */
+  async begin(eventId: string, priorStateHash: string): Promise<void> {
+    if (await this.get(eventId, priorStateHash)) return;
+    const existing = await this.store.getItem(this.#key(eventId));
+    if (existing) return;
+    const value: StoredWrapperV2 = {
+      version: 2,
+      state: "prepared",
+      priorStateHash,
+    };
+    await this.store.setItem(
+      this.#key(eventId),
+      encoder.encode(JSON.stringify(value)),
+    );
+  }
+
   async record(
     eventId: string,
     outcome: TerminalWrapperOutcome,
   ): Promise<void> {
-    const value: StoredTerminalWrapperV1 = { version: 1, outcome };
+    const value: StoredWrapperV2 = { version: 2, state: "terminal", outcome };
     await this.store.setItem(
       this.#key(eventId),
       encoder.encode(JSON.stringify(value)),

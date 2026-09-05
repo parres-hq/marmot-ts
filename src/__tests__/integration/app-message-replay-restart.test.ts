@@ -27,6 +27,7 @@ import {
 import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
+import { TerminalWrapperLedger } from "../../client/group/wrapper-ledger.js";
 
 const NETWORK: NostrNetworkInterface = {
   request: async () => {
@@ -54,6 +55,20 @@ async function collectKinds(gen: AsyncIterable<{ kind: string }>) {
  * wrapper is persisted independently of MLS state and suppressed on restart.
  */
 describe("application message replay across restart", () => {
+  it("recovers a prepared wrapper on either side of the canonical-state write", async () => {
+    const ingestStateStore = new InMemoryKeyValueStore<Uint8Array>();
+    const ledger = new TerminalWrapperLedger(ingestStateStore, "group");
+
+    await ledger.begin("event", "state-before");
+    // Crash before canonical state: the identical durable state retries.
+    expect(await ledger.get("event", "state-before")).toBeUndefined();
+    // Crash after canonical state but before terminalization: the changed
+    // durable state proves application completed and suppresses replay.
+    expect(await ledger.get("event", "state-after")).toBe("accepted");
+    await ledger.record("event", "accepted");
+    expect(await ledger.get("event", "state-before")).toBe("accepted");
+  });
+
   it("does not re-process a terminal wrapper when the ingest ledger is reloaded", async () => {
     const impl: CiphersuiteImpl = await getCiphersuiteImpl(
       "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",

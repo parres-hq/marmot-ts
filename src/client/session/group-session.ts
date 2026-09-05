@@ -2,6 +2,7 @@
 import type { NostrEvent } from "applesauce-core/helpers/event";
 import type { CiphersuiteImpl, ClientState, Proposal } from "ts-mls";
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { sha256 } from "@noble/hashes/sha2.js";
 
 import {
   getMarmotGroupView,
@@ -336,12 +337,12 @@ export class GroupSession<
     if (!force && !this.#dirty && !treeDirty) return;
 
     const idHex = bytesToHex(this.id);
-    const stateBytes = serializeClientState(this.state);
-    await this.store.setItem(idHex, stateBytes);
     // Persist the full-fork history tree — the single source for fork recovery
     // across restarts. Append-only flush of any new nodes (O(new nodes)). The
     // bounded convergence window is rebuilt from the tree on load.
     if (this.rewindStore) await this.#engine.history.flush();
+    const stateBytes = serializeClientState(this.state);
+    await this.store.setItem(idHex, stateBytes);
     this.#dirty = false;
     this.#onStateSaved?.();
   }
@@ -525,11 +526,15 @@ export class GroupSession<
   ): AsyncGenerator<DispositionedIngestResult> {
     const selfEcho: NostrEvent[] = [];
     const rest: NostrEvent[] = [];
+    const stateHash = bytesToHex(sha256(serializeClientState(this.state)));
 
     for (const event of events) {
-      if (await this.#wrapperLedger?.get(event.id)) continue;
+      if (await this.#wrapperLedger?.get(event.id, stateHash)) continue;
       if (this.#sentEventIds.delete(event.id)) selfEcho.push(event);
-      else rest.push(event);
+      else {
+        await this.#wrapperLedger?.begin(event.id, stateHash);
+        rest.push(event);
+      }
     }
 
     for (const event of selfEcho) {
@@ -561,11 +566,14 @@ export class GroupSession<
 
       const retryableUnreadable =
         mapped.kind === "unreadable" && mapped.decryptFailure === true;
-      if (
+      const terminal =
         "event" in mapped &&
         mapped.disposition.kind !== "deferred" &&
-        !retryableUnreadable
-      ) {
+        !retryableUnreadable;
+      if (terminal) {
+        // Canonical state and fork material must be durable before terminal
+        // wrapper evidence can suppress replay after a crash.
+        await this.save(true);
         await this.#wrapperLedger?.record(
           mapped.event.id,
           mapped.disposition.kind === "accepted"
