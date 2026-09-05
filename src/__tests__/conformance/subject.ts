@@ -253,22 +253,37 @@ export class MarmotConformanceSubject {
           const group = this.requireGroup(client);
           const cursor = this.#deliveryCursor.get(client) ?? 0;
           const events = this.options.network.events.slice(cursor);
+          const batchOutputs: Array<{
+            identity: string;
+            kind: string;
+            value: string;
+            observed: boolean;
+          }> = [];
           for await (const result of group.ingest(events)) {
             if (
               result.kind === "processed" &&
               result.result.kind === "applicationMessage"
             ) {
               const rumor = deserializeApplicationRumor(result.result.message);
-              const outputs = this.#outputs.get(client) ?? [];
-              outputs.push({
+              batchOutputs.push({
                 identity: rumor.id,
                 kind: "message",
                 value: rumor.content,
                 observed: true,
               });
-              this.#outputs.set(client, outputs);
             }
           }
+          // Preserve the fixture's tick/batch order, while canonicalizing the
+          // independent messages surfaced by one ingest/retry pass.
+          batchOutputs.sort(
+            (left, right) =>
+              left.value.localeCompare(right.value) ||
+              left.identity.localeCompare(right.identity),
+          );
+          this.#outputs.set(client, [
+            ...(this.#outputs.get(client) ?? []),
+            ...batchOutputs,
+          ]);
           this.#deliveryCursor.set(client, this.options.network.events.length);
         }
         return { kind: "supported", action: action.type };
