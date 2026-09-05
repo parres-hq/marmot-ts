@@ -24,7 +24,16 @@ import {
 
 type Envelope = { id: string };
 
-async function fixture(now: () => number) {
+async function fixture(
+  now: () => number,
+  scheduling?: {
+    scheduler: {
+      setTimer(delayMs: number, callback: () => void): unknown;
+      clearTimer(handle: unknown): void;
+    };
+    onSettleCheck: () => void | Promise<void>;
+  },
+) {
   const admin = "a".repeat(64);
   const ciphersuite = await getCiphersuiteImpl(
     "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
@@ -61,6 +70,8 @@ async function fixture(now: () => number) {
     ciphersuite,
     now,
     settlementQuiescenceMs: 1_000,
+    scheduler: scheduling?.scheduler,
+    onSettleCheck: scheduling?.onSettleCheck,
     peeler: {
       async peelGroupMessages(envelopes) {
         return {
@@ -133,6 +144,39 @@ describe("bounded convergence scheduling", () => {
     expect(resumed.length).toBeGreaterThan(0);
     expect(engine.retainedConvergenceInputCount).toBe(0);
     expect(engine.convergencePass?.generation).toBe(2);
+  });
+
+  it("re-arms an immediate continuation when deadline-edge ingest cancels the pass timer", async () => {
+    let nowMs = 100;
+    const timers = new Map<number, { delayMs: number; callback: () => void }>();
+    let nextTimer = 1;
+    let wakeups = 0;
+    const { engine, makeCommit } = await fixture(() => nowMs, {
+      scheduler: {
+        setTimer(delayMs, callback) {
+          const handle = nextTimer++;
+          timers.set(handle, { delayMs, callback });
+          return handle;
+        },
+        clearTimer(handle) {
+          timers.delete(handle as number);
+        },
+      },
+      onSettleCheck() {
+        wakeups += 1;
+      },
+    });
+    engine.admitConvergencePass();
+
+    nowMs = 5_100;
+    for await (const _ of engine.ingest([await makeCommit("deadline-edge")])) {
+      // The expired pass retains this input and yields nothing.
+    }
+
+    expect(engine.retainedConvergenceInputCount).toBe(1);
+    expect([...timers.values()].map((timer) => timer.delayMs)).toEqual([0]);
+    [...timers.values()][0]!.callback();
+    expect(wakeups).toBe(1);
   });
 
   it("retains inbound while PendingPublish without opening a pass", async () => {

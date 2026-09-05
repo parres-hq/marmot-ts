@@ -1164,6 +1164,7 @@ export class MarmotGroupEngine<TEnvelope> {
     ) {
       this.#retainedPassInput.push(...envelopes);
       this.#closeConvergencePass();
+      this.#scheduleRetainedContinuation();
       return;
     }
     // Track this batch's convergence signal (B5): whether it carried any
