@@ -178,17 +178,17 @@ describe("Rust MDK proof-v2 round-trip fixture (generated once, pinned)", () => 
   });
   // Fixed inputs used to generate the fixture (see comment above).
   const RUST_FIXTURE_ACCOUNT_IDENTITY_HEX =
-    "67d3ed702d55d4c049de6e43ead43a9b9cf1b4976f40a7357673b1acbf8f34b0";
+    proofV2Rust.account_identity_hex;
   const RUST_FIXTURE_MLS_SIGNATURE_KEY_HEX =
-    "9f228d14a7609599c4971bd0f65f43ae7d00b0a50ccfc021e95ca7fd825197ac";
-  const RUST_FIXTURE_CIPHERSUITE = 1;
-  const RUST_FIXTURE_SIGNATURE_SCHEME = 2055;
+    proofV2Rust.mls_signature_key_hex;
+  const RUST_FIXTURE_CIPHERSUITE = proofV2Rust.ciphersuite;
+  const RUST_FIXTURE_SIGNATURE_SCHEME = proofV2Rust.signature_scheme;
 
   // Rust-produced outputs to reproduce/verify.
   const RUST_FIXTURE_EVENT_ID_HEX =
-    "29e15f6d6dacb28ba1a806829ec7016709cad47cd998eb620558d7df0a39ec18";
+    proofV2Rust.event_id_hex;
   const RUST_FIXTURE_SIGNATURE_HEX =
-    "c0a3944043456dad09411928f77c317a4134d8ebbe8353b3cf07695d31159842b4a7a172790fe55f4b9653e999a29e3b0827a862bbd1a143f57d7a5f0f92e13f";
+    proofV2Rust.signature_hex;
 
   function fixtureRequest(): AccountIdentityProofRequest {
     return {
@@ -238,6 +238,22 @@ describe("Rust MDK proof-v2 round-trip fixture (generated once, pinned)", () => 
     expect(() =>
       verifyLeafAccountIdentityProof(leaf, RUST_FIXTURE_CIPHERSUITE),
     ).not.toThrow();
+  });
+
+  it("rejects the Rust signature after canonical signed-event mutation", () => {
+    const req = fixtureRequest();
+    const mutated = {
+      ...req,
+      mlsSignaturePublicKey: Uint8Array.from(req.mlsSignaturePublicKey),
+    };
+    mutated.mlsSignaturePublicKey[0] ^= 1;
+    expect(
+      schnorr.verify(
+        hexToBytes(RUST_FIXTURE_SIGNATURE_HEX),
+        accountIdentityProofSigningDigest(mutated),
+        mutated.accountIdentity,
+      ),
+    ).toBe(false);
   });
 
   it("round-trips the pinned account-identity/mls-key/version fields through encode/decode", () => {

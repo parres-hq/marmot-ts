@@ -1,0 +1,10 @@
+{
+  "source": "refs/mdk crates/cgka-engine account_identity_proof.rs",
+  "version": 2,
+  "account_identity_hex": "67d3ed702d55d4c049de6e43ead43a9b9cf1b4976f40a7357673b1acbf8f34b0",
+  "mls_signature_key_hex": "9f228d14a7609599c4971bd0f65f43ae7d00b0a50ccfc021e95ca7fd825197ac",
+  "ciphersuite": 1,
+  "signature_scheme": 2055,
+  "event_id_hex": "29e15f6d6dacb28ba1a806829ec7016709cad47cd998eb620558d7df0a39ec18",
+  "signature_hex": "c0a3944043456dad09411928f77c317a4134d8ebbe8353b3cf07695d31159842b4a7a172790fe55f4b9653e999a29e3b0827a862bbd1a143f57d7a5f0f92e13f"
+}
