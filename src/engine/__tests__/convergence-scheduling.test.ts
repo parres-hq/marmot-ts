@@ -17,6 +17,10 @@ import { generateKeyPackage } from "../../core/key-package.js";
 import { marmotAuthService } from "../../core/auth-service.js";
 import { MarmotGroupEngine } from "../group-engine.js";
 import { selectFairQueuedStateIntent } from "../../client/group/marmot-group.js";
+import {
+  groupLifecycleStates,
+  mayApplyRetainedInbound,
+} from "../../core/group-lifecycle.js";
 
 type Envelope = { id: string };
 
@@ -136,6 +140,10 @@ describe("bounded convergence scheduling", () => {
     expect(results).toHaveLength(0);
     expect(engine.convergencePass).toBeUndefined();
     expect(engine.retainedConvergenceInputCount).toBe(1);
+    expect(mayApplyRetainedInbound(groupLifecycleStates.pendingPublish)).toBe(
+      false,
+    );
+    expect(mayApplyRetainedInbound(groupLifecycleStates.merging)).toBe(false);
   });
 
   it("selects exactly one pre-existing group-state intent for fairness", () => {
