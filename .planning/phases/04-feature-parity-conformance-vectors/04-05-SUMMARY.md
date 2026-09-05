@@ -74,6 +74,7 @@ status: complete
 4. **Task 2 GREEN: settlement fairness and resumed inbound** - `b037d94`
 5. **Regression: public export snapshot** - `a4ca2ea`
 6. **Coverage: unsafe lifecycle pass gates** - `af34b3e`
+7. **Regression: resume retained input after publish lifecycle** - `d38408a`
 
 ## Files Created/Modified
 
@@ -104,7 +105,15 @@ status: complete
 - **Verification:** `CI=true npx --yes pnpm@10.18.3 vitest run src/__tests__/exports.test.ts`
 - **Committed in:** `a4ca2ea`
 
-**Total deviations:** 1 auto-fixed (1 blocking regression). **Impact on plan:** Required contract pinning only; no feature scope expansion.
+**2. [Rule 1 - Bug] Woke retained continuation after publish lifecycle settlement**
+- **Found during:** Post-wave retained-history regression verification
+- **Issue:** PendingPublish correctly retained inbound work, but confirmation/failure did not wake the owner after returning to Stable, so retained work could remain dormant.
+- **Fix:** Schedule a zero-delay owner wake when a publish lifecycle settles with retained input, and update the pruning regression to assert no mutation while unsafe followed by deterministic continuation in Stable.
+- **Files modified:** `src/engine/group-engine.ts`, `src/engine/__tests__/group-engine.test.ts`
+- **Verification:** focused group-engine and scheduling suites (15/15) plus strict compile.
+- **Committed in:** `d38408a`
+
+**Total deviations:** 2 auto-fixed (1 blocking regression, 1 scheduler bug). **Impact on plan:** Both fixes enforce the planned scheduling contract; no feature scope expansion.
 
 ## Issues Encountered
 
@@ -122,8 +131,8 @@ None - no external service configuration required.
 ## Self-Check: PASSED
 
 - All key files exist.
-- All six task/regression commits exist.
-- Focused scheduling tests, broader convergence/client regressions, root export tests, and strict compile passed.
+- All seven task/regression commits exist.
+- Focused group-engine and scheduling suites (15/15), broader convergence/client regressions, root export tests, and strict compile passed.
 
 ---
 *Phase: 04-feature-parity-conformance-vectors*
