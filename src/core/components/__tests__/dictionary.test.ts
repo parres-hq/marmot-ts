@@ -26,6 +26,7 @@ import {
   getMessageRetention,
   getNostrRouting,
   groupAvatarUrlEntry,
+  groupLifecycleEntry,
   groupProfileEntry,
   makeAppComponentsExtension,
   messageRetentionEntry,
@@ -45,7 +46,7 @@ import { makeLeafAppComponentsExtension } from "../dictionary.js";
 import { createCredential } from "../../credential.js";
 import { generateKeyPackage } from "../../key-package.js";
 import { createGroup } from "../../group.js";
-import { getMarmotGroupView } from "../../client-state.js";
+import { getMarmotGroupInfo, getMarmotGroupView } from "../../client-state.js";
 
 const gid = new Uint8Array(32);
 for (let i = 0; i < 32; i++) gid[i] = i;
@@ -230,5 +231,31 @@ describe("group lifecycle defaults", () => {
         },
       })?.protocolLifecycle,
     ).toBeUndefined();
+
+    expect(groupLifecycleEntry(groupProtocolLifecycleValues.disbanded)).toEqual(
+      {
+        componentId: GROUP_LIFECYCLE_COMPONENT_ID,
+        data: new Uint8Array([1]),
+      },
+    );
+
+    const malformedExtensions = extensionsWith(
+      groupProfileEntry({ name: "Malformed Group", description: "" }),
+      adminPolicyEntry([creatorPubkey]),
+      componentEntry(GROUP_LIFECYCLE_COMPONENT_ID, new Uint8Array([0, 0])),
+    );
+    const malformedState = {
+      ...clientState,
+      groupContext: {
+        ...clientState.groupContext,
+        extensions: malformedExtensions,
+      },
+    };
+    expect(getMarmotGroupView(malformedState)).toBeNull();
+    expect(
+      getMarmotGroupInfo(malformedState).app.components.find(
+        (component) => component.id === GROUP_LIFECYCLE_COMPONENT_ID,
+      )?.decodeError,
+    ).toBeDefined();
   });
 });
