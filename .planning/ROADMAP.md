@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Commit Integrity & Convergence Parity** - App-component integrity, admin/leaf coupling, SelfEvicted, notification withdrawal, own-commit protection (all 7 plans executed; completion held through 3 code-review rounds — see 03-REVIEW.md. The CR-08/CR-11 own-commit convergence defect class has moved to Phase 4 for a structural fix; Phase 3's remaining scope is its local findings CR-12/CR-13/CR-14, the round-1 carry-forwards, and WR-24's stale MIP citations) (completed 2026-09-01)
 - [x] **Phase 3.1: Phase 3 Review Closure** (INSERTED) - Close the 30 open findings from 03-REVIEW.md round 3; excludes CR-08/CR-11, which moved to Phase 4 (completed 2026-09-02)
 - [x] **Phase 4: Feature Parity & Conformance Vectors** - SafeAAD advertisement, MDK's own test vectors as cross-impl tests, and the own-commit convergence stamp port that closes CR-08/CR-11 (completed 2026-09-05)
-- [ ] **Phase 4.1: Terminal Group Disbanding** (INSERTED) - New `marmot.group.lifecycle.v1` `disbanded` component and its forced `Stable → Recovering` admission rule
+- [x] **Phase 4.1: Terminal Group Disbanding** (INSERTED) - New `marmot.group.lifecycle.v1` `disbanded` component and its forced `Stable → Recovering` admission rule (completed 2026-09-06)
 - [ ] **Phase 5: Quality Gate** - Green suite on every supported runtime; byte-exact MDK cross-checks recorded
 
 ## Phase Details
@@ -318,7 +318,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Inbound Trust & Wire Boundary         | 4/4            | Complete    | 2026-07-22 |
 | 3. Commit Integrity & Convergence Parity | 11/11 | Complete    | 2026-09-01 |
 | 4. Feature Parity & Conformance Vectors  | 7/7 | Complete    | 2026-09-05 |
-| 4.1. Terminal Group Disbanding           | 6/6 | In Progress|  |
+| 4.1. Terminal Group Disbanding           | 6/6 | Complete    | 2026-09-06 |
 | 5. Quality Gate                          | 0/TBD          | Not started | -          |
 
 ## Backlog
