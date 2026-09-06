@@ -893,6 +893,7 @@ export async function* ingestEnvelopes<TEnvelope>(
             envelope: rep.envelope,
             message: rep.message,
             notifications: resolution.notifications,
+            selectedTerminal: resolution.selectedTerminal,
           };
         }
         for (let i = 1; i < retainedPool.length; i++)

@@ -25,12 +25,20 @@ import { MarmotGroupEngine } from "../../engine/group-engine.js";
 import { GroupHistoryTree } from "../../engine/history-tree.js";
 import type { RetainedHistoryStore } from "../../engine/retained-store.js";
 import type { DisbandRequest } from "../../engine/disband-request.js";
+import { disbandRequestKey } from "../../engine/disband-request.js";
+import {
+  decodeDisbandTombstone,
+  disbandTombstoneKey,
+  encodeDisbandTombstone,
+  type DisbandTombstone,
+} from "../../engine/disband-tombstone.js";
 import { ingestResultDisposition as engineIngestResultDisposition } from "../../engine/ingest-disposition.js";
 import type {
   DispositionedIngestResult as EngineDispositionedIngestResult,
   IngestResult as EngineIngestResult,
   PendingState,
   ProposalContext,
+  DisbandCandidateEvidence,
 } from "../../engine/types.js";
 import type { StateNotification } from "../../engine/state-notifications.js";
 import type { GenericKeyValueStore } from "../../utils/key-value.js";
@@ -219,6 +227,8 @@ export class GroupSession<
 
   #groupData: MarmotGroupView | null = null;
   #dirty = false;
+  #terminalTombstone: DisbandTombstone | undefined;
+  readonly #terminalHydrated: Promise<void>;
 
   readonly #onStateChanged?: (state: ClientState) => void;
   readonly #onStateSaved?: () => void;
@@ -279,6 +289,7 @@ export class GroupSession<
     // flush on the next save.
     if (this.rewindStore && !options.historyTree)
       this.#engine.history.bindStore(this.rewindStore);
+    this.#terminalHydrated = this.#hydrateDisbandTombstone();
   }
 
   get id(): Uint8Array {
@@ -343,6 +354,8 @@ export class GroupSession<
   }
 
   async save(force = false): Promise<void> {
+    await this.#terminalHydrated;
+    if (this.#terminalTombstone) return;
     // The history tree can grow without the canonical state changing — a fork
     // whose incoming branch is superseded still records the losing branch — so
     // a dirty tree must trigger a save even when `#dirty` (state-changed) is not.
@@ -395,6 +408,70 @@ export class GroupSession<
     await this.#removedMarkerStore?.removeItem(`${idHex}/removed`);
     await this.store.removeItem(idHex);
     if (this.rewindStore) await GroupHistoryTree.purge(this.rewindStore, idHex);
+  }
+
+  /** Returns authoritative terminal evidence, failing closed on corrupt bytes. */
+  async disbandTombstone(): Promise<DisbandTombstone | undefined> {
+    await this.#terminalHydrated;
+    return this.#terminalTombstone;
+  }
+
+  /**
+   * Commits selected terminal evidence before repeatable cleanup. The first
+   * durable write is authoritative even if any later store operation fails.
+   */
+  async persistSelectedDisband(
+    evidence: DisbandCandidateEvidence,
+  ): Promise<DisbandTombstone> {
+    await this.#terminalHydrated;
+    if (this.#terminalTombstone) return this.#terminalTombstone;
+    if (!this.lifecycleStore)
+      throw new Error("Selected disband requires a lifecycle store");
+
+    const idHex = bytesToHex(this.id);
+    const tombstone: DisbandTombstone = {
+      groupId: this.id.slice(),
+      selectedEpoch: Number(this.state.groupContext.epoch),
+      commitDigest: evidence.commitDigest.slice(),
+      actorPubkey: evidence.actorPubkey,
+      notificationState: "pending",
+    };
+    // The terminal write is the commit point. Everything below is idempotent
+    // cleanup and is resumed by hydration after an interrupted attempt.
+    await this.lifecycleStore.setItem(
+      disbandTombstoneKey(idHex),
+      encodeDisbandTombstone(tombstone),
+    );
+    this.#terminalTombstone = tombstone;
+    await this.#cleanupAfterDisband(idHex);
+    return tombstone;
+  }
+
+  async #hydrateDisbandTombstone(): Promise<void> {
+    if (!this.lifecycleStore) return;
+    const idHex = bytesToHex(this.id);
+    const bytes = await this.lifecycleStore.getItem(disbandTombstoneKey(idHex));
+    if (!bytes) return;
+    const tombstone = decodeDisbandTombstone(bytes);
+    if (bytesToHex(tombstone.groupId) !== idHex)
+      throw new Error("Invalid disband tombstone group id");
+    this.#terminalTombstone = tombstone;
+    await this.#cleanupAfterDisband(idHex);
+  }
+
+  async #cleanupAfterDisband(idHex: string): Promise<void> {
+    this.#engine.dispose();
+    await this.history?.purgeMessages();
+    await this.lifecycleStore?.removeItem(disbandRequestKey(idHex));
+    await this.#removedMarkerStore?.removeItem(`${idHex}/removed`);
+    await this.store.removeItem(idHex);
+    if (this.rewindStore) await GroupHistoryTree.purge(this.rewindStore, idHex);
+    if (this.ingestStateStore) {
+      for (const key of await this.ingestStateStore.keys())
+        if (key.startsWith(`${idHex}/`))
+          await this.ingestStateStore.removeItem(key);
+    }
+    this.#dirty = false;
   }
 
   /** Releases engine resources (the settle-check timer); call on teardown (B5). */
@@ -624,6 +701,9 @@ export class GroupSession<
 
     for await (const result of this.#engine.ingest(rest, options)) {
       const mapped = mapEngineIngestResult(result);
+
+      if (mapped.kind === "processed" && mapped.selectedTerminal)
+        await this.persistSelectedDisband(mapped.selectedTerminal);
 
       if (
         mapped.kind === "processed" &&

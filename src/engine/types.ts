@@ -157,6 +157,8 @@ export type ProcessedIngestResult<TEnvelope> = {
    * `commitDigest`, which is the only correct way to attribute it.
    */
   notifications?: StateNotification[];
+  /** Authenticated terminal evidence, present only after canonical selection. */
+  selectedTerminal?: DisbandCandidateEvidence;
 };
 
 /** A commit rejected by the admin-verification callback. */
