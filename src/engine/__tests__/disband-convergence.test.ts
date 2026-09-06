@@ -295,6 +295,8 @@ describe("bounded disband convergence", () => {
       throw new Error("expected disband candidate");
 
     const beforeEpoch = Number(observer.state.groupContext.epoch);
+    const ordinaryPass = observer.admitConvergencePass();
+    nowMs = 500;
     const yielded = [];
     for await (const result of observer.ingest([candidate.envelope]))
       yielded.push(result);
@@ -309,9 +311,10 @@ describe("bounded disband convergence", () => {
       lastRelevantInputMs: 100,
       baseEpoch: beforeEpoch,
     });
+    expect(observer.convergencePass).toEqual(ordinaryPass);
     const openedPass = observer.convergencePass;
 
-    nowMs = 500;
+    nowMs = 700;
     for await (const _ of observer.ingest([candidate.envelope])) {
       // Duplicate terminal evidence has no scheduler effect.
     }

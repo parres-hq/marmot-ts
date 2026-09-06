@@ -2379,10 +2379,11 @@ export class MarmotGroupEngine<TEnvelope> {
     } catch (error) {
       this.#log()("terminal candidate tree retention failed: %o", error);
     }
-    const nowMs = this.#now();
-    if (!this.#convergencePass) this.#passOpenedWallMs = this.#wallNow();
-    this.#lastConvergenceRelevantInputMs = nowMs;
-    this.admitConvergencePass();
+    if (!this.#convergencePass) {
+      this.#passOpenedWallMs = this.#wallNow();
+      const pass = this.admitConvergencePass();
+      this.#lastConvergenceRelevantInputMs = pass.lastRelevantInputMs;
+    }
     if (this.#lifecycle === groupLifecycleStates.stable)
       this.#transitionLifecycle(
         groupLifecycleStates.recovering,
