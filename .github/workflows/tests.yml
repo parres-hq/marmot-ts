@@ -33,6 +33,11 @@ jobs:
         with:
           version: 10
 
+      - name: Report runtime versions
+        run: |
+          node --version
+          pnpm --version
+
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
@@ -52,6 +57,9 @@ jobs:
 
       - name: Run tests
         run: pnpm vitest run
+
+      - name: Run extended conformance tests
+        run: pnpm conformance:extended
 
   test-deno:
     name: Test on Deno ${{ matrix.deno-version }}
@@ -77,6 +85,11 @@ jobs:
         with:
           version: 10
 
+      - name: Report runtime versions
+        run: |
+          deno --version
+          pnpm --version
+
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
@@ -96,6 +109,9 @@ jobs:
 
       - name: Run tests with Deno
         run: deno run -A --node-modules-dir=auto npm:vitest run
+
+      - name: Run extended conformance tests with Deno
+        run: deno run -A --node-modules-dir=auto npm:vitest run --config vitest.extended.config.ts
 
   test-bun:
     name: Test on Bun ${{ matrix.bun-version }}
@@ -121,6 +137,12 @@ jobs:
         with:
           version: 10
 
+      - name: Report runtime versions
+        run: |
+          bun --version
+          bun --revision
+          pnpm --version
+
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
@@ -140,3 +162,6 @@ jobs:
 
       - name: Run tests with Bun
         run: bun run vitest run
+
+      - name: Run extended conformance tests with Bun
+        run: bun run vitest run --config vitest.extended.config.ts
