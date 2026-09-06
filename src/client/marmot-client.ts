@@ -104,6 +104,12 @@ export type MarmotClientOptions<
   capabilities?: Capabilities;
   /** The backend to store and load the groups from */
   groupStateStore: GenericKeyValueStore<SerializedClientState>;
+  /**
+   * Durable backend for group lifecycle intent and terminal records. When
+   * omitted, lifecycle records share {@link groupStateStore} through a
+   * disband-key-scoped adapter.
+   */
+  lifecycleStore?: GenericKeyValueStore<Uint8Array>;
   /** Durable terminal-wrapper and convergence-effect evidence. */
   ingestStateStore?: GenericKeyValueStore<Uint8Array>;
   /**
@@ -212,6 +218,9 @@ export class MarmotClient<
     const verifyEvent = options.verifyEvent ?? defaultVerifyEvent;
     const ingestStateStore =
       options.ingestStateStore ?? new InMemoryKeyValueStore<Uint8Array>();
+    const lifecycleStore =
+      options.lifecycleStore ??
+      lifecycleStoreFromGroupState(options.groupStateStore);
     this.ingestPersistence = options.ingestStateStore
       ? { kind: "durable" }
       : { kind: "ephemeral", reason: "ingest_state_store_omitted" };
@@ -234,6 +243,7 @@ export class MarmotClient<
     this.groups = new GroupsManager<THistory, TMedia>({
       store: options.groupStateStore,
       ingestStateStore,
+      lifecycleStore,
       ingestPersistence: this.ingestPersistence,
       rewindStore: options.rewindStore,
       removedMarkerStore: options.removedMarkerStore,
@@ -443,4 +453,22 @@ export class MarmotClient<
 
     return { group };
   }
+}
+
+function lifecycleStoreFromGroupState(
+  store: GenericKeyValueStore<SerializedClientState>,
+): GenericKeyValueStore<Uint8Array> {
+  const isLifecycleKey = (key: string) => key.includes("/disband/");
+  return {
+    getItem: (key) => store.getItem(key),
+    setItem: (key, value) => store.setItem(key, value),
+    removeItem: (key) => store.removeItem(key),
+    async clear() {
+      for (const key of await store.keys())
+        if (isLifecycleKey(key)) await store.removeItem(key);
+    },
+    async keys() {
+      return (await store.keys()).filter(isLifecycleKey);
+    },
+  };
 }

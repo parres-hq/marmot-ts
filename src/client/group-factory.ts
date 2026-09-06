@@ -31,6 +31,7 @@ export type GroupFactoryOptions<
 > = {
   store: GenericKeyValueStore<SerializedClientState>;
   ingestStateStore: GenericKeyValueStore<Uint8Array>;
+  lifecycleStore: GenericKeyValueStore<Uint8Array>;
   /** Dedicated store for the per-group rewind-history blob (optional). */
   rewindStore?: GenericKeyValueStore<Uint8Array>;
   /**
@@ -70,6 +71,7 @@ export class GroupFactory<
 > {
   readonly #store: GenericKeyValueStore<SerializedClientState>;
   readonly #ingestStateStore: GenericKeyValueStore<Uint8Array>;
+  readonly #lifecycleStore: GenericKeyValueStore<Uint8Array>;
   readonly #rewindStore?: GenericKeyValueStore<Uint8Array>;
   readonly #removedMarkerStore?: GenericKeyValueStore<boolean>;
   readonly #signer: EventSigner;
@@ -86,6 +88,7 @@ export class GroupFactory<
   constructor(options: GroupFactoryOptions<THistory, TMedia>) {
     this.#store = options.store;
     this.#ingestStateStore = options.ingestStateStore;
+    this.#lifecycleStore = options.lifecycleStore;
     this.#rewindStore = options.rewindStore;
     this.#removedMarkerStore = options.removedMarkerStore;
     this.#convergencePolicy = options.convergencePolicy;
@@ -144,6 +147,7 @@ export class GroupFactory<
       ciphersuite: ciphersuiteImpl,
       store: this.#store,
       ingestStateStore: this.#ingestStateStore,
+      lifecycleStore: this.#lifecycleStore,
       rewindStore: this.#rewindStore,
       removedMarkerStore: this.#removedMarkerStore,
       convergencePolicy: this.#convergencePolicy,

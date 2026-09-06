@@ -206,6 +206,7 @@ export class GroupSession<
   readonly store: GenericKeyValueStore<SerializedClientState>;
   readonly rewindStore?: GenericKeyValueStore<Uint8Array>;
   readonly ingestStateStore?: GenericKeyValueStore<Uint8Array>;
+  readonly lifecycleStore?: GenericKeyValueStore<Uint8Array>;
   readonly #removedMarkerStore?: GenericKeyValueStore<boolean>;
   readonly history: THistory;
 
@@ -229,6 +230,7 @@ export class GroupSession<
     this.store = options.store;
     this.rewindStore = options.rewindStore;
     this.ingestStateStore = options.ingestStateStore;
+    this.lifecycleStore = options.lifecycleStore ?? options.ingestStateStore;
     this.#removedMarkerStore = options.removedMarkerStore;
     this.history = options.history as THistory;
     this.#onStateChanged = options.onStateChanged;
@@ -263,7 +265,7 @@ export class GroupSession<
       onSettleCheck: options.onSettleCheck,
       audit: options.audit,
       auditContext: options.auditContext,
-      lifecycleStore: options.lifecycleStore ?? options.ingestStateStore,
+      lifecycleStore: this.lifecycleStore,
       onStateChanged: (newState) => {
         this.#dirty = true;
         this.#groupData = null;

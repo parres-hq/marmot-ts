@@ -151,6 +151,8 @@ export type MarmotGroupOptions<
 > = {
   /** The key-value backend where serialized group state bytes are persisted */
   store: GenericKeyValueStore<SerializedClientState>;
+  /** Durable group lifecycle request and terminal record backend. */
+  lifecycleStore?: GenericKeyValueStore<Uint8Array>;
   /**
    * Dedicated backend for the rewind-history blob (one entry per group). When
    * provided, the convergence rewind window survives a restart. Optional —
@@ -553,6 +555,7 @@ export class MarmotGroup<
       ciphersuite: this.ciphersuite,
       store: this.store,
       ingestStateStore: options.ingestStateStore,
+      lifecycleStore: options.lifecycleStore,
       rewindStore: options.rewindStore,
       removedMarkerStore: options.removedMarkerStore,
       retained: options.retained,

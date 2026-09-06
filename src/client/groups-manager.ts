@@ -112,6 +112,7 @@ export type GroupsManagerOptions<
   /** The backend storing serialized group state bytes */
   store: GenericKeyValueStore<SerializedClientState>;
   ingestStateStore: GenericKeyValueStore<Uint8Array>;
+  lifecycleStore: GenericKeyValueStore<Uint8Array>;
   ingestPersistence: IngestPersistenceCapability;
   /**
    * Dedicated backend for the per-group rewind-history blob. When provided, the
@@ -259,6 +260,7 @@ export class GroupsManager<
     this.#registry = new GroupRegistry<THistory, TMedia>({
       store: options.store,
       ingestStateStore: options.ingestStateStore,
+      lifecycleStore: options.lifecycleStore,
       rewindStore: options.rewindStore,
       removedMarkerStore: options.removedMarkerStore,
       convergencePolicy: options.convergencePolicy,
@@ -275,6 +277,7 @@ export class GroupsManager<
     this.#factory = new GroupFactory<THistory, TMedia>({
       store: options.store,
       ingestStateStore: options.ingestStateStore,
+      lifecycleStore: options.lifecycleStore,
       rewindStore: options.rewindStore,
       removedMarkerStore: options.removedMarkerStore,
       convergencePolicy: options.convergencePolicy,
