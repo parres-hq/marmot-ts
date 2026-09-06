@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://internet-privacy.github.io/marmot-ts/quality-dossier-v1.schema.json",
+  "title": "marmot-ts quality dossier evidence block",
+  "schema_version": 1,
+  "evidence_markers": {
+    "start": "<!-- quality-dossier-evidence:start -->",
+    "end": "<!-- quality-dossier-evidence:end -->"
+  },
+  "dossiers": ["proof-v2", "key-package-lifetime", "tag-cardinality", "safe-aad"],
+  "required_paths": [
+    "schema_version",
+    "dossier",
+    "provenance.tested_source_sha",
+    "provenance.marmot_sha",
+    "provenance.mdk_sha",
+    "provenance.lockfile_sha256",
+    "environment.detached_worktree",
+    "environment.node_version",
+    "environment.pnpm_version",
+    "environment.install_command",
+    "environment.install_result",
+    "environment.post_install_lockfile_sha256",
+    "verification.compile_command",
+    "verification.compile_result",
+    "verification.build_command",
+    "verification.build_result",
+    "verification.rust_command",
+    "verification.rust_output_or_digest",
+    "verification.fixture_diff_result",
+    "verification.typescript_command",
+    "verification.typescript_output",
+    "oracle.generator_language",
+    "oracle.generator_path",
+    "oracle.subject_language",
+    "oracle.subject_paths",
+    "oracle.independence",
+    "negative_control.command",
+    "negative_control.result"
+  ],
+  "conditional_required_paths": {
+    "tag-cardinality": ["oracle.source_classification"],
+    "key-package-lifetime": ["review.b4649c01_sha", "review.b4649c01_result"],
+    "safe-aad": ["review.b4649c01_sha", "review.b4649c01_result"]
+  }
+}
