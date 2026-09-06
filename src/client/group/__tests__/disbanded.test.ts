@@ -101,6 +101,54 @@ async function fixture() {
 }
 
 describe("public disband terminal contract", () => {
+  it("repairs a missing registry shell after the tombstone write and survives two restarts", async () => {
+    const { group, lifecycleStore, store, network, pubkey } = await fixture();
+    await group.save(true);
+    let failShell = true;
+    const faultStore = {
+      getItem: (key: string) => lifecycleStore.getItem(key),
+      setItem: async (key: string, value: Uint8Array) => {
+        if (failShell && key.endsWith("/disband/registry-state")) {
+          failShell = false;
+          throw new Error("injected registry shell crash");
+        }
+        return lifecycleStore.setItem(key, value);
+      },
+      removeItem: (key: string) => lifecycleStore.removeItem(key),
+      clear: () => lifecycleStore.clear(),
+      keys: () => lifecycleStore.keys(),
+    };
+    const crashing = new MarmotGroup(group.state, {
+      store,
+      lifecycleStore: faultStore,
+      signer: { getPublicKey: async () => pubkey } as EventSigner,
+      ciphersuite: group.ciphersuite,
+      network,
+    });
+    await expect(
+      crashing.session.persistSelectedDisband({
+        actorPubkey: pubkey,
+        commitDigest: COMMIT_DIGEST,
+        parentTag: "parent",
+        sourceEpoch: 0,
+        terminalOutcome: "disbanded",
+      }),
+    ).rejects.toThrow("injected registry shell crash");
+
+    const options = {
+      store,
+      ingestStateStore: new InMemoryKeyValueStore<Uint8Array>(),
+      lifecycleStore,
+      signer: { getPublicKey: async () => pubkey } as EventSigner,
+      network,
+    };
+    const first = new GroupRegistry(options);
+    expect((await first.get(group.id)).status).toBe("disbanded");
+    first.untrack(group.id);
+    const second = new GroupRegistry(options);
+    expect((await second.get(group.id)).status).toBe("disbanded");
+  });
+
   it("discovers and loads a scrubbed terminal facade after live-state cleanup", async () => {
     const { group, lifecycleStore, store, network, pubkey } = await fixture();
     await group.session.persistSelectedDisband({
