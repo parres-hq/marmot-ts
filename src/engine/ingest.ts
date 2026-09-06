@@ -677,7 +677,7 @@ export async function* ingestEnvelopes<TEnvelope>(
         callback: capture.callback,
       });
 
-      const capturedProposals = capture.take();
+      const capturedCommit = capture.take();
 
       if (result.kind === "newState") {
         if (result.actionTaken === "reject") {
@@ -705,7 +705,8 @@ export async function* ingestEnvelopes<TEnvelope>(
         const violation = validateCommitLegality({
           parentState,
           resultingState: result.newState,
-          proposals: capturedProposals,
+          proposals: capturedCommit.proposals,
+          committerLeafIndex: capturedCommit.committerLeafIndex,
         });
         if (violation) {
           log(

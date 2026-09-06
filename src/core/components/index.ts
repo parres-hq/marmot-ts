@@ -9,5 +9,6 @@ export * from "./avatar-url.js";
 export * from "./encrypted-media.js";
 export * from "./agent-text-stream.js";
 export * from "./group-lifecycle.js";
+export * from "./disband-validation.js";
 export * from "./dictionary.js";
 export * from "./integrity.js";

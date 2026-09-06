@@ -5,12 +5,14 @@ import {
   getAppDataDictionary,
   GroupContextExtension,
   Proposal,
+  ProposalWithSender,
 } from "ts-mls";
 
 import { getAdminPolicy, getAppComponents } from "./dictionary.js";
 import { getGroupMemberPubkeys } from "../group-members.js";
 import { APP_COMPONENTS_COMPONENT_ID, AppComponentId } from "./ids.js";
 import { bytesEqual } from "./bytes.js";
+import { classifyDisbandCommit, type DisbandClassification } from "./disband-validation.js";
 
 /**
  * Ported commit-legality validators for the Marmot app-component layer.
@@ -27,7 +29,9 @@ import { bytesEqual } from "./bytes.js";
 
 /** The reason a commit was found to violate a ported MDK commit-legality rule. */
 export type CommitIntegrityViolationReason =
-  "component-integrity" | "admin-leaf-coupling";
+  | "component-integrity"
+  | "admin-leaf-coupling"
+  | "disband-legality";
 
 /**
  * A typed, non-throwing violation returned by {@link validateAppComponentIntegrity},
@@ -270,9 +274,14 @@ export function validateAdminLeafCoupling(args: {
 export function validateCommitLegality(args: {
   parentState: ClientState;
   resultingState: ClientState;
-  proposals: readonly Proposal[];
+  proposals: readonly (Proposal | ProposalWithSender)[];
+  committerLeafIndex?: number;
 }): CommitIntegrityViolation | undefined {
-  const appDataUpdateOps = collectAppDataUpdateOps(args.proposals);
+  const proposalsWithSenders: ProposalWithSender[] = args.proposals.map((item) =>
+    "proposal" in item ? item : { proposal: item, senderLeafIndex: undefined },
+  );
+  const proposals = proposalsWithSenders.map(({ proposal }) => proposal);
+  const appDataUpdateOps = collectAppDataUpdateOps(proposals);
 
   // The `app_components` (0x0001) bytes are attacker-influenceable: an admin
   // can land an AppDataUpdate writing arbitrary bytes to that id (Rule 3
@@ -303,6 +312,15 @@ export function validateCommitLegality(args: {
     requiredIds,
   });
   if (integrityViolation) return integrityViolation;
+
+  const disband: DisbandClassification = classifyDisbandCommit({
+    parentState: args.parentState,
+    resultingState: args.resultingState,
+    proposals: proposalsWithSenders,
+    committerLeafIndex: args.committerLeafIndex,
+  });
+  if (disband.kind === "violation")
+    return { reason: "disband-legality", detail: disband.detail };
 
   const resultingMemberAccounts = getGroupMemberPubkeys(args.resultingState);
 

@@ -6,7 +6,7 @@ import {
   type ClientState,
   type IncomingMessageCallback,
   type LeafIndex,
-  type Proposal,
+  type ProposalWithSender,
 } from "ts-mls";
 
 import {
@@ -158,20 +158,23 @@ export function createAdminCommitPolicyCallback(args: {
  */
 export function withCapturedProposals(inner: IncomingMessageCallback): {
   callback: IncomingMessageCallback;
-  take(): Proposal[];
+  take(): { proposals: ProposalWithSender[]; committerLeafIndex: number | undefined };
 } {
-  let buffered: Proposal[] = [];
+  let buffered: ProposalWithSender[] = [];
+  let committerLeafIndex: number | undefined;
 
   const callback: IncomingMessageCallback = (incoming) => {
     if (incoming.kind === "commit") {
-      buffered = buffered.concat(incoming.proposals.map((p) => p.proposal));
+      buffered = buffered.concat(incoming.proposals);
+      committerLeafIndex = incoming.senderLeafIndex;
     }
     return inner(incoming);
   };
 
-  const take = (): Proposal[] => {
-    const result = buffered;
+  const take = () => {
+    const result = { proposals: buffered, committerLeafIndex };
     buffered = [];
+    committerLeafIndex = undefined;
     return result;
   };
 

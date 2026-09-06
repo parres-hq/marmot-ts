@@ -117,7 +117,7 @@ export async function resolveCandidateParent(params: {
   } catch {
     return { kind: "authentication_mismatch" };
   }
-  const proposals = capture.take();
+  const capturedCommit = capture.take();
   if (result.kind !== "newState" || result.actionTaken === "reject")
     return { kind: "rejected", reason: "authorization_or_components" };
   try {
@@ -125,7 +125,8 @@ export async function resolveCandidateParent(params: {
       validateCommitLegality({
         parentState: parent,
         resultingState: result.newState,
-        proposals,
+        proposals: capturedCommit.proposals,
+        committerLeafIndex: capturedCommit.committerLeafIndex,
       })
     )
       return { kind: "rejected", reason: "authorization_or_components" };

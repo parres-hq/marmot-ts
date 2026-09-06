@@ -718,7 +718,8 @@ export class MarmotGroupEngine<TEnvelope> {
         this.#assertStagedCommitLegal(
           parentState,
           newState,
-          prepared.committedProposals,
+          prepared.committedWithSenders,
+          Number(parentState.privatePath.leafIndex),
         );
 
         const envelope = await this.peeler.wrapGroupMessage(commit, this.state);
@@ -800,7 +801,8 @@ export class MarmotGroupEngine<TEnvelope> {
         this.#assertStagedCommitLegal(
           parentState,
           newState,
-          prepared.committedProposals,
+          prepared.committedWithSenders,
+          Number(parentState.privatePath.leafIndex),
         );
 
         // WR-17: same post-staging bookkeeping as `case "commit"` — the
@@ -856,6 +858,7 @@ export class MarmotGroupEngine<TEnvelope> {
   ): {
     extraProposals: Proposal[];
     committedProposals: Proposal[];
+    committedWithSenders: ProposalWithSender[];
     committer: string;
     priority: CommitOrderingPriority;
   } {
@@ -909,6 +912,7 @@ export class MarmotGroupEngine<TEnvelope> {
     return {
       extraProposals,
       committedProposals,
+      committedWithSenders,
       committer: actorPubkey,
       priority: nonAdminShape.authorized ? "ordinary" : "privileged",
     };
@@ -1024,12 +1028,14 @@ export class MarmotGroupEngine<TEnvelope> {
   #assertStagedCommitLegal(
     parentState: ClientState,
     resultingState: ClientState,
-    committedProposals: readonly Proposal[],
+    committedProposals: readonly ProposalWithSender[],
+    committerLeafIndex: number,
   ): void {
     const violation = validateCommitLegality({
       parentState,
       resultingState,
       proposals: committedProposals,
+      committerLeafIndex,
     });
     if (violation) throw new CommitLegalityError(violation);
   }

@@ -158,7 +158,11 @@ export type RejectedIngestResult<TEnvelope> = {
    * `foundation/errors.md` requires pre-convergence rejections be described
    * "by category alone".
    */
-  reason?: "admin-policy" | "component-integrity" | "admin-leaf-coupling";
+  reason?:
+    | "admin-policy"
+    | "component-integrity"
+    | "admin-leaf-coupling"
+    | "disband-legality";
 };
 
 /** An envelope skipped without processing. */
