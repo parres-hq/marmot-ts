@@ -364,7 +364,10 @@ describe("GroupsManager session/runtime helpers", () => {
       await created.save(true);
 
       let rejectActivation!: (reason: Error) => void;
-      const activationStarted = Promise.withResolvers<void>();
+      let resolveActivationStarted!: () => void;
+      const activationStarted = new Promise<void>((resolve) => {
+        resolveActivationStarted = resolve;
+      });
       const activation = new Promise<void>((_resolve, reject) => {
         rejectActivation = reject;
       });
@@ -377,7 +380,7 @@ describe("GroupsManager session/runtime helpers", () => {
       const activationSpy = vi
         .spyOn(MarmotGroup.prototype, activationStep)
         .mockImplementationOnce(async () => {
-          activationStarted.resolve();
+          resolveActivationStarted();
           await activation;
         })
         .mockResolvedValue(undefined);
@@ -389,7 +392,7 @@ describe("GroupsManager session/runtime helpers", () => {
       reader.on("loaded", loaded);
 
       const activatingGet = reader.get(created.id);
-      await activationStarted.promise;
+      await activationStarted;
       const lateCacheHit = reader.get(created.id);
       let lateSettled = false;
       void lateCacheHit.then(
