@@ -7,6 +7,7 @@ import {
   type MlsMessage,
   unsafeTestingAuthenticationService,
 } from "ts-mls";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { describe, expect, it } from "vitest";
 
 import { createCredential } from "../../core/credential.js";
@@ -14,9 +15,138 @@ import { createSimpleGroup } from "../../core/group.js";
 import { generateKeyPackage } from "../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { MarmotGroupEngine } from "../group-engine.js";
+import { GroupHistoryTree } from "../history-tree.js";
 import type { GroupPeeler } from "../types.js";
 
 describe("bounded disband convergence", () => {
+  it("holds its locally acknowledged disband at the parent until cutoff", async () => {
+    const admin = "a".repeat(64);
+    const ciphersuite = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const adminPackage = await generateKeyPackage({
+      credential: createCredential(admin),
+      ciphersuiteImpl: ciphersuite,
+    });
+    const { clientState } = await createSimpleGroup(
+      adminPackage,
+      ciphersuite,
+      "Terminal",
+      { adminPubkeys: [admin], relays: [] },
+    );
+    type Envelope = { id: string };
+    const messages = new Map<string, MlsMessage>();
+    const peeler: GroupPeeler<Envelope> = {
+      async peelGroupMessages(envelopes) {
+        return {
+          read: envelopes.map((envelope) => ({
+            envelope,
+            message: messages.get(envelope.id)!,
+          })),
+          unreadable: [],
+        };
+      },
+      wrapGroupMessage(message) {
+        messages.set("local", message);
+        return Promise.resolve({ id: "local" });
+      },
+      idOf: (envelope) => envelope.id,
+    };
+    let nowMs = 100;
+    const engine = new MarmotGroupEngine({
+      state: clientState,
+      ciphersuite,
+      peeler,
+      now: () => nowMs,
+      settlementQuiescenceMs: 1_000,
+      lifecycleStore: new InMemoryKeyValueStore<Uint8Array>(),
+    });
+    const pending = await engine.requestDisband();
+    if (pending?.kind !== "groupEvolution") throw new Error("expected commit");
+    const parentEpoch = Number(engine.state.groupContext.epoch);
+    expect(engine.confirmPublished(pending.pending)).toEqual([]);
+    expect(engine.lifecycle).toBe("Recovering");
+    expect(Number(engine.state.groupContext.epoch)).toBe(parentEpoch);
+    expect(engine.convergencePass).toMatchObject({
+      generation: 1,
+      baseEpoch: parentEpoch,
+      deadlineMs: 5_100,
+    });
+    nowMs = 1_100;
+    await engine.driveConvergence();
+    expect(engine.lifecycle).toBe("Disbanded");
+  });
+
+  it("restores terminal candidate and immutable pass evidence after a crash", async () => {
+    const admin = "a".repeat(64);
+    const ciphersuite = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const adminPackage = await generateKeyPackage({
+      credential: createCredential(admin),
+      ciphersuiteImpl: ciphersuite,
+    });
+    const { clientState } = await createSimpleGroup(
+      adminPackage,
+      ciphersuite,
+      "Crash",
+      { adminPubkeys: [admin], relays: [] },
+    );
+    type Envelope = { id: string };
+    const peeler: GroupPeeler<Envelope> = {
+      async peelGroupMessages(envelopes) {
+        return { read: [], unreadable: envelopes };
+      },
+      wrapGroupMessage() {
+        return Promise.resolve({ id: "local" });
+      },
+      idOf: (envelope) => envelope.id,
+    };
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const rewindStore = new InMemoryKeyValueStore<Uint8Array>();
+    let nowMs = 50;
+    const first = new MarmotGroupEngine({
+      state: clientState,
+      ciphersuite,
+      peeler,
+      now: () => nowMs,
+      settlementQuiescenceMs: 1_000,
+      lifecycleStore,
+    });
+    first.history.bindStore(rewindStore);
+    const staged = await first.requestDisband();
+    if (staged?.kind !== "groupEvolution") throw new Error("expected commit");
+    first.confirmPublished(staged.pending);
+    const originalPass = first.convergencePass;
+    await first.history.flush();
+    await first.persistDisbandConvergence();
+
+    const tree = await GroupHistoryTree.load(
+      rewindStore,
+      bytesToHex(clientState.groupContext.groupId),
+    );
+    if (!tree) throw new Error("expected history");
+    const restored = new MarmotGroupEngine({
+      state: clientState,
+      ciphersuite,
+      peeler,
+      historyTree: tree,
+      now: () => nowMs,
+      settlementQuiescenceMs: 1_000,
+      lifecycleStore,
+    });
+    await restored.disbandRequest();
+    expect(restored.lifecycle).toBe("Recovering");
+    expect(restored.convergencePass?.generation).toBe(originalPass?.generation);
+    expect(Number(restored.state.groupContext.epoch)).toBe(
+      Number(clientState.groupContext.epoch),
+    );
+    nowMs += 1_000;
+    await restored.driveConvergence();
+    expect(restored.lifecycle).toBe("Disbanded");
+  });
   it("holds a valid linear disband until cutoff and terminalizes only its selected branch", async () => {
     const admin = "a".repeat(64);
     const member = "d".repeat(64);

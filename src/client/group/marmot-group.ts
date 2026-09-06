@@ -17,6 +17,7 @@ import type { ProposalAction, ProposalContext } from "../../engine/types.js";
 import type { MediaAttachment } from "../../core/media.js";
 import type { AuditContextOptions, AuditSink } from "../../audit/index.js";
 import { mayReleaseOutbound } from "../../core/convergence-status.js";
+import { groupLifecycleStates } from "../../core/group-lifecycle.js";
 import { commitDigest } from "../../core/convergence.js";
 import type { ConvergenceScheduler } from "../../engine/group-engine.js";
 import type { ConvergencePolicy } from "../../core/convergence.js";
@@ -391,7 +392,10 @@ export class MarmotGroup<
   /** Project-owned metadata for safe `removed` dispatch; never reads emitter internals. */
   readonly #removedListeners: RemovedListener<THistory, TMedia>[] = [];
   readonly #disbandedListeners: Array<{
-    fn: (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void;
+    fn: (
+      group: MarmotGroup<THistory, TMedia>,
+      evidence: GroupDisbandedEvent,
+    ) => void;
     context: unknown;
     once: boolean;
   }> = [];
@@ -414,7 +418,10 @@ export class MarmotGroup<
     }
     if (event === "disbanded")
       this.#disbandedListeners.push({
-        fn: fn as (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void,
+        fn: fn as (
+          group: MarmotGroup<THistory, TMedia>,
+          evidence: GroupDisbandedEvent,
+        ) => void,
         context: context || this,
         once: false,
       });
@@ -437,7 +444,10 @@ export class MarmotGroup<
     }
     if (event === "disbanded")
       this.#disbandedListeners.push({
-        fn: fn as (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void,
+        fn: fn as (
+          group: MarmotGroup<THistory, TMedia>,
+          evidence: GroupDisbandedEvent,
+        ) => void,
         context: context || this,
         once: true,
       });
@@ -472,14 +482,18 @@ export class MarmotGroup<
     if (event === "disbanded") {
       if (!fn) this.#disbandedListeners.length = 0;
       else {
-        const disbandedFn = fn as (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void;
+        const disbandedFn = fn as (
+          group: MarmotGroup<THistory, TMedia>,
+          evidence: GroupDisbandedEvent,
+        ) => void;
         for (let i = this.#disbandedListeners.length - 1; i >= 0; i--) {
           const listener = this.#disbandedListeners[i]!;
           if (
             listener.fn === disbandedFn &&
             (!once || listener.once) &&
             (!context || listener.context === context)
-          ) this.#disbandedListeners.splice(i, 1);
+          )
+            this.#disbandedListeners.splice(i, 1);
         }
       }
     }
@@ -961,8 +975,6 @@ export class MarmotGroup<
   async disband(): Promise<DisbandResult> {
     this.#assertNotDisbanded();
     const existing = await this.session.disbandRequest();
-    if (existing?.status === "pending")
-      return { kind: "pending", request: existing };
     if (existing?.status === "failed")
       return { kind: "failed", reason: existing.reason };
     let effects;
@@ -1048,7 +1060,22 @@ export class MarmotGroup<
       await this.#applyRemovalWithdrawal(result);
       if (result.kind === "removed") await this.#realizeRemovalIfNeeded();
     }
+    if (
+      this.lifecycle === groupLifecycleStates.stable &&
+      (await this.session.disbandRequest())?.status === "pending"
+    )
+      await this.disband();
     if (resumed.length === 0) await this.#drainOutbound();
+  }
+
+  /** Resumes a durable terminal intent after hydration when preparation is eligible. */
+  async resumePendingDisband(): Promise<void> {
+    if (
+      this.status !== "disbanded" &&
+      this.lifecycle === groupLifecycleStates.stable &&
+      (await this.session.disbandRequest())?.status === "pending"
+    )
+      await this.disband();
   }
 
   /** Rejects and clears every queued outbound intent (teardown / removal). */

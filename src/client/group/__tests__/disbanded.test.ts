@@ -1,4 +1,5 @@
 import { EventSigner } from "applesauce-core/factories";
+import { bytesToHex } from "@noble/hashes/utils.js";
 import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
 import { describe, expect, it, vi } from "vitest";
 
@@ -8,6 +9,7 @@ import { generateKeyPackage } from "../../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../../extra/in-memory-key-value-store.js";
 import { GroupTerminalError, MarmotGroup } from "../marmot-group.js";
 import { MockNetwork } from "../../../__tests__/helpers/mock-network.js";
+import { GroupRegistry } from "../../group-registry.js";
 import {
   decodeDisbandTombstone,
   disbandTombstoneKey,
@@ -86,17 +88,48 @@ async function fixture() {
     relays: ["wss://relay.test"],
   });
   const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+  const store = new InMemoryKeyValueStore<Uint8Array>();
+  const network = new MockNetwork(["wss://relay.test"]);
   const group = new MarmotGroup(clientState, {
-    store: new InMemoryKeyValueStore(),
+    store,
     lifecycleStore,
     signer: { getPublicKey: async () => pubkey } as EventSigner,
     ciphersuite: impl,
-    network: new MockNetwork(["wss://relay.test"]),
+    network,
   });
-  return { group, lifecycleStore, pubkey };
+  return { group, lifecycleStore, store, network, pubkey };
 }
 
 describe("public disband terminal contract", () => {
+  it("discovers and loads a scrubbed terminal facade after live-state cleanup", async () => {
+    const { group, lifecycleStore, store, network, pubkey } = await fixture();
+    await group.session.persistSelectedDisband({
+      actorPubkey: pubkey,
+      commitDigest: COMMIT_DIGEST,
+      parentTag: "parent",
+      sourceEpoch: 0,
+      terminalOutcome: "disbanded",
+    });
+    expect(await store.getItem(group.idStr)).toBeNull();
+
+    const registry = new GroupRegistry({
+      store,
+      ingestStateStore: new InMemoryKeyValueStore<Uint8Array>(),
+      lifecycleStore,
+      signer: { getPublicKey: async () => pubkey } as EventSigner,
+      network,
+    });
+    expect((await registry.listIds()).map(bytesToHex)).toContain(group.idStr);
+    expect(await registry.has(group.id)).toBe(true);
+    const restored = await registry.get(group.id);
+    expect(restored.status).toBe("disbanded");
+    expect(restored.groupData).toBeNull();
+    expect(await registry.has(group.id)).toBe(true);
+    await expect(restored.selfUpdate()).rejects.toBeInstanceOf(
+      GroupTerminalError,
+    );
+  });
+
   it("records delivery before emitting once and rejects every outbound intent", async () => {
     const { group, pubkey } = await fixture();
     const digest = new Uint8Array(32).fill(7);
@@ -122,12 +155,17 @@ describe("public disband terminal contract", () => {
       commitDigest: digest,
     });
     await expect(
-      group.submitIntent({ kind: "applicationMessage", payload: new Uint8Array() }),
+      group.submitIntent({
+        kind: "applicationMessage",
+        payload: new Uint8Array(),
+      }),
     ).rejects.toMatchObject({ reason: "group_disbanded" });
     await expect(group.selfUpdate()).rejects.toBeInstanceOf(GroupTerminalError);
     await expect(group.enableDisbanding()).rejects.toMatchObject({
       reason: "group_disbanded",
     });
-    await expect(group.disband()).rejects.toMatchObject({ reason: "group_disbanded" });
+    await expect(group.disband()).rejects.toMatchObject({
+      reason: "group_disbanded",
+    });
   });
 });

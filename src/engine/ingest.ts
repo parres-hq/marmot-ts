@@ -142,7 +142,6 @@ export interface IngestContext<TEnvelope> {
   ): void;
   /** Retains a fully validated terminal edge without advancing canonical state. */
   admitDisbandCandidate(
-    envelope: TEnvelope,
     parentState: ClientState,
     message: MlsMessage,
     resultingState: ClientState,
@@ -760,19 +759,13 @@ export async function* ingestEnvelopes<TEnvelope>(
         });
         if (disband.kind === "validDisband") {
           const digest = commitDigest(encode(mlsMessageEncoder, message));
-          ctx.admitDisbandCandidate(
-            envelope,
-            parentState,
-            message,
-            result.newState,
-            {
-              commitDigest: digest,
-              actorPubkey: disband.actorPubkey,
-              sourceEpoch: Number(parentState.groupContext.epoch),
-              parentTag: bytesToHex(parentState.confirmationTag),
-              terminalOutcome: "disbanded",
-            },
-          );
+          ctx.admitDisbandCandidate(parentState, message, result.newState, {
+            commitDigest: digest,
+            actorPubkey: disband.actorPubkey,
+            sourceEpoch: Number(parentState.groupContext.epoch),
+            parentTag: bytesToHex(parentState.confirmationTag),
+            terminalOutcome: "disbanded",
+          });
           continue;
         }
 

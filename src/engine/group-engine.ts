@@ -1,5 +1,5 @@
 /** @module @category Engine */
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 import { Debugger } from "debug";
 import {
   appDataUpdateProposalType,
@@ -138,8 +138,11 @@ import type {
 } from "./types.js";
 import { openConvergencePass, refreshConvergencePass } from "./types.js";
 import {
+  decodeDisbandConvergence,
   decodeDisbandRequest,
+  disbandConvergenceKey,
   disbandRequestKey,
+  encodeDisbandConvergence,
   encodeDisbandRequest,
   type DisbandRequest,
 } from "./disband-request.js";
@@ -347,7 +350,6 @@ export class MarmotGroupEngine<TEnvelope> {
   readonly #disbandCandidates = new Map<
     string,
     {
-      envelope: TEnvelope;
       parentState: ClientState;
       message: MlsMessage;
       resultingState: ClientState;
@@ -368,6 +370,8 @@ export class MarmotGroupEngine<TEnvelope> {
   readonly #disbandRequestKey: string;
   #disbandRequest: DisbandRequest | undefined;
   readonly #disbandHydrated: Promise<void>;
+  readonly #wallNow: () => number;
+  #passOpenedWallMs: number | undefined;
 
   constructor(options: MarmotGroupEngineOptions<TEnvelope>) {
     this.#state = options.state;
@@ -375,6 +379,7 @@ export class MarmotGroupEngine<TEnvelope> {
     this.peeler = options.peeler;
     this.#onStateChanged = options.onStateChanged;
     this.#now = options.now ?? (() => performance.now());
+    this.#wallNow = Date.now;
     this.#settlementQuiescenceMs =
       options.settlementQuiescenceMs ??
       DEFAULT_CONVERGENCE_POLICY.settlementQuiescenceMs;
@@ -384,7 +389,7 @@ export class MarmotGroupEngine<TEnvelope> {
     this.#disbandRequestKey = disbandRequestKey(
       bytesToHex(options.state.groupContext.groupId),
     );
-    this.#disbandHydrated = this.#hydrateDisbandRequest();
+    this.#disbandHydrated = this.#hydrateDisbandState();
 
     this.#policy = normalizeConvergencePolicy(
       options.convergencePolicy ?? DEFAULT_CONVERGENCE_POLICY,
@@ -606,6 +611,41 @@ export class MarmotGroupEngine<TEnvelope> {
     return this.#disbandRequest && { ...this.#disbandRequest };
   }
 
+  /** Flushes restart-critical terminal candidate/pass evidence. */
+  async persistDisbandConvergence(): Promise<void> {
+    await this.#disbandHydrated;
+    if (!this.#lifecycleStore) return;
+    const key = disbandConvergenceKey(
+      bytesToHex(this.#state.groupContext.groupId),
+    );
+    if (!this.#convergencePass || this.#disbandCandidates.size === 0) {
+      await this.#lifecycleStore.removeItem(key);
+      return;
+    }
+    const wallNow = this.#wallNow();
+    const monoNow = this.#now();
+    await this.#lifecycleStore.setItem(
+      key,
+      encodeDisbandConvergence({
+        generation: this.#convergencePass.generation,
+        baseEpoch: this.#convergencePass.baseEpoch,
+        openedAtWallMs: this.#passOpenedWallMs ?? wallNow,
+        deadlineWallMs: wallNow + (this.#convergencePass.deadlineMs - monoNow),
+        lastRelevantInputWallMs:
+          wallNow + (this.#convergencePass.lastRelevantInputMs - monoNow),
+        candidates: [...this.#disbandCandidates.values()].map(
+          ({ evidence, resultingState }) => ({
+            commitDigest: bytesToHex(evidence.commitDigest),
+            actorPubkey: evidence.actorPubkey,
+            sourceEpoch: evidence.sourceEpoch,
+            parentTag: evidence.parentTag,
+            childTag: bytesToHex(resultingState.confirmationTag),
+          }),
+        ),
+      }),
+    );
+  }
+
   /** Persist irreversible intent, then prepare its exact candidate against this epoch. */
   async requestDisband(): Promise<SendResult<TEnvelope> | undefined> {
     await this.#disbandHydrated;
@@ -682,11 +722,23 @@ export class MarmotGroupEngine<TEnvelope> {
         },
       },
     );
-    return this.#sendInner({
+    const result = await this.#sendInner({
       kind: "commit",
       actorPubkey,
       extraProposals: proposals,
     });
+    if (result.kind !== "groupEvolution" || !result.pending.commitMessage)
+      throw new Error("Disband request did not produce a commit");
+    result.pending.terminalEvidence = {
+      commitDigest: commitDigest(
+        encode(mlsMessageEncoder, result.pending.commitMessage),
+      ),
+      actorPubkey,
+      sourceEpoch: epoch,
+      parentTag: bytesToHex(this.#state.confirmationTag),
+      terminalOutcome: "disbanded",
+    };
+    return result;
   }
 
   /** Atomically enables lifecycle-v1 for a legacy group when every leaf supports it. */
@@ -1260,6 +1312,31 @@ export class MarmotGroupEngine<TEnvelope> {
         "publish_confirmed",
         pending.kind,
       );
+      if (pending.terminalEvidence) {
+        try {
+          this.#transitionLifecycle(
+            groupLifecycleStates.stable,
+            "terminal_publish_retained",
+            pending.kind,
+          );
+          this.#admitDisbandCandidate(
+            pending.parentState,
+            pending.commitMessage,
+            pending.newState,
+            pending.terminalEvidence,
+          );
+          this.#emitAudit({
+            type: "epoch_confirmed",
+            from_epoch: fromEpoch,
+            to_epoch: toEpoch,
+            pending_kind: pending.kind,
+          });
+          return [];
+        } finally {
+          this.#stagedCommitParentEpoch = undefined;
+          this.#scheduleRetainedContinuation();
+        }
+      }
       try {
         this.#setState(pending.newState);
         this.#recordCommitNode(
@@ -1948,10 +2025,57 @@ export class MarmotGroupEngine<TEnvelope> {
     this.#onStateChanged?.(newState);
   }
 
-  async #hydrateDisbandRequest(): Promise<void> {
+  async #hydrateDisbandState(): Promise<void> {
     if (!this.#lifecycleStore) return;
     const encoded = await this.#lifecycleStore.getItem(this.#disbandRequestKey);
     if (encoded) this.#disbandRequest = decodeDisbandRequest(encoded);
+    const convergence = await this.#lifecycleStore.getItem(
+      disbandConvergenceKey(bytesToHex(this.#state.groupContext.groupId)),
+    );
+    if (!convergence) return;
+    const stored = decodeDisbandConvergence(convergence);
+    const monoNow = this.#now();
+    const wallNow = this.#wallNow();
+    for (const candidate of stored.candidates) {
+      const parentState = await this.#tree.stateAt(candidate.parentTag);
+      const resultingState = await this.#tree.stateAt(candidate.childTag);
+      const message = await this.#tree.commitMessageOf(candidate.childTag);
+      if (!parentState || !resultingState || !message)
+        throw new Error(
+          "Persisted disband candidate is missing history material",
+        );
+      this.#disbandCandidates.set(candidate.commitDigest, {
+        parentState,
+        resultingState,
+        message,
+        evidence: {
+          commitDigest: hexToBytes(candidate.commitDigest),
+          actorPubkey: candidate.actorPubkey,
+          sourceEpoch: candidate.sourceEpoch,
+          parentTag: candidate.parentTag,
+          terminalOutcome: "disbanded",
+        },
+      });
+    }
+    this.#convergencePass = {
+      generation: stored.generation,
+      baseEpoch: stored.baseEpoch,
+      openedAtMs: monoNow + (stored.openedAtWallMs - wallNow),
+      deadlineMs: monoNow + Math.max(0, stored.deadlineWallMs - wallNow),
+      lastRelevantInputMs: monoNow + (stored.lastRelevantInputWallMs - wallNow),
+    };
+    this.#nextPassGeneration = Math.max(
+      this.#nextPassGeneration,
+      stored.generation + 1,
+    );
+    this.#passOpenedWallMs = stored.openedAtWallMs;
+    this.#lastConvergenceRelevantInputMs =
+      this.#convergencePass.lastRelevantInputMs;
+    this.#transitionLifecycle(
+      groupLifecycleStates.recovering,
+      "disband_candidate_restored",
+    );
+    this.#scheduleSettleCheck();
   }
 
   async #persistDisbandRequest(): Promise<void> {
@@ -2134,15 +2258,8 @@ export class MarmotGroupEngine<TEnvelope> {
       setState: (state) => this.#setState(state),
       recordCommit: (parentState, message, newState) =>
         this.#recordCommitNode(parentState, message, newState),
-      admitDisbandCandidate: (
-        envelope,
-        parentState,
-        message,
-        resultingState,
-        evidence,
-      ) =>
+      admitDisbandCandidate: (parentState, message, resultingState, evidence) =>
         this.#admitDisbandCandidate(
-          envelope,
           parentState,
           message,
           resultingState,
@@ -2209,7 +2326,6 @@ export class MarmotGroupEngine<TEnvelope> {
 
   /** Opens or joins the one immutable pass for a validated linear disband edge. */
   #admitDisbandCandidate(
-    envelope: TEnvelope,
     parentState: ClientState,
     message: MlsMessage,
     resultingState: ClientState,
@@ -2230,7 +2346,6 @@ export class MarmotGroupEngine<TEnvelope> {
       return;
 
     this.#disbandCandidates.set(key, {
-      envelope,
       parentState,
       message,
       resultingState,
@@ -2244,6 +2359,7 @@ export class MarmotGroupEngine<TEnvelope> {
       this.#log()("terminal candidate tree retention failed: %o", error);
     }
     const nowMs = this.#now();
+    if (!this.#convergencePass) this.#passOpenedWallMs = this.#wallNow();
     this.#lastConvergenceRelevantInputMs = nowMs;
     this.admitConvergencePass();
     if (this.#lifecycle === groupLifecycleStates.stable)

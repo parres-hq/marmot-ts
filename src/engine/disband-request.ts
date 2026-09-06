@@ -21,6 +21,67 @@ export function disbandRequestKey(groupIdHex: string): string {
   return `${groupIdHex}/disband/request`;
 }
 
+export interface StoredDisbandConvergence {
+  readonly generation: number;
+  readonly baseEpoch: number;
+  readonly openedAtWallMs: number;
+  readonly deadlineWallMs: number;
+  readonly lastRelevantInputWallMs: number;
+  readonly candidates: readonly {
+    readonly commitDigest: string;
+    readonly actorPubkey: string;
+    readonly sourceEpoch: number;
+    readonly parentTag: string;
+    readonly childTag: string;
+  }[];
+}
+
+export function disbandConvergenceKey(groupIdHex: string): string {
+  return `${groupIdHex}/disband/convergence`;
+}
+
+export function encodeDisbandConvergence(
+  record: StoredDisbandConvergence,
+): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify({ version: 1, ...record }));
+}
+
+export function decodeDisbandConvergence(
+  data: Uint8Array,
+): StoredDisbandConvergence {
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder().decode(data));
+  } catch {
+    throw new Error("Invalid disband convergence encoding");
+  }
+  const record = value as Partial<StoredDisbandConvergence> & {
+    version?: number;
+  };
+  if (
+    !record ||
+    record.version !== 1 ||
+    !Number.isSafeInteger(record.generation) ||
+    !Number.isSafeInteger(record.baseEpoch) ||
+    typeof record.openedAtWallMs !== "number" ||
+    typeof record.deadlineWallMs !== "number" ||
+    typeof record.lastRelevantInputWallMs !== "number" ||
+    !Array.isArray(record.candidates)
+  )
+    throw new Error("Invalid disband convergence record");
+  for (const candidate of record.candidates) {
+    if (
+      !/^[0-9a-f]{64}$/i.test(candidate.commitDigest) ||
+      !/^[0-9a-f]{64}$/i.test(candidate.actorPubkey) ||
+      !Number.isSafeInteger(candidate.sourceEpoch) ||
+      typeof candidate.parentTag !== "string" ||
+      typeof candidate.childTag !== "string"
+    )
+      throw new Error("Invalid disband convergence record");
+  }
+  return record as StoredDisbandConvergence;
+}
+
 export function encodeDisbandRequest(request: DisbandRequest): Uint8Array {
   return new TextEncoder().encode(
     JSON.stringify({ version: 1, ...request } satisfies StoredDisbandRequest),

@@ -126,5 +126,8 @@ describe("durable disband request codec", () => {
     await expect(
       restored.send({ kind: "applicationMessage", payload: new Uint8Array() }),
     ).rejects.toBeInstanceOf(DisbandingError);
+    await expect(restored.requestDisband()).resolves.toMatchObject({
+      kind: "groupEvolution",
+    });
   });
 });

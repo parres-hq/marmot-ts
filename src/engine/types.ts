@@ -96,6 +96,8 @@ export type PendingState = {
   commitMessage?: MlsMessage;
   /** Confirmation-time recovery evidence captured before proposals are cleared. */
   ownCommitStamp?: OwnCommitConvergenceStamp;
+  /** Authenticated local terminal intent retained until bounded selection. */
+  terminalEvidence?: DisbandCandidateEvidence;
 };
 
 export type ProposalContext = {

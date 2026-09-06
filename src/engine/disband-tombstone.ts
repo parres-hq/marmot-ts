@@ -25,6 +25,11 @@ export function disbandTombstoneKey(groupIdHex: string): string {
   return `${groupIdHex}/disband/terminal`;
 }
 
+/** Non-secret, scrubbed MLS shell used only to construct the terminal facade. */
+export function disbandRegistryStateKey(groupIdHex: string): string {
+  return `${groupIdHex}/disband/registry-state`;
+}
+
 export function encodeDisbandTombstone(
   tombstone: DisbandTombstone,
 ): Uint8Array {

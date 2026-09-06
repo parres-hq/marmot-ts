@@ -16,6 +16,10 @@ import { GroupHistoryTree } from "../engine/history-tree.js";
 import type { IngestionPoolOptions } from "../engine/ingestion-pool.js";
 import type { AuditContextOptions, AuditSink } from "../audit/index.js";
 import { RetainedHistoryStore } from "../engine/retained-store.js";
+import {
+  disbandRegistryStateKey,
+  disbandTombstoneKey,
+} from "../engine/disband-tombstone.js";
 import { logger } from "../utils/debug.js";
 import type { GenericKeyValueStore } from "../utils/key-value.js";
 import {
@@ -111,7 +115,14 @@ export class GroupRegistry<
   /** Per-group listener handles, so we can detach them when a group is unloaded. */
   #groupListeners = new Map<
     string,
-    { destroyed: () => void; removed: () => void; disbanded: (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void }
+    {
+      destroyed: () => void;
+      removed: () => void;
+      disbanded: (
+        group: MarmotGroup<THistory, TMedia>,
+        evidence: GroupDisbandedEvent,
+      ) => void;
+    }
   >();
 
   /** Tracks in-flight group loads to prevent duplicate instances under concurrency */
@@ -190,7 +201,9 @@ export class GroupRegistry<
     const id = typeof groupId === "string" ? hexToBytes(groupId) : groupId;
     const idHex = bytesToHex(id);
     log("loading group %s from store", idHex);
-    const stateBytes = await this.store.getItem(idHex);
+    const stateBytes =
+      (await this.store.getItem(idHex)) ??
+      (await this.lifecycleStore?.getItem(disbandRegistryStateKey(idHex)));
 
     if (!stateBytes) throw new Error(`Group ${idHex} not found`);
 
@@ -286,8 +299,10 @@ export class GroupRegistry<
     // signal so the manager can re-emit it to the application.
     const removed = () => this.emit("removed", group);
     group.on("removed", removed);
-    const disbanded = (_group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) =>
-      this.emit("disbanded", group, evidence);
+    const disbanded = (
+      _group: MarmotGroup<THistory, TMedia>,
+      evidence: GroupDisbandedEvent,
+    ) => this.emit("disbanded", group, evidence);
     group.on("disbanded", disbanded);
     const listeners = { destroyed, removed, disbanded };
     this.#groupListeners.set(id, listeners);
@@ -300,6 +315,7 @@ export class GroupRegistry<
       if (group.forkTree.tips().length > 1) await group.reconverge();
       await group.realizeRemovalIfNeeded();
       await group.realizeDisbandIfNeeded();
+      await group.resumePendingDisband();
       this.#activatingGroups.delete(id);
       this.emit("updated", this.loaded);
     } catch (error) {
@@ -345,15 +361,23 @@ export class GroupRegistry<
 
   /** Lists all persisted group IDs, decoded from their hex storage keys. */
   async listIds(): Promise<Uint8Array[]> {
-    const keys = await this.store.keys();
-    return keys.map((key) => hexToBytes(key));
+    const ids = new Set(
+      (await this.store.keys()).filter((key) => /^[0-9a-f]+$/i.test(key)),
+    );
+    for (const key of (await this.lifecycleStore?.keys()) ?? []) {
+      const match = /^([0-9a-f]+)\/disband\/terminal$/i.exec(key);
+      if (match) ids.add(match[1]!);
+    }
+    return [...ids].map((key) => hexToBytes(key));
   }
 
   /** Checks if a group exists in the backend. */
   async has(groupId: Uint8Array | string): Promise<boolean> {
     const key = typeof groupId === "string" ? groupId : bytesToHex(groupId);
-    const item = await this.store.getItem(key);
-    return item !== null;
+    return (
+      (await this.store.getItem(key)) !== null ||
+      (await this.lifecycleStore?.getItem(disbandTombstoneKey(key))) != null
+    );
   }
 
   /** Gets a group from cache or loads it from the store, caching the result. */

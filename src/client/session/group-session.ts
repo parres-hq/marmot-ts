@@ -25,9 +25,13 @@ import { MarmotGroupEngine } from "../../engine/group-engine.js";
 import { GroupHistoryTree } from "../../engine/history-tree.js";
 import type { RetainedHistoryStore } from "../../engine/retained-store.js";
 import type { DisbandRequest } from "../../engine/disband-request.js";
-import { disbandRequestKey } from "../../engine/disband-request.js";
+import {
+  disbandConvergenceKey,
+  disbandRequestKey,
+} from "../../engine/disband-request.js";
 import {
   decodeDisbandTombstone,
+  disbandRegistryStateKey,
   disbandTombstoneKey,
   encodeDisbandTombstone,
   type DisbandTombstone,
@@ -367,6 +371,7 @@ export class GroupSession<
     // across restarts. Append-only flush of any new nodes (O(new nodes)). The
     // bounded convergence window is rebuilt from the tree on load.
     if (this.rewindStore) await this.#engine.history.flush();
+    await this.#engine.persistDisbandConvergence();
     const stateBytes = serializeClientState(this.state);
     await this.store.setItem(idHex, stateBytes);
     this.#dirty = false;
@@ -422,7 +427,9 @@ export class GroupSession<
   }
 
   /** Durably records public notification delivery before application callbacks run. */
-  async markDisbandNotificationDelivered(): Promise<DisbandTombstone | undefined> {
+  async markDisbandNotificationDelivered(): Promise<
+    DisbandTombstone | undefined
+  > {
     await this.#terminalHydrated;
     const current = this.#terminalTombstone;
     if (!current || current.notificationState === "delivered") return undefined;
@@ -472,6 +479,10 @@ export class GroupSession<
       disbandTombstoneKey(idHex),
       encodeDisbandTombstone(tombstone),
     );
+    await this.lifecycleStore.setItem(
+      disbandRegistryStateKey(idHex),
+      serializeClientState(scrubTerminalRegistryState(this.state)),
+    );
     this.#terminalTombstone = tombstone;
     await this.#cleanupAfterDisband(idHex);
     return tombstone;
@@ -493,6 +504,7 @@ export class GroupSession<
     this.#engine.dispose();
     await this.history?.purgeMessages();
     await this.lifecycleStore?.removeItem(disbandRequestKey(idHex));
+    await this.lifecycleStore?.removeItem(disbandConvergenceKey(idHex));
     await this.#removedMarkerStore?.removeItem(`${idHex}/removed`);
     await this.store.removeItem(idHex);
     if (this.rewindStore) await GroupHistoryTree.purge(this.rewindStore, idHex);
@@ -849,6 +861,31 @@ export class GroupSession<
       this.#onHistoryError?.(err as Error);
     }
   }
+}
+
+function scrubTerminalRegistryState(state: ClientState): ClientState {
+  const copy = structuredClone(state);
+  scrubSecrets(copy.keySchedule);
+  scrubSecrets(copy.secretTree);
+  scrubSecrets(copy.privatePath);
+  copy.signaturePrivateKey.fill(0);
+  copy.historicalReceiverData.clear();
+  copy.unappliedProposals = {};
+  return copy;
+}
+
+function scrubSecrets(value: unknown): void {
+  if (value instanceof Uint8Array) {
+    value.fill(0);
+    return;
+  }
+  if (value instanceof Map) {
+    for (const entry of value.values()) scrubSecrets(entry);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  for (const entry of Object.values(value as Record<string, unknown>))
+    scrubSecrets(entry);
 }
 
 export type ProposalBuilder<
