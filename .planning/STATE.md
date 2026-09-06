@@ -5,15 +5,15 @@ milestone_name: Phase 1)
 current_phase: 04.1
 current_phase_name: Terminal Group Disbanding
 status: executing
-stopped_at: Completed 04.1-02-PLAN.md
-last_updated: "2026-09-06T16:25:01.596Z"
+stopped_at: Completed 04.1-03-PLAN.md
+last_updated: "2026-09-06T16:32:31.323Z"
 last_activity: 2026-09-06
 last_activity_desc: Completed lifecycle component foundation
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 45
-  completed_plans: 41
+  completed_plans: 42
   percent: 71
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-21)
 ## Current Position
 
 Phase: 04.1 — Terminal Group Disbanding
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-09-06 — Completed lifecycle component foundation
 
-Progress: [█████████░] 91% (7 phases)
+Progress: [█████████░] 93% (7 phases)
 
 **Next recommended run:** `/gsd-execute-phase 04.1`
 
@@ -105,6 +105,7 @@ _Updated after each plan completion_
 | Phase 04 P07 | 6min | 3 tasks | 6 files |
 | Phase 04.1 P01 | 13min | 2 tasks | 9 files |
 | Phase 04.1 P02 | 10min | 2 tasks | 14 files |
+| Phase 04.1 P03 | 6min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -209,6 +210,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.1-02]: Carry authenticated committer leaf metadata beside decoded proposals so every legality seam uses the same parent-relative classifier.
 - [Phase ?]: [Phase 04.1-02]: Persist one versioned request at groupId/disband/request and hydrate it before engine send or ingest work.
 - [Phase ?]: [Phase 04.1-02]: Keep Disbanding as a typed non-canonical outbound gate while canonical lifecycle remains independently managed.
+- [Phase ?]: [Phase 04.1-03]: Resolve an omitted lifecycleStore once as a disband-key-scoped adapter over durable groupStateStore.
+- [Phase ?]: [Phase 04.1-03]: Relay acknowledgement retains the pending request; canonical selection and regeneration remain scheduler-owned.
 
 ### Pending Todos
 
@@ -243,7 +246,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T16:25:01.576Z
-Stopped at: Completed 04.1-02-PLAN.md
+Last session: 2026-09-06T16:32:31.303Z
+Stopped at: Completed 04.1-03-PLAN.md
 Resume file:
 None

@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 7
 waived_count: 0
 fixed_count: 0
-total_count: 5
-last_updated: 2026-09-06T16:13:16.377Z
+total_count: 7
+last_updated: 2026-09-06T16:32:30.529Z
 ---
 
 # Broken Windows Ledger
@@ -20,6 +20,8 @@ last_updated: 2026-09-06T16:13:16.377Z
 | 3 | 04 | deviation | src/__tests__/conformance/manifest.ts |  | Executable vector path validation distinguishes scenario vectors from inventory-only formal records | open |  | 2026-09-05T15:54:48.522Z |  |
 | 4 | 04.1 | deviation | src/core/group.ts |  | Wired lifecycle defaults into real group creation | open |  | 2026-09-06T16:13:16.265Z |  |
 | 5 | 04.1 | deviation | src/core/__tests__/group.test.ts |  | Updated stale group-construction lifecycle expectation | open |  | 2026-09-06T16:13:16.377Z |  |
+| 6 | 04.1 | deviation | src/client/session/group-session.ts |  | Added read-only hydrated disband request projection required by the public facade | open |  | 2026-09-06T16:32:30.422Z |  |
+| 7 | 04.1 | deviation | src/client/group/__tests__/marmot-group.test.ts |  | Updated stale expected component list after lifecycle-v1 became required | open |  | 2026-09-06T16:32:30.529Z |  |
 
 ````json
 [
@@ -81,6 +83,30 @@ last_updated: 2026-09-06T16:13:16.377Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T16:13:16.377Z",
+    "resolved_at": null
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "04.1",
+    "file": "src/client/session/group-session.ts",
+    "line": null,
+    "description": "Added read-only hydrated disband request projection required by the public facade",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T16:32:30.422Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "04.1",
+    "file": "src/client/group/__tests__/marmot-group.test.ts",
+    "line": null,
+    "description": "Updated stale expected component list after lifecycle-v1 became required",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T16:32:30.529Z",
     "resolved_at": null
   }
 ]
