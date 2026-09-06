@@ -264,7 +264,7 @@ spec scope surfaced by the 2026-08-06 reference sweep, not urgent remediation.
 2. A valid Commit that changes the component to `disbanded` forces `Stable → Recovering` on admission **even when it is a linear edge and no divergent edge exists**, so terminalization can only occur after branch selection.
 3. That forced transition does **not** restart either convergence timer, resnapshot `pass_base_epoch`, or give the disband candidate special branch-scoring priority — it is a terminalization boundary, not a scoring rule.
 4. Once `disbanded` is canonical, the group is terminal: no further outbound, and subsequent input is classified consistently with the existing removed-inactive handling.
-   **Plans**: 4 plans
+   **Plans**: 5 plans
 
 Plans:
 
@@ -274,15 +274,19 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04.1-02-PLAN.md — Parent-relative disband legality plus durable local request and regeneration
+- [ ] 04.1-02-PLAN.md — Parent-relative disband legality plus low-level durable local request and regeneration
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 04.1-03-PLAN.md — Forced linear convergence admission and canonical-only terminal selection
+- [ ] 04.1-03-PLAN.md — Durable request-store construction wiring and public enable/disband publication
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 04.1-04-PLAN.md — Tombstone-first cleanup, public terminal contract, and inactive routing
+- [ ] 04.1-04-PLAN.md — Forced linear convergence admission and canonical-only terminal selection
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04.1-05-PLAN.md — Tombstone-first cleanup, public terminal contract, and inactive routing
 
 ### Phase 5: Quality Gate
 
@@ -310,7 +314,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Inbound Trust & Wire Boundary         | 4/4            | Complete    | 2026-07-22 |
 | 3. Commit Integrity & Convergence Parity | 11/11 | Complete    | 2026-09-01 |
 | 4. Feature Parity & Conformance Vectors  | 7/7 | Complete    | 2026-09-05 |
-| 4.1. Terminal Group Disbanding           | 0/4            | Not started | -          |
+| 4.1. Terminal Group Disbanding           | 0/5            | Not started | -          |
 | 5. Quality Gate                          | 0/TBD          | Not started | -          |
 
 ## Backlog
