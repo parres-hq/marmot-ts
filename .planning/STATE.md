@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: Phase 1)
 current_phase: 04.1
 current_phase_name: Terminal Group Disbanding
-status: planned
-stopped_at: Phase 04.1 planned — 6 plans in 6 waves
-last_updated: "2026-09-06T16:30:00.000Z"
+status: in_progress
+stopped_at: Completed 04.1-01-PLAN.md
+last_updated: "2026-09-06T16:13:25.007Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 04.1 planned as 6 dependency-ordered execution plans
+last_activity_desc: Completed Phase 04.1 Plan 01 lifecycle component foundation
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 45
-  completed_plans: 39
-  percent: 71
+  completed_plans: 40
+  percent: 89
 ---
 
 # Project State
@@ -24,18 +24,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-21)
 
 **Core value:** A downstream client can join a Marmot group and exchange messages that interoperate, byte-for-byte, with any spec-conformant peer (incl. the Rust MDK reference), across every supported runtime.
-**Current focus:** Phase 04 — Feature Parity & Conformance Vectors
+**Current focus:** Phase 04.1 — Terminal Group Disbanding
 
 ## Current Position
 
 Phase: 04.1 — Terminal Group Disbanding
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-09-05 — Phase 04 complete, transitioned to Phase 04.1
+Plan: 1 of 6
+Status: In progress
+Last activity: 2026-09-06 — Completed lifecycle component foundation
 
-Progress: [██████████] 100% (7 phases)
+Progress: [█████████░] 89% (7 phases)
 
-**Next recommended run:** `/gsd-execute-phase 03.1`
+**Next recommended run:** `/gsd-execute-phase 04.1`
 
 ## Performance Metrics
 
@@ -103,6 +103,7 @@ _Updated after each plan completion_
 | Phase 04 P05 | 8min | 2 tasks | 8 files |
 | Phase 04 P06 | 7min | 2 tasks | 7 files |
 | Phase 04 P07 | 6min | 3 tasks | 6 files |
+| Phase 04.1 P01 | 13min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -202,6 +203,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04-06]: Canonical snapshots hash public GroupContext encoder bytes and a domain-separated MLS exporter commitment.
 - [Phase ?]: Portable Scenario IR operations outside the adapter surface remain explicit capability results under immutable MDK ids.
 - [Phase ?]: Extended offline cases 6-23 are isolated from root Vitest discovery for Phase 5 matrix execution.
+- [Phase ?]: Represent protocol lifecycle with a named const object and literal union, not a TypeScript enum.
+- [Phase ?]: Seed lifecycle-v1 in createGroup while treating absent lifecycle bytes as valid legacy state.
 
 ### Pending Todos
 
@@ -236,7 +239,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T15:32:57.788Z
-Stopped at: Phase 04.1 context gathered
+Last session: 2026-09-06T16:13:24.987Z
+Stopped at: Completed 04.1-01-PLAN.md
 Resume file:
-.planning/phases/04.1-terminal-group-disbanding/04.1-CONTEXT.md
+None

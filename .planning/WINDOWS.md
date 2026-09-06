@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
+open_count: 5
 waived_count: 0
 fixed_count: 0
-total_count: 3
-last_updated: 2026-09-05T15:54:48.522Z
+total_count: 5
+last_updated: 2026-09-06T16:13:16.377Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,8 @@ last_updated: 2026-09-05T15:54:48.522Z
 | 1 | 03.1 | unrun-verify | src/__tests__/exports.test.ts |  | Full suite otherwise passed; pre-existing export snapshot drift remains assigned to plan 03.1-08 | open |  | 2026-09-02T14:52:14.235Z |  |
 | 2 | 03.1 | deviation | .planning/STATE.md |  | Corrected stale 11/11 state position to 12/14 after state.advance-plan misclassified the phase as complete | open |  | 2026-09-02T16:32:47.191Z |  |
 | 3 | 04 | deviation | src/__tests__/conformance/manifest.ts |  | Executable vector path validation distinguishes scenario vectors from inventory-only formal records | open |  | 2026-09-05T15:54:48.522Z |  |
+| 4 | 04.1 | deviation | src/core/group.ts |  | Wired lifecycle defaults into real group creation | open |  | 2026-09-06T16:13:16.265Z |  |
+| 5 | 04.1 | deviation | src/core/__tests__/group.test.ts |  | Updated stale group-construction lifecycle expectation | open |  | 2026-09-06T16:13:16.377Z |  |
 
 ````json
 [
@@ -55,6 +57,30 @@ last_updated: 2026-09-05T15:54:48.522Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-05T15:54:48.522Z",
+    "resolved_at": null
+  },
+  {
+    "id": 4,
+    "kind": "deviation",
+    "phase": "04.1",
+    "file": "src/core/group.ts",
+    "line": null,
+    "description": "Wired lifecycle defaults into real group creation",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T16:13:16.265Z",
+    "resolved_at": null
+  },
+  {
+    "id": 5,
+    "kind": "deviation",
+    "phase": "04.1",
+    "file": "src/core/__tests__/group.test.ts",
+    "line": null,
+    "description": "Updated stale group-construction lifecycle expectation",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T16:13:16.377Z",
     "resolved_at": null
   }
 ]

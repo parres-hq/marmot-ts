@@ -34,7 +34,7 @@ Requirements for catching marmot-ts up to feature parity + byte-for-byte interop
 
 ### Group lifecycle / disbanding
 
-- [ ] **LIFE-01**: Implement `marmot.group.lifecycle.v1` (`0x800c`) with the exact one-byte active/disbanded codec, required enablement for new groups, legacy-group compatibility, required-component immutability, capability checks, and full parent-relative disband Commit validation
+- [x] **LIFE-01**: Implement `marmot.group.lifecycle.v1` (`0x800c`) with the exact one-byte active/disbanded codec, required enablement for new groups, legacy-group compatibility, required-component immutability, capability checks, and full parent-relative disband Commit validation
 - [ ] **LIFE-02**: Selected disbanding is an absorbing, durable, publicly observable terminal state with one actor-attributed event, typed outbound rejection, terminal inbound classification, restart-safe tombstone cleanup, and a durable local disband request that regenerates against a selected active branch until it terminalizes or loses membership/admin authority
 
 ### Conformance vectors
@@ -88,7 +88,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CONV-05     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
 | WIRE-04     | Phase 4 — Feature Parity & Conformance Vectors  | Complete |
 | CONF-01     | Phase 4 — Feature Parity & Conformance Vectors  | Complete |
-| LIFE-01     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
+| LIFE-01     | Phase 4.1 — Terminal Group Disbanding           | Complete |
 | LIFE-02     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
 | QA-01       | Phase 5 — Quality Gate                          | Pending  |
 | QA-02       | Phase 5 — Quality Gate                          | Pending  |
