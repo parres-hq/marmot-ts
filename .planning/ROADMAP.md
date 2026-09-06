@@ -28,7 +28,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.1: Phase 3 Review Closure** (INSERTED) - Close the 30 open findings from 03-REVIEW.md round 3; excludes CR-08/CR-11, which moved to Phase 4 (completed 2026-09-02)
 - [x] **Phase 4: Feature Parity & Conformance Vectors** - SafeAAD advertisement, MDK's own test vectors as cross-impl tests, and the own-commit convergence stamp port that closes CR-08/CR-11 (completed 2026-09-05)
 - [x] **Phase 4.1: Terminal Group Disbanding** (INSERTED) - New `marmot.group.lifecycle.v1` `disbanded` component and its forced `Stable → Recovering` admission rule (completed 2026-09-06)
-- [ ] **Phase 5: Quality Gate** - Green suite on every supported runtime; byte-exact MDK cross-checks recorded
+- [x] **Phase 5: Quality Gate** - Green suite on every supported runtime; byte-exact MDK cross-checks recorded (completed 2026-09-06)
 
 ## Phase Details
 
@@ -330,7 +330,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3. Commit Integrity & Convergence Parity | 11/11 | Complete    | 2026-09-01 |
 | 4. Feature Parity & Conformance Vectors  | 7/7 | Complete    | 2026-09-05 |
 | 4.1. Terminal Group Disbanding           | 6/6 | Complete    | 2026-09-06 |
-| 5. Quality Gate                          | 8/8 | In Progress|  |
+| 5. Quality Gate                          | 8/8 | Complete    | 2026-09-06 |
 
 ## Backlog
 
