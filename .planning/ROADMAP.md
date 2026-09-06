@@ -305,12 +305,12 @@ the milestone is shippable.
 2. `deno run -A --node-modules-dir=auto npm:vitest run` exits 0 on Deno 2.
 3. `bun run vitest run` exits 0 on Bun latest and Bun 1.1.
 4. Every catch-up change with a byte-exact MDK counterpart (proof v2, KeyPackage lifetime, tag cardinality, SafeAAD dictionary bytes) has been cross-checked against the Rust reference output and the result recorded.
-   **Plans**: 1/8 plans executed
+   **Plans**: 2/8 plans executed
 
 Plans:
 
 - [x] 05-01-PLAN.md — Six-runtime normal/extended CI matrix and local smoke evidence
-- [ ] 05-02-PLAN.md — Proof-v2 reproducibility dossier
+- [x] 05-02-PLAN.md — Proof-v2 reproducibility dossier
 - [ ] 05-03-PLAN.md — KeyPackage lifetime and capability-delta dossier
 - [ ] 05-04-PLAN.md — Canonical tag and cardinality dossier
 - [ ] 05-05-PLAN.md — SafeAAD/Leaf dictionary and capability-delta dossier
@@ -330,7 +330,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3. Commit Integrity & Convergence Parity | 11/11 | Complete    | 2026-09-01 |
 | 4. Feature Parity & Conformance Vectors  | 7/7 | Complete    | 2026-09-05 |
 | 4.1. Terminal Group Disbanding           | 6/6 | Complete    | 2026-09-06 |
-| 5. Quality Gate                          | 1/8 | In Progress|  |
+| 5. Quality Gate                          | 2/8 | In Progress|  |
 
 ## Backlog
 

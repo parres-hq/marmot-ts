@@ -44,7 +44,7 @@ Requirements for catching marmot-ts up to feature parity + byte-for-byte interop
 ### Quality gate
 
 - [x] **QA-01**: Full test suite green across all supported runtimes (Node 20/22/24, Deno 2, Bun latest/1.1) at milestone end
-- [ ] **QA-02**: Every catch-up change with a byte-exact MDK counterpart is cross-checked against the Rust reference output and the result recorded
+- [x] **QA-02**: Every catch-up change with a byte-exact MDK counterpart is cross-checked against the Rust reference output and the result recorded
 
 ## v2 Requirements
 
@@ -91,7 +91,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | LIFE-01     | Phase 4.1 — Terminal Group Disbanding           | Complete |
 | LIFE-02     | Phase 4.1 — Terminal Group Disbanding           | Complete |
 | QA-01       | Phase 5 — Quality Gate                          | Complete |
-| QA-02       | Phase 5 — Quality Gate                          | Pending  |
+| QA-02       | Phase 5 — Quality Gate                          | Complete |
 
 **Coverage:**
 
