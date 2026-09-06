@@ -24,6 +24,7 @@ import {
   GroupHistoryFactory,
   GroupMediaFactory,
   MarmotGroup,
+  type GroupDisbandedEvent,
 } from "./group/marmot-group.js";
 import type { NostrNetworkInterface } from "./nostr-interface.js";
 
@@ -71,6 +72,11 @@ export type GroupRegistryEvents<
   loaded: (group: MarmotGroup<THistory, TMedia>) => void;
   /** Emitted when an inbound commit removed the client from a tracked group. */
   removed: (group: MarmotGroup<THistory, TMedia>) => void;
+  /** Emitted after durable canonical disband notification delivery is recorded. */
+  disbanded: (
+    group: MarmotGroup<THistory, TMedia>,
+    evidence: GroupDisbandedEvent,
+  ) => void;
 };
 
 /**
@@ -105,7 +111,7 @@ export class GroupRegistry<
   /** Per-group listener handles, so we can detach them when a group is unloaded. */
   #groupListeners = new Map<
     string,
-    { destroyed: () => void; removed: () => void }
+    { destroyed: () => void; removed: () => void; disbanded: (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void }
   >();
 
   /** Tracks in-flight group loads to prevent duplicate instances under concurrency */
@@ -280,7 +286,10 @@ export class GroupRegistry<
     // signal so the manager can re-emit it to the application.
     const removed = () => this.emit("removed", group);
     group.on("removed", removed);
-    const listeners = { destroyed, removed };
+    const disbanded = (_group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) =>
+      this.emit("disbanded", group, evidence);
+    group.on("disbanded", disbanded);
+    const listeners = { destroyed, removed, disbanded };
     this.#groupListeners.set(id, listeners);
 
     try {
@@ -290,6 +299,7 @@ export class GroupRegistry<
       await group.session.hydrateLifecycleEvidence();
       if (group.forkTree.tips().length > 1) await group.reconverge();
       await group.realizeRemovalIfNeeded();
+      await group.realizeDisbandIfNeeded();
       this.#activatingGroups.delete(id);
       this.emit("updated", this.loaded);
     } catch (error) {
@@ -298,6 +308,7 @@ export class GroupRegistry<
       // point to it so a stale rejection cannot evict a newer activation.
       group.off("destroyed", destroyed);
       group.off("removed", removed);
+      group.off("disbanded", disbanded);
       if (this.#groups.get(id) === group) {
         this.#groups.delete(id);
         this.#activatingGroups.delete(id);
@@ -320,6 +331,7 @@ export class GroupRegistry<
     if (listeners) {
       existing.off("destroyed", listeners.destroyed);
       existing.off("removed", listeners.removed);
+      existing.off("disbanded", listeners.disbanded);
       this.#groupListeners.delete(id);
     }
 

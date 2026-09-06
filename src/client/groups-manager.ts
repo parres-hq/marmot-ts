@@ -36,6 +36,7 @@ import {
   GroupHistoryFactory,
   GroupMediaFactory,
   MarmotGroup,
+  type GroupDisbandedEvent,
 } from "./group/marmot-group.js";
 import { createInviteIntent } from "./group/invite.js";
 import type { WelcomeKeyPackageCandidate } from "./key-package-store.js";
@@ -197,6 +198,8 @@ export type GroupsManagerEvents<
    * call {@link GroupsManager.destroy} to purge it.
    */
   removed: (groupId: Uint8Array) => void;
+  /** Emitted once for the selected, durably recorded terminal commit. */
+  disbanded: (groupId: Uint8Array, evidence: GroupDisbandedEvent) => void;
   /**
    * Emitted by a {@link GroupsManager.connect} subscription when a received
    * transport event could not be read (e.g. an epoch beyond the retained
@@ -296,6 +299,9 @@ export class GroupsManager<
     this.#registry.on("updated", (groups) => this.emit("updated", groups));
     this.#registry.on("loaded", (group) => this.emit("loaded", group));
     this.#registry.on("removed", (group) => this.emit("removed", group.id));
+    this.#registry.on("disbanded", (group, evidence) =>
+      this.emit("disbanded", group.id, evidence),
+    );
   }
 
   /** Returns the list of currently loaded group instances */
@@ -492,6 +498,7 @@ export class GroupsManager<
     this.on("left", disconnect);
     this.on("unloaded", disconnect);
     this.on("removed", disconnect);
+    this.on("disbanded", disconnect);
 
     return {
       unsubscribe: () => {
@@ -503,6 +510,7 @@ export class GroupsManager<
         this.off("left", disconnect);
         this.off("unloaded", disconnect);
         this.off("removed", disconnect);
+        this.off("disbanded", disconnect);
         for (const record of records.values()) {
           record.cancelled = true;
           record.sub?.unsubscribe();

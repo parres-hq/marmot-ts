@@ -416,6 +416,30 @@ export class GroupSession<
     return this.#terminalTombstone;
   }
 
+  /** Synchronous terminal authority after lifecycle hydration has completed. */
+  get terminalTombstone(): DisbandTombstone | undefined {
+    return this.#terminalTombstone;
+  }
+
+  /** Durably records public notification delivery before application callbacks run. */
+  async markDisbandNotificationDelivered(): Promise<DisbandTombstone | undefined> {
+    await this.#terminalHydrated;
+    const current = this.#terminalTombstone;
+    if (!current || current.notificationState === "delivered") return undefined;
+    if (!this.lifecycleStore)
+      throw new Error("Disband notification requires a lifecycle store");
+    const delivered: DisbandTombstone = {
+      ...current,
+      notificationState: "delivered",
+    };
+    await this.lifecycleStore.setItem(
+      disbandTombstoneKey(bytesToHex(current.groupId)),
+      encodeDisbandTombstone(delivered),
+    );
+    this.#terminalTombstone = delivered;
+    return delivered;
+  }
+
   /** Waits until both durable lifecycle namespaces have been decoded. */
   async hydrateLifecycleEvidence(): Promise<void> {
     await this.#terminalHydrated;

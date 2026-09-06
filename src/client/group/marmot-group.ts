@@ -27,6 +27,7 @@ import type {
   DisbandFailureReason,
   DisbandRequest,
 } from "../../engine/disband-request.js";
+import type { DisbandTombstone } from "../../engine/disband-tombstone.js";
 import { buildForkTreeView, type ForkTreeView } from "./fork-tree-view.js";
 import { logger } from "../../utils/debug.js";
 import type { GenericKeyValueStore } from "../../utils/key-value.js";
@@ -74,6 +75,23 @@ export class NoMarmotGroupDataError extends Error {
   constructor() {
     super("MarmotGroupData not found in ClientState.");
   }
+}
+
+export type MarmotGroupStatus = "active" | "removed" | "disbanded";
+
+/** Stable typed refusal for every operation attempted after canonical disband. */
+export class GroupTerminalError extends Error {
+  readonly reason = "group_disbanded" as const;
+
+  constructor() {
+    super("Group is disbanded");
+    this.name = "GroupTerminalError";
+  }
+}
+
+export interface GroupDisbandedEvent {
+  readonly actorPubkey: string;
+  readonly commitDigest: Uint8Array;
 }
 
 export type EnableDisbandingResult =
@@ -290,6 +308,11 @@ export type MarmotGroupEvents<
    * decides when to call {@link MarmotGroup.destroy} to purge it.
    */
   removed: (group: MarmotGroup<THistory, TMedia>) => void;
+  /** Emitted once, after durable terminal notification delivery is recorded. */
+  disbanded: (
+    group: MarmotGroup<THistory, TMedia>,
+    evidence: GroupDisbandedEvent,
+  ) => void;
   /** Emitted when history persistence fails (best-effort, non-blocking) */
   historyError: (error: Error) => void;
   /**
@@ -367,6 +390,11 @@ export class MarmotGroup<
   #removalRealizationInFlight?: Promise<void>;
   /** Project-owned metadata for safe `removed` dispatch; never reads emitter internals. */
   readonly #removedListeners: RemovedListener<THistory, TMedia>[] = [];
+  readonly #disbandedListeners: Array<{
+    fn: (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void;
+    context: unknown;
+    once: boolean;
+  }> = [];
 
   private log: Debugger;
 
@@ -384,6 +412,12 @@ export class MarmotGroup<
         once: false,
       });
     }
+    if (event === "disbanded")
+      this.#disbandedListeners.push({
+        fn: fn as (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void,
+        context: context || this,
+        once: false,
+      });
     return super.on(event, fn, context);
   }
 
@@ -401,6 +435,12 @@ export class MarmotGroup<
         once: true,
       });
     }
+    if (event === "disbanded")
+      this.#disbandedListeners.push({
+        fn: fn as (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void,
+        context: context || this,
+        once: true,
+      });
     return super.once(event, fn, context);
   }
 
@@ -429,6 +469,20 @@ export class MarmotGroup<
         }
       }
     }
+    if (event === "disbanded") {
+      if (!fn) this.#disbandedListeners.length = 0;
+      else {
+        const disbandedFn = fn as (group: MarmotGroup<THistory, TMedia>, evidence: GroupDisbandedEvent) => void;
+        for (let i = this.#disbandedListeners.length - 1; i >= 0; i--) {
+          const listener = this.#disbandedListeners[i]!;
+          if (
+            listener.fn === disbandedFn &&
+            (!once || listener.once) &&
+            (!context || listener.context === context)
+          ) this.#disbandedListeners.splice(i, 1);
+        }
+      }
+    }
     return super.removeListener(event, fn, context, once);
   }
 
@@ -448,6 +502,8 @@ export class MarmotGroup<
   ): this {
     if (event === undefined || event === "removed")
       this.#removedListeners.length = 0;
+    if (event === undefined || event === "disbanded")
+      this.#disbandedListeners.length = 0;
     return super.removeAllListeners(event);
   }
 
@@ -461,6 +517,14 @@ export class MarmotGroup<
   /** Read the current group state */
   get state() {
     return this.session.state;
+  }
+
+  /** Public absorbing status; Unrecoverable deliberately remains active/repairable. */
+  get status(): MarmotGroupStatus {
+    if (this.session.terminalTombstone) return "disbanded";
+    return this.state.groupActiveState.kind === "removedFromGroup"
+      ? "removed"
+      : "active";
   }
 
   /** Group-scoped durable key for removal realization state. */
@@ -681,6 +745,34 @@ export class MarmotGroup<
     await this.#realizeRemovalIfNeeded();
   }
 
+  /** Realizes durable terminal notification exactly once across restarts. */
+  async realizeDisbandIfNeeded(): Promise<void> {
+    const tombstone = await this.session.markDisbandNotificationDelivered();
+    if (!tombstone) return;
+    this.session.dispose();
+    this.#rejectQueuedOutbound(new GroupTerminalError());
+    this.#emitDisbandedSafely(tombstone);
+  }
+
+  #emitDisbandedSafely(tombstone: DisbandTombstone): void {
+    const evidence: GroupDisbandedEvent = {
+      actorPubkey: tombstone.actorPubkey,
+      commitDigest: tombstone.commitDigest,
+    };
+    for (const listener of [...this.#disbandedListeners]) {
+      if (listener.once) this.off("disbanded", listener.fn, undefined, true);
+      try {
+        listener.fn.call(listener.context, this, evidence);
+      } catch (error) {
+        this.log("disbanded listener failed: %o", error);
+      }
+    }
+  }
+
+  async #assertNotDisbanded(): Promise<void> {
+    if (await this.session.disbandTombstone()) throw new GroupTerminalError();
+  }
+
   /**
    * Persists any pending changes to the group state in the store.
    *
@@ -710,6 +802,7 @@ export class MarmotGroup<
    * removal.
    */
   async reconverge(): Promise<void> {
+    await this.#assertNotDisbanded();
     const results = await this.session.reconverge();
     for (const result of results) await this.#applyRemovalWithdrawal(result);
     // A tree-fed switch can also land us ON a branch that removes us. The
@@ -730,6 +823,7 @@ export class MarmotGroup<
    * allowed for non-admin members.
    */
   async selfUpdate(): Promise<Record<string, PublishResponse>> {
+    await this.#assertNotDisbanded();
     this.log("self-update commit");
     const groupData = this.groupData;
     if (!groupData) throw new NoMarmotGroupDataError();
@@ -752,6 +846,7 @@ export class MarmotGroup<
   async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
     ...args: Args
   ): Promise<Record<string, PublishResponse>> {
+    await this.#assertNotDisbanded();
     const groupData = this.groupData;
     if (!groupData) throw new NoMarmotGroupDataError();
 
@@ -783,6 +878,7 @@ export class MarmotGroup<
   async sendProposal(
     proposal: Proposal,
   ): Promise<Record<string, PublishResponse>> {
+    await this.#assertNotDisbanded();
     const [result] = await this.submitIntent({ kind: "proposal", proposal });
     return result.response;
   }
@@ -800,6 +896,7 @@ export class MarmotGroup<
   async submitIntent(
     intent: GroupSessionSendIntent,
   ): Promise<GroupPublishResult[]> {
+    await this.#assertNotDisbanded();
     if (mayReleaseOutbound(this.session.convergenceStatus, this.lifecycle)) {
       return this.#sendNow(intent);
     }
@@ -816,6 +913,7 @@ export class MarmotGroup<
 
   /** Atomically enables lifecycle-v1 for a legacy group and publishes it once. */
   async enableDisbanding(): Promise<EnableDisbandingResult> {
+    await this.#assertNotDisbanded();
     let effects;
     try {
       effects = await this.session.enableGroupDisbanding();
@@ -847,6 +945,7 @@ export class MarmotGroup<
 
   /** Persists irreversible intent, publishes one candidate, and retains it until selection. */
   async disband(): Promise<DisbandResult> {
+    await this.#assertNotDisbanded();
     const existing = await this.session.disbandRequest();
     if (existing?.status === "pending")
       return { kind: "pending", request: existing };
@@ -939,9 +1038,9 @@ export class MarmotGroup<
   }
 
   /** Rejects and clears every queued outbound intent (teardown / removal). */
-  #rejectQueuedOutbound(reason: string): void {
+  #rejectQueuedOutbound(reason: string | Error): void {
     if (this.#outboundQueue.length === 0) return;
-    const error = new Error(reason);
+    const error = typeof reason === "string" ? new Error(reason) : reason;
     for (const item of this.#outboundQueue.splice(0)) item.reject(error);
   }
 
@@ -1117,6 +1216,9 @@ export class MarmotGroup<
         await this.save(true);
         await this.#realizeRemovalIfNeeded();
       }
+
+      if (result.kind === "processed" && result.selectedTerminal)
+        await this.realizeDisbandIfNeeded();
 
       await this.#applyRemovalWithdrawal(result);
 
