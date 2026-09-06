@@ -20,11 +20,13 @@ import {
   getAdminPolicy,
   getAppComponents,
   getComponentData,
+  getGroupLifecycle,
   getGroupAvatarUrl,
   getGroupProfile,
   getMessageRetention,
   getNostrRouting,
   groupAvatarUrlEntry,
+  groupProtocolLifecycleValues,
   groupProfileEntry,
   makeAppComponentsExtension,
   messageRetentionEntry,
@@ -33,6 +35,7 @@ import {
 import {
   APP_COMPONENTS_COMPONENT_ID,
   GROUP_ADMIN_POLICY_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT_ID,
   GROUP_PROFILE_COMPONENT_ID,
   NOSTR_ROUTING_COMPONENT_ID,
   SAFE_AAD_COMPONENT_ID,
@@ -41,6 +44,8 @@ import {
 import { makeLeafAppComponentsExtension } from "../dictionary.js";
 import { createCredential } from "../../credential.js";
 import { generateKeyPackage } from "../../key-package.js";
+import { createGroup } from "../../group.js";
+import { getMarmotGroupView } from "../../client-state.js";
 
 const gid = new Uint8Array(32);
 for (let i = 0; i < 32; i++) gid[i] = i;
@@ -174,5 +179,57 @@ describe("makeLeafAppComponentsExtension", () => {
         componentEntry(SAFE_AAD_COMPONENT_ID, new Uint8Array([0])),
       ]),
     ).toThrow(/SafeAAD.*LeafNode/i);
+  });
+});
+
+describe("group lifecycle defaults", () => {
+  it("carries active lifecycle state from new-group bytes to the public view", async () => {
+    const creatorPubkey =
+      "884704bd421671e01c13f854d2ce23ce2a5bfe9562f4f297ad2bc921ba30c3a6";
+    const ciphersuiteImpl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const creatorKeyPackage = await generateKeyPackage({
+      credential: createCredential(creatorPubkey),
+      ciphersuiteImpl,
+    });
+    const { clientState } = await createGroup({
+      creatorKeyPackage,
+      components: [
+        groupProfileEntry({ name: "Lifecycle Group", description: "" }),
+        adminPolicyEntry([creatorPubkey]),
+      ],
+      ciphersuiteImpl,
+    });
+
+    expect(getAppComponents(clientState.groupContext.extensions)).toContain(
+      GROUP_LIFECYCLE_COMPONENT_ID,
+    );
+    expect(getComponentData(
+      clientState.groupContext.extensions,
+      GROUP_LIFECYCLE_COMPONENT_ID,
+    )).toEqual(new Uint8Array([0]));
+    expect(getGroupLifecycle(clientState.groupContext.extensions)).toBe(
+      groupProtocolLifecycleValues.active,
+    );
+    expect(getMarmotGroupView(clientState)?.protocolLifecycle).toBe(
+      groupProtocolLifecycleValues.active,
+    );
+
+    const legacyExtensions = extensionsWith(
+      groupProfileEntry({ name: "Legacy Group", description: "" }),
+      adminPolicyEntry([creatorPubkey]),
+    );
+    expect(getGroupLifecycle(legacyExtensions)).toBeUndefined();
+    expect(
+      getMarmotGroupView({
+        ...clientState,
+        groupContext: {
+          ...clientState.groupContext,
+          extensions: legacyExtensions,
+        },
+      })?.protocolLifecycle,
+    ).toBeUndefined();
   });
 });
