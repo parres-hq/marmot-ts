@@ -1,6 +1,6 @@
 # Proof-v2 Cross-Implementation Dossier
 
-This document is an attestation template. Evidence is populated only from a detached worktree at the immutable tested source.
+Evidence captured on 2026-09-06 UTC from a detached worktree at the immutable tested source. This attestation was written later and does not redefine the tested source.
 
 <!-- quality-dossier-evidence:start -->
 ```json
@@ -8,29 +8,29 @@ This document is an attestation template. Evidence is populated only from a deta
   "schema_version": 1,
   "dossier": "proof-v2",
   "provenance": {
-    "tested_source_sha": "",
-    "marmot_sha": "",
-    "mdk_sha": "",
-    "lockfile_sha256": ""
+    "tested_source_sha": "b937e3f3e4fddcb6e48aff4ca6507623504be48d",
+    "marmot_sha": "4a2bc65f8db5866cec3b2a127dedb37818eaf207",
+    "mdk_sha": "dbf45c83a8e157302edd13010944ad2c6a9cf9a5",
+    "lockfile_sha256": "0f516945e45e257735c4c89a5e9e08b4bb2f839b7ce48121a71b4fb0b03a0932"
   },
   "environment": {
-    "detached_worktree": false,
-    "node_version": "",
-    "pnpm_version": "",
-    "install_command": "",
-    "install_result": "",
-    "post_install_lockfile_sha256": ""
+    "detached_worktree": true,
+    "node_version": "v22.23.1",
+    "pnpm_version": "10.18.3",
+    "install_command": "CI=true npx --yes pnpm@10.18.3 install --frozen-lockfile",
+    "install_result": "PASS: 816 packages installed; prepare built ts-mls; lockfile unchanged",
+    "post_install_lockfile_sha256": "0f516945e45e257735c4c89a5e9e08b4bb2f839b7ce48121a71b4fb0b03a0932"
   },
   "verification": {
-    "compile_command": "",
-    "compile_result": "",
-    "build_command": "",
-    "build_result": "",
-    "rust_command": "",
-    "rust_output_or_digest": "",
-    "fixture_diff_result": "",
-    "typescript_command": "",
-    "typescript_output": ""
+    "compile_command": "CI=true npx --yes pnpm@10.18.3 compile",
+    "compile_result": "PASS: tsc -b tsconfig.build.json, exit 0",
+    "build_command": "CI=true npx --yes pnpm@10.18.3 build",
+    "build_result": "PASS: clean plus compile, exit 0",
+    "rust_command": "CARGO_TARGET_DIR=/home/user/Projects/marmot-ts/tools/quality-gate/proof-v2-probe/target cargo run --quiet --manifest-path tools/quality-gate/proof-v2-probe/Cargo.toml --locked | diff -u src/__tests__/fixtures/proof-v2-rust.json -",
+    "rust_output_or_digest": "PASS: no diff; fixture SHA-256 a106630044c129b7621fddf6c7a5ab1976afe6b5a785aab68925c3270b0c560f",
+    "fixture_diff_result": "PASS: exit 0, no output",
+    "typescript_command": "CI=true npx --yes pnpm@10.18.3 vitest run src/__tests__/conformance/proof-v2-parity.test.ts src/core/__tests__/key-package-lifetime-parity.test.ts src/core/__tests__/key-package-tag-parity.test.ts src/core/components/__tests__/safe-aad-parity.test.ts",
+    "typescript_output": "PASS: 4 files, 68 tests, Vitest 3.2.6, duration 2.98s"
   },
   "oracle": {
     "generator_language": "Rust",
@@ -42,8 +42,8 @@ This document is an attestation template. Evidence is populated only from a deta
     "independence": "independent"
   },
   "negative_control": {
-    "command": "",
-    "result": ""
+    "command": "CI=true npx --yes pnpm@10.18.3 vitest run src/__tests__/conformance/proof-v2-parity.test.ts src/core/__tests__/key-package-lifetime-parity.test.ts src/core/__tests__/key-package-tag-parity.test.ts src/core/components/__tests__/safe-aad-parity.test.ts -t 'rejects canonical-event and signature mutations|negative control detects a one-second cap mutation|negative control detects a canonical tag mutation|detects a one-byte dictionary mutation'",
+    "result": "PASS: 4 mutation controls passed; 64 nonmatching tests skipped"
   }
 }
 ```
@@ -51,5 +51,5 @@ This document is an attestation template. Evidence is populated only from a deta
 
 ## Result
 
-Pending immutable-source execution.
+PASS — the independent Rust fixture reproduced byte-for-byte, shipping TypeScript verification passed, and the dossier-specific mutation control rejected altered evidence.
 
