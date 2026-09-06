@@ -1,0 +1,25 @@
+{
+  "kind": 30443,
+  "mdk_sha": "dbf45c83a8e157302edd13010944ad2c6a9cf9a5",
+  "source": "refs/mdk transport-nostr-adapter NostrKeyPackagePublication::to_event_at",
+  "tags": [
+    ["d", "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"],
+    ["mls_protocol_version", "1.0"],
+    ["i", "3c20ae45aa82f20b69836e446e2fc15cac2cc220eaef5e5bc33b9c0586e9023e"],
+    ["mls_ciphersuite", "0x0001"],
+    ["mls_extensions", "0x0006"],
+    ["mls_proposals", "0x0008"],
+    [
+      "app_components",
+      "0x8001",
+      "0x8003",
+      "0x8004",
+      "0x8005",
+      "0x8006",
+      "0x8007",
+      "0x8008",
+      "0x800c"
+    ]
+  ],
+  "tags_sha256": "7d68975a5864f568ed147fb2bb6ca5d9b9ec40e9992b8d42392f664688cb1c4b"
+}

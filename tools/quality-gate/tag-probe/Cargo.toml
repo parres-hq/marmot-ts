@@ -1,0 +1,16 @@
+[package]
+name = "tag-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+cgka-engine = { path = "../../../refs/mdk/crates/cgka-engine" }
+cgka-traits = { path = "../../../refs/mdk/crates/traits" }
+hex = "0.4"
+serde_json = "1"
+sha2 = "0.10"
+transport-nostr-adapter = { path = "../../../refs/mdk/crates/transport-nostr-adapter" }
+

@@ -117,7 +117,9 @@ async function createKeyPackageEventInternal(
   ).find((k) => protocolVersions[k] === keyPackage.version);
   const version = versionName === "mls10" ? "1.0" : String(keyPackage.version);
 
-  // Build tags
+  const keyPackageRef = await calculateKeyPackageRef(keyPackage);
+
+  // Build tags in the canonical MDK publisher order.
   const tags: string[][] = [];
 
   // NIP-70: protected event — relay must not serve this event to non-authors.
@@ -142,15 +144,12 @@ async function createKeyPackageEventInternal(
   // encoding"); content is always standard base64.
   tags.push(
     [KEY_PACKAGE_MLS_VERSION_TAG, version],
+    ["i", bytesToHex(keyPackageRef)],
     [KEY_PACKAGE_CIPHER_SUITE_TAG, ciphersuiteHex],
     [KEY_PACKAGE_EXTENSIONS_TAG, ...filteredExtensionTypes],
     [KEY_PACKAGE_PROPOSALS_TAG, ...proposalTypes],
     [KEY_PACKAGE_APP_COMPONENTS_TAG, ...appComponentIds],
   );
-
-  // MIP-00: required KeyPackageRef tag ("i")
-  const keyPackageRef = await calculateKeyPackageRef(keyPackage);
-  tags.push(["i", bytesToHex(keyPackageRef)]);
 
   // Add client tag if provided
   if (client) tags.push([KEY_PACKAGE_CLIENT_TAG, client]);

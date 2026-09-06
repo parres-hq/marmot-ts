@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 
 import lifetimeFixture from "../../__tests__/fixtures/key-package-lifetime-rust.json";
 import tagFixture from "../../__tests__/fixtures/key-package-tags-rust.json";
-import { getListTag, getSingletonTagValue, TAG_CARDINALITY } from "../../utils/tag-cardinality.js";
+import {
+  getListTag,
+  getSingletonTagValue,
+  TAG_CARDINALITY,
+} from "../../utils/tag-cardinality.js";
 import { createKeyPackageEvent } from "../key-package-event.js";
 
 type TagFixture = {
@@ -21,9 +25,9 @@ describe("MDK kind-30443 tag parity", () => {
 
   it("matches the Rust-produced canonical tag array and order", async () => {
     expect(rust.mdk_sha).toBe("dbf45c83a8e157302edd13010944ad2c6a9cf9a5");
-    expect(bytesToHex(sha256(new TextEncoder().encode(JSON.stringify(rust.tags))))).toBe(
-      rust.tags_sha256,
-    );
+    expect(
+      bytesToHex(sha256(new TextEncoder().encode(JSON.stringify(rust.tags)))),
+    ).toBe(rust.tags_sha256);
 
     const message = decode(
       mlsMessageDecoder,
@@ -49,7 +53,8 @@ describe("MDK kind-30443 tag parity", () => {
 describe("specification-derived required-tag rejection matrix", () => {
   for (const [kind, rules] of Object.entries(TAG_CARDINALITY)) {
     for (const [name, cardinality] of Object.entries(rules)) {
-      const valid = cardinality === "singleton" ? [name, "value"] : [name, "one", "two"];
+      const valid =
+        cardinality === "singleton" ? [name, "value"] : [name, "one", "two"];
       const read = (tags: string[][]) =>
         cardinality === "singleton"
           ? getSingletonTagValue({ tags }, name)
