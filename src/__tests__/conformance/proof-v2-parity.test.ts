@@ -103,6 +103,6 @@ describe("MDK proof-v2 parity", () => {
         fixtureLeaf(mutatedProof),
         fixture.ciphersuite,
       ),
-    ).toThrow("Invalid account identity proof signature");
+    ).toThrow("proof signature does not verify for credential identity");
   });
 });
