@@ -30,6 +30,12 @@ Requirements for catching marmot-ts up to feature parity + byte-for-byte interop
 - [x] **CONV-02**: SelfEvicted / Realizing removal is handled — on being removed, marmot-ts emits a self-removed notification, marks the group removed-inactive, and classifies later input as SelfEvicted/stale (additive; new; `member-departure.md` #171)
 - [x] **CONV-03**: Group-state-change notifications are attributed to their `commit_digest` and withdrawn when that commit is superseded on rewind, including clearing removal markers (additive; `src/engine/` convergence, cf. `delivered-payloads.ts`; `convergence.md` #171, mdk #724)
 - [x] **CONV-04**: Own-confirmed-commit convergence protection is verified against MDK scenario vectors — a device's own published+confirmed commit is never rolled back for a same-epoch sibling; fixes are added only if marmot-ts diverges (verify-first; `src/engine/fork-recovery.ts`, `tree-convergence.ts`; mdk #706/#723/#702, #724)
+- [ ] **CONV-05**: Every valid Commit that changes `marmot.group.lifecycle.v1` to `disbanded` enters the existing bounded convergence pass even on a linear edge, without changing pass identity, deadline, base epoch, or branch scoring; terminalization occurs only when that branch is selected canonically
+
+### Group lifecycle / disbanding
+
+- [ ] **LIFE-01**: Implement `marmot.group.lifecycle.v1` (`0x800c`) with the exact one-byte active/disbanded codec, required enablement for new groups, legacy-group compatibility, required-component immutability, capability checks, and full parent-relative disband Commit validation
+- [ ] **LIFE-02**: Selected disbanding is an absorbing, durable, publicly observable terminal state with one actor-attributed event, typed outbound rejection, terminal inbound classification, restart-safe tombstone cleanup, and a durable local disband request that regenerates against a selected active branch until it terminalizes or loses membership/admin authority
 
 ### Conformance vectors
 
@@ -79,18 +85,21 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CONV-02     | Phase 3 — Commit Integrity & Convergence Parity | Gaps Found |
 | CONV-03     | Phase 3 — Commit Integrity & Convergence Parity | Gaps Found |
 | CONV-04     | Phase 3 — Commit Integrity & Convergence Parity | Complete |
+| CONV-05     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
 | WIRE-04     | Phase 4 — Feature Parity & Conformance Vectors  | Complete |
 | CONF-01     | Phase 4 — Feature Parity & Conformance Vectors  | Complete |
+| LIFE-01     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
+| LIFE-02     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
 | QA-01       | Phase 5 — Quality Gate                          | Pending  |
 | QA-02       | Phase 5 — Quality Gate                          | Pending  |
 
 **Coverage:**
 
-- v1 requirements: 13 total (PROOF-01, SEC-01, WIRE-01..04, CONV-01..04, CONF-01, QA-01, QA-02 — corrected from the earlier "12 total" placeholder, which undercounted by one)
-- Mapped to phases: 13/13
+- v1 requirements: 16 total (PROOF-01, SEC-01, WIRE-01..04, CONV-01..05, CONF-01, LIFE-01..02, QA-01, QA-02)
+- Mapped to phases: 16/16
 - Unmapped: 0
 
 ---
 
 _Requirements defined: 2026-07-21_
-_Last updated: 2026-07-21 after roadmap creation (traceability filled, coverage corrected to 13/13)_
+_Last updated: 2026-09-06 after inserting Phase 04.1 terminal group disbanding requirements_

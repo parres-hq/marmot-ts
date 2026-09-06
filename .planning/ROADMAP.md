@@ -255,7 +255,7 @@ Plans:
 through a bounded convergence pass. Marked INSERTED mechanically by `/gsd-phase`; this is new
 spec scope surfaced by the 2026-08-06 reference sweep, not urgent remediation.
 **Depends on**: Phase 4 (shares the convergence-pass machinery)
-**Requirements**: TBD (new — not in the original v1.0 catchup requirement set)
+**Requirements**: LIFE-01, LIFE-02, CONV-05
 **Reference**: `refs/marmot/app-components/group-lifecycle-v1.md` (new in `4ad4ae2`),
 `refs/marmot/protocol-core/convergence.md` "Fork detection"
 **Success Criteria** (what must be TRUE):
@@ -264,11 +264,25 @@ spec scope surfaced by the 2026-08-06 reference sweep, not urgent remediation.
 2. A valid Commit that changes the component to `disbanded` forces `Stable → Recovering` on admission **even when it is a linear edge and no divergent edge exists**, so terminalization can only occur after branch selection.
 3. That forced transition does **not** restart either convergence timer, resnapshot `pass_base_epoch`, or give the disband candidate special branch-scoring priority — it is a terminalization boundary, not a scoring rule.
 4. Once `disbanded` is canonical, the group is terminal: no further outbound, and subsequent input is classified consistently with the existing removed-inactive handling.
-   **Plans**: TBD
+   **Plans**: 4 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 04.1 to break down)
+**Wave 1**
+
+- [ ] 04.1-01-PLAN.md — Exact lifecycle-v1 component bytes, defaults, compatibility, and public projection
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04.1-02-PLAN.md — Parent-relative disband legality plus durable local request and regeneration
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04.1-03-PLAN.md — Forced linear convergence admission and canonical-only terminal selection
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04.1-04-PLAN.md — Tombstone-first cleanup, public terminal contract, and inactive routing
 
 ### Phase 5: Quality Gate
 
@@ -296,6 +310,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Inbound Trust & Wire Boundary         | 4/4            | Complete    | 2026-07-22 |
 | 3. Commit Integrity & Convergence Parity | 11/11 | Complete    | 2026-09-01 |
 | 4. Feature Parity & Conformance Vectors  | 7/7 | Complete    | 2026-09-05 |
+| 4.1. Terminal Group Disbanding           | 0/4            | Not started | -          |
 | 5. Quality Gate                          | 0/TBD          | Not started | -          |
 
 ## Backlog
