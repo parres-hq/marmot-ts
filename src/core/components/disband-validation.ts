@@ -100,9 +100,17 @@ export function classifyDisbandCommit(args: {
   }
 
   const parentRequires = parentRequired.includes(GROUP_LIFECYCLE_COMPONENT_ID);
-  const resultRequires = resultingRequired.includes(
-    GROUP_LIFECYCLE_COMPONENT_ID,
-  );
+  let resultRequires = resultingRequired.includes(GROUP_LIFECYCLE_COMPONENT_ID);
+  // ts-mls exposes a removed receiver as a tombstone carrying the authenticated
+  // parent GroupContext, not the post-Commit roster/context. The exact inline
+  // proposal set below is therefore the only available resulting-state evidence
+  // on that receiver; MLS acceptance has already authenticated those bytes.
+  const receiverRemoved =
+    args.resultingState.groupActiveState?.kind === "removedFromGroup";
+  if (receiverRemoved) {
+    resultRequires = parentRequires;
+    resultingLifecycle = "disbanded";
+  }
   const touchesLifecycle = args.proposals.some(
     (proposal) =>
       updateBytes(proposal, GROUP_LIFECYCLE_COMPONENT_ID) !== undefined ||
@@ -253,12 +261,16 @@ export function classifyDisbandCommit(args: {
     );
   try {
     const resultingAdmins =
-      getAdminPolicy(args.resultingState.groupContext.extensions) ?? [];
+      receiverRemoved
+        ? [actorPubkey]
+        : (getAdminPolicy(args.resultingState.groupContext.extensions) ?? []);
     if (
       resultingAdmins.length !== 1 ||
       resultingAdmins[0] !== actorPubkey ||
-      leafIndexes(args.resultingState).length !== 1 ||
-      actorOf(args.resultingState, args.committerLeafIndex) !== actorPubkey
+      (!receiverRemoved &&
+        (leafIndexes(args.resultingState).length !== 1 ||
+          actorOf(args.resultingState, args.committerLeafIndex) !==
+            actorPubkey))
     )
       return violation(
         "disband resulting roster or admin policy is not committer-only",

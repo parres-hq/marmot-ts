@@ -14,6 +14,8 @@ export interface ConvergencePassState {
   readonly openedAtMs: number;
   readonly deadlineMs: number;
   readonly lastRelevantInputMs: number;
+  /** Canonical epoch sampled once when this pass opened. */
+  readonly baseEpoch: number;
 }
 
 /** Opens a pass from one monotonic-clock sample. */
@@ -21,12 +23,14 @@ export function openConvergencePass(
   nowMs: number,
   maxDurationMs: number,
   generation: number,
+  baseEpoch = 0,
 ): ConvergencePassState {
   return {
     generation,
     openedAtMs: nowMs,
     deadlineMs: nowMs + maxDurationMs,
     lastRelevantInputMs: nowMs,
+    baseEpoch,
   };
 }
 
@@ -36,6 +40,15 @@ export function refreshConvergencePass(
   nowMs: number,
 ): ConvergencePassState {
   return { ...pass, lastRelevantInputMs: nowMs };
+}
+
+/** Authenticated terminal metadata carried beside, never inside, branch scores. */
+export interface DisbandCandidateEvidence {
+  readonly commitDigest: Uint8Array;
+  readonly actorPubkey: string;
+  readonly sourceEpoch: number;
+  readonly parentTag: string;
+  readonly terminalOutcome: "disbanded";
 }
 
 import type { MarmotGroupView } from "../core/client-state.js";

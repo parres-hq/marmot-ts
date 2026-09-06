@@ -127,6 +127,7 @@ import type {
 import type {
   AutoCommitIngestResult,
   ConvergencePassState,
+  DisbandCandidateEvidence,
   DispositionedIngestResult,
   GroupPeeler,
   IngestResult,
@@ -342,6 +343,17 @@ export class MarmotGroupEngine<TEnvelope> {
   #nextPassGeneration = 1;
   /** Input retained while lifecycle gates admission or a prior pass reaches cutoff. */
   readonly #retainedPassInput: TEnvelope[] = [];
+  /** Fully validated terminal edges awaiting the current pass cutoff. */
+  readonly #disbandCandidates = new Map<
+    string,
+    {
+      envelope: TEnvelope;
+      parentState: ClientState;
+      message: MlsMessage;
+      resultingState: ClientState;
+      evidence: DisbandCandidateEvidence;
+    }
+  >();
   /** Capacity-refused input retained independently so a full pool cannot deadlock it. */
   readonly #capacityRefusedInput = new Map<string, TEnvelope>();
 
@@ -583,6 +595,7 @@ export class MarmotGroupEngine<TEnvelope> {
           nowMs,
           this.#policy.maxConvergencePassMs,
           this.#nextPassGeneration++,
+          Number(this.#state.groupContext.epoch),
         );
     return { ...this.#convergencePass };
   }
@@ -1444,6 +1457,10 @@ export class MarmotGroupEngine<TEnvelope> {
       if (this.#now() < cutoffMs) return [];
       this.#closeConvergencePass();
     }
+    if (this.#disbandCandidates.size > 0) {
+      await this.#settleDisbandCandidates();
+      if (this.#lifecycle === groupLifecycleStates.disbanded) return [];
+    }
     if (this.#retainedPassInput.length === 0) return [];
     const retained = this.#retainedPassInput.splice(0);
     this.admitConvergencePass();
@@ -2116,6 +2133,20 @@ export class MarmotGroupEngine<TEnvelope> {
       setState: (state) => this.#setState(state),
       recordCommit: (parentState, message, newState) =>
         this.#recordCommitNode(parentState, message, newState),
+      admitDisbandCandidate: (
+        envelope,
+        parentState,
+        message,
+        resultingState,
+        evidence,
+      ) =>
+        this.#admitDisbandCandidate(
+          envelope,
+          parentState,
+          message,
+          resultingState,
+          evidence,
+        ),
       recordProposalStaged: (state) => this.#recordProposalStaged(state),
       createAdminCallback: () => this.#createAdminVerificationCallback(),
       resolveFork: (forkEpoch, pool, encrypted, witnessEnvelopes) =>
@@ -2175,6 +2206,90 @@ export class MarmotGroupEngine<TEnvelope> {
       );
   }
 
+  /** Opens or joins the one immutable pass for a validated linear disband edge. */
+  #admitDisbandCandidate(
+    envelope: TEnvelope,
+    parentState: ClientState,
+    message: MlsMessage,
+    resultingState: ClientState,
+    evidence: DisbandCandidateEvidence,
+  ): void {
+    const key = bytesToHex(evidence.commitDigest);
+    if (this.#disbandCandidates.has(key)) return;
+    const currentEpoch = Number(this.#state.groupContext.epoch);
+    if (
+      evidence.sourceEpoch !== currentEpoch ||
+      evidence.parentTag !== bytesToHex(this.#state.confirmationTag)
+    )
+      return;
+    if (
+      this.#convergencePass &&
+      this.#convergencePass.baseEpoch !== evidence.sourceEpoch
+    )
+      return;
+
+    this.#disbandCandidates.set(key, {
+      envelope,
+      parentState,
+      message,
+      resultingState,
+      evidence,
+    });
+    try {
+      const parentTag = bytesToHex(parentState.confirmationTag);
+      if (!this.#tree.hasNode(parentTag)) this.#tree.setRoot(parentState);
+      this.#tree.recordCommit(parentTag, message, resultingState);
+    } catch (error) {
+      this.#log()("terminal candidate tree retention failed: %o", error);
+    }
+    const nowMs = this.#now();
+    this.#lastConvergenceRelevantInputMs = nowMs;
+    this.admitConvergencePass();
+    if (this.#lifecycle === groupLifecycleStates.stable)
+      this.#transitionLifecycle(
+        groupLifecycleStates.recovering,
+        "disband_candidate_admitted",
+      );
+    this.#scheduleSettleCheck();
+  }
+
+  /** Resolves admitted terminal edges with the unchanged canonical comparator. */
+  async #settleDisbandCandidates(): Promise<void> {
+    const candidates = [...this.#disbandCandidates.values()];
+    if (candidates.length === 0) return;
+    const forkEpoch = Math.min(
+      ...candidates.map(({ evidence }) => evidence.sourceEpoch),
+    );
+    const terminalCandidates = new Map(
+      candidates.map(({ evidence }) => [
+        bytesToHex(evidence.commitDigest),
+        evidence,
+      ]),
+    );
+    const resolution = await this.#forkRecovery.resolveFork({
+      forkEpoch,
+      pool: candidates.map(({ message }) => message),
+      currentState: this.#state,
+      retained: this.#retained,
+      adminCallback: this.#createAdminVerificationCallback(),
+      terminalCandidates,
+      knownCandidates: new Map(
+        candidates.map(({ evidence, resultingState }) => [
+          bytesToHex(evidence.commitDigest),
+          { parentTag: evidence.parentTag, state: resultingState },
+        ]),
+      ),
+    });
+    this.#disbandCandidates.clear();
+    if (resolution.outcome === "recovered") {
+      this.#applyForkResolution(forkEpoch, resolution);
+      return;
+    }
+    if (this.#lifecycle === groupLifecycleStates.recovering)
+      this.#transitionLifecycle(groupLifecycleStates.stable, "active_selected");
+    this.#scheduleRetainedContinuation();
+  }
+
   /**
    * Resolves a fork via {@link ForkRecovery} and applies the rewind: on a
    * canonical-branch win, transitions through `Recovering`, adopts the winning
@@ -2195,6 +2310,12 @@ export class MarmotGroupEngine<TEnvelope> {
       currentState: this.state,
       retained: this.#retained,
       adminCallback: this.#createAdminVerificationCallback(),
+      terminalCandidates: new Map(
+        [...this.#disbandCandidates.values()].map(({ evidence }) => [
+          bytesToHex(evidence.commitDigest),
+          evidence,
+        ]),
+      ),
     });
 
     // Retain every branch built while resolving — the winner and every loser —
@@ -2320,7 +2441,12 @@ export class MarmotGroupEngine<TEnvelope> {
         this.#pinnedEpochs(),
       );
     }
-    this.#transitionLifecycle(groupLifecycleStates.stable, "branch_applied");
+    this.#transitionLifecycle(
+      resolution.selectedTerminal
+        ? groupLifecycleStates.disbanded
+        : groupLifecycleStates.stable,
+      resolution.selectedTerminal ? "disband_selected" : "branch_applied",
+    );
     // The canonical path moved; let held fork messages re-decrypt on it.
     this.#pool.resetTried();
 
@@ -2378,11 +2504,16 @@ export class MarmotGroupEngine<TEnvelope> {
         // from taking down the whole chain.
         let derived: StateNotification[];
         try {
-          derived = deriveStateNotifications({
-            parentState: link.parent,
-            resultingState: link.child,
-            commitDigest: linkDigest,
-          });
+          derived =
+            resolution.selectedTerminal &&
+            bytesToHex(linkDigest) ===
+              bytesToHex(resolution.selectedTerminal.commitDigest)
+              ? []
+              : deriveStateNotifications({
+                  parentState: link.parent,
+                  resultingState: link.child,
+                  commitDigest: linkDigest,
+                });
         } catch (error) {
           this.#log()(
             "state notification derivation failed for link %s: %o",
@@ -2420,6 +2551,7 @@ export class MarmotGroupEngine<TEnvelope> {
           epoch,
         }),
       ),
+      selectedTerminal: resolution.selectedTerminal,
     };
   }
 

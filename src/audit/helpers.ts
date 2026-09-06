@@ -69,6 +69,8 @@ export function auditEpochStateName(value: string): AuditEpochState {
       return "recovering";
     case "Unrecoverable":
       return "unrecoverable";
+    case "Disbanded":
+      return "disbanded";
     default:
       throw new Error(`Unknown Marmot group lifecycle state: ${value}`);
   }

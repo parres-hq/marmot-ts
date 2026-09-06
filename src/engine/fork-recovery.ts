@@ -38,7 +38,7 @@ import {
 import { withCapturedProposals } from "./admin-policy.js";
 import type { EdgeSnapshot } from "./history-tree.js";
 import type { RetainedAppliedLink } from "./retained-store.js";
-import type { GroupPeeler } from "./types.js";
+import type { DisbandCandidateEvidence, GroupPeeler } from "./types.js";
 import { framedEpoch } from "./wire-format.js";
 
 /** One applied step on a candidate branch: parent → message → child. */
@@ -165,6 +165,7 @@ export type ForkResolution =
         decisiveRule: string;
         score: BranchScore;
       };
+      selectedTerminal?: DisbandCandidateEvidence;
     }
   | {
       outcome: "superseded";
@@ -177,6 +178,7 @@ export type ForkResolution =
         decisiveRule: string;
         score: BranchScore;
       };
+      selectedTerminal?: DisbandCandidateEvidence;
     }
   | { outcome: "skip" };
 
@@ -243,6 +245,10 @@ export class ForkRecovery<TEnvelope> {
     witnessEnvelopes: TEnvelope[],
     callback: IncomingMessageCallback,
     knownNextStates: ReadonlyMap<string, KnownNextState> = new Map(),
+    terminalCandidates: ReadonlyMap<
+      string,
+      DisbandCandidateEvidence
+    > = new Map(),
   ): Promise<BuiltBranches> {
     const forkEpoch = Number(root.groupContext.epoch);
     const branches: BranchCandidate[] = [];
@@ -264,8 +270,11 @@ export class ForkRecovery<TEnvelope> {
         callback,
       });
 
-    const candidatesAt = async (state: ClientState): Promise<MlsMessage[]> => {
-      const epoch = Number(state.groupContext.epoch);
+    const candidatesAt = async (
+      state: ClientState,
+      logicalEpoch: number,
+    ): Promise<MlsMessage[]> => {
+      const epoch = Math.max(Number(state.groupContext.epoch), logicalEpoch);
       const out: MlsMessage[] = [];
       const seenDigests = new Set<string>();
       const add = (m: MlsMessage) => {
@@ -301,7 +310,10 @@ export class ForkRecovery<TEnvelope> {
       const accumulated = [...witnesses, ...(await witnessesAt(state))];
       let extended = false;
       let branchDeferred = false;
-      for (const message of await candidatesAt(state)) {
+      for (const message of await candidatesAt(
+        state,
+        forkEpoch + chain.length,
+      )) {
         // Candidate commits are framed (private or public); skip anything else.
         if (
           message.wireformat !== wireformats.mls_private_message &&
@@ -348,7 +360,27 @@ export class ForkRecovery<TEnvelope> {
         if (resolution.kind !== "resolved") continue;
         const next = resolution.result;
         const tag = bytesToHex(next.newState.confirmationTag);
-        if (seen.has(tag)) continue;
+        if (seen.has(tag)) {
+          const digest = this.#commitDigestOf(message);
+          const terminal = terminalCandidates.get(bytesToHex(digest));
+          if (terminal) {
+            const branch: BranchCandidate = {
+              id: `branch-${counter++}`,
+              forkEpoch,
+              tipEpoch: forkEpoch + chain.length + 1,
+              tipDigest: digest,
+              tipCommitter: hexToBytes(terminal.actorPubkey),
+              appWitnesses: accumulated,
+            };
+            tips.set(branch, next.newState);
+            chains.set(branch, [
+              ...chain,
+              { parent: state, message, child: next.newState },
+            ]);
+            branches.push(branch);
+          }
+          continue;
+        }
         extended = true;
         // Snapshot the child now, before recursing — exploring its children
         // would zero this state's consumed secrets in place (ts-mls), corrupting
@@ -371,7 +403,12 @@ export class ForkRecovery<TEnvelope> {
         );
       }
       if (!extended && !branchDeferred && tipMessage !== undefined) {
-        const tipEpoch = Number(state.groupContext.epoch);
+        // A removed receiver's ts-mls tombstone retains its parent epoch even
+        // though the authenticated Commit is one edge past the fork root.
+        const tipEpoch = Math.max(
+          Number(state.groupContext.epoch),
+          forkEpoch + chain.length,
+        );
         const branch: BranchCandidate = {
           id: `branch-${counter++}`,
           forkEpoch,
@@ -437,6 +474,8 @@ export class ForkRecovery<TEnvelope> {
     currentState: ClientState;
     retained: RetainedView;
     adminCallback: IncomingMessageCallback;
+    terminalCandidates?: ReadonlyMap<string, DisbandCandidateEvidence>;
+    knownCandidates?: ReadonlyMap<string, KnownNextState>;
   }): Promise<ForkResolution> {
     const {
       forkEpoch,
@@ -446,6 +485,8 @@ export class ForkRecovery<TEnvelope> {
       currentState,
       retained,
       adminCallback,
+      terminalCandidates = new Map(),
+      knownCandidates = new Map(),
     } = params;
 
     const root = retained.stateAt(forkEpoch);
@@ -459,7 +500,7 @@ export class ForkRecovery<TEnvelope> {
     const ours = retainedLinks
       ? retainedLinks.map((link) => link.message)
       : retained.appliedCommitsBetween(forkEpoch, currentTipEpoch);
-    if (ours.length === 0) return { outcome: "skip" };
+    if (ours.length === 0 && pool.length === 0) return { outcome: "skip" };
 
     // CONV-04: every commit in `ours` already applied on our own canonical
     // branch, so `RetainedHistoryStore` already holds the exact state it
@@ -477,7 +518,7 @@ export class ForkRecovery<TEnvelope> {
     // The recorded PARENT is captured alongside the resulting state so
     // `#buildBranches` can only take the short-circuit at the node that
     // actually produced this child — see {@link KnownNextState}.
-    const knownNextStates = new Map<string, KnownNextState>();
+    const knownNextStates = new Map<string, KnownNextState>(knownCandidates);
     for (const [index, msg] of ours.entries()) {
       const structural = retainedLinks?.[index];
       if (!structural?.ownCommitStamp) continue;
@@ -504,6 +545,7 @@ export class ForkRecovery<TEnvelope> {
       witnessEnvelopes,
       adminCallback,
       knownNextStates,
+      terminalCandidates,
     );
     if (branches.length === 0) return { outcome: "skip" };
 
@@ -539,11 +581,21 @@ export class ForkRecovery<TEnvelope> {
       decisiveRule,
       score: winnerScore,
     };
+    const selectedTerminal = terminalCandidates.get(
+      bytesToHex(winner.tipDigest),
+    );
     if (
+      !selectedTerminal &&
       bytesToHex(winnerTip.confirmationTag) ===
-      bytesToHex(currentState.confirmationTag)
+        bytesToHex(currentState.confirmationTag)
     )
-      return { outcome: "superseded", edges, winnerTip, decision };
+      return {
+        outcome: "superseded",
+        edges,
+        winnerTip,
+        decision,
+        selectedTerminal,
+      };
 
     return {
       outcome: "recovered",
@@ -551,6 +603,7 @@ export class ForkRecovery<TEnvelope> {
       winnerChain: chains.get(winner) ?? [],
       edges,
       decision,
+      selectedTerminal,
       result: {
         kind: "newState",
         newState: winnerTip,

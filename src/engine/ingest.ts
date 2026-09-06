@@ -21,6 +21,7 @@ import {
 import { verifyApplicationRumorAuthorship } from "../core/application-rumor.js";
 import { marmotAuthService } from "../core/auth-service.js";
 import { validateCommitLegality } from "../core/components/integrity.js";
+import { classifyDisbandCommit } from "../core/components/disband-validation.js";
 import {
   type CommitOrderingKey,
   commitDigest,
@@ -37,7 +38,11 @@ import {
   groupWithdrawnNotificationsByCommit,
   type StateNotification,
 } from "./state-notifications.js";
-import type { IngestResult, PeeledMessagePair } from "./types.js";
+import type {
+  DisbandCandidateEvidence,
+  IngestResult,
+  PeeledMessagePair,
+} from "./types.js";
 import { framedContentType, framedEpoch } from "./wire-format.js";
 
 /** A message deferred this batch, remembered so terminal yields report it as
@@ -95,6 +100,8 @@ export type AppliedForkResolution<TEnvelope> =
        * commit at once.
        */
       withdrawnNotifications: StateNotification[];
+      /** Present only when canonical selection chose authenticated disband evidence. */
+      selectedTerminal?: DisbandCandidateEvidence;
     }
   | { outcome: "superseded" | "skip" };
 
@@ -130,6 +137,14 @@ export interface IngestContext<TEnvelope> {
     parentState: ClientState,
     message: MlsMessage,
     newState: ClientState,
+  ): void;
+  /** Retains a fully validated terminal edge without advancing canonical state. */
+  admitDisbandCandidate(
+    envelope: TEnvelope,
+    parentState: ClientState,
+    message: MlsMessage,
+    resultingState: ClientState,
+    evidence: DisbandCandidateEvidence,
   ): void;
   /**
    * Records that a proposal was staged onto the current state (its epoch and
@@ -723,6 +738,30 @@ export async function* ingestEnvelopes<TEnvelope>(
             message,
             reason: violation.reason,
           };
+          continue;
+        }
+
+        const disband = classifyDisbandCommit({
+          parentState,
+          resultingState: result.newState,
+          proposals: capturedCommit.proposals,
+          committerLeafIndex: capturedCommit.committerLeafIndex,
+        });
+        if (disband.kind === "validDisband") {
+          const digest = commitDigest(encode(mlsMessageEncoder, message));
+          ctx.admitDisbandCandidate(
+            envelope,
+            parentState,
+            message,
+            result.newState,
+            {
+              commitDigest: digest,
+              actorPubkey: disband.actorPubkey,
+              sourceEpoch: Number(parentState.groupContext.epoch),
+              parentTag: bytesToHex(parentState.confirmationTag),
+              terminalOutcome: "disbanded",
+            },
+          );
           continue;
         }
 
