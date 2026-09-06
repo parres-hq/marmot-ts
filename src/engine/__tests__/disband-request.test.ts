@@ -1,5 +1,7 @@
 import type { NostrEvent } from "applesauce-core/helpers/event";
 import {
+  getAppDataDictionary,
+  makeAppDataDictionaryExtension,
   defaultCryptoProvider,
   getCiphersuiteImpl,
   type CiphersuiteImpl,
@@ -8,6 +10,12 @@ import { describe, expect, it } from "vitest";
 
 import { createCredential } from "../../core/credential.js";
 import { createSimpleGroup } from "../../core/group.js";
+import { encodeAdminPolicyV1 } from "../../core/components/admin-policy.js";
+import { GROUP_ADMIN_POLICY_COMPONENT_ID } from "../../core/components/ids.js";
+import {
+  deserializeClientState,
+  serializeClientState,
+} from "../../core/client-state.js";
 import { generateKeyPackage } from "../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { DisbandingError, MarmotGroupEngine } from "../group-engine.js";
@@ -128,6 +136,69 @@ describe("durable disband request codec", () => {
     ).rejects.toBeInstanceOf(DisbandingError);
     await expect(restored.requestDisband()).resolves.toMatchObject({
       kind: "groupEvolution",
+    });
+  });
+
+  it("regenerates at an active selected epoch and records typed authority loss", async () => {
+    const store = new InMemoryKeyValueStore<Uint8Array>();
+    const fixture = await engineFixture(store);
+    const branchBuilder = fixture.makeEngine(
+      deserializeClientState(serializeClientState(fixture.state)),
+    );
+    const active = await branchBuilder.send({ kind: "selfUpdate" });
+    if (active.kind !== "selfUpdate") throw new Error("expected self update");
+
+    const engine = fixture.makeEngine(
+      deserializeClientState(serializeClientState(fixture.state)),
+    );
+    const first = await engine.requestDisband();
+    if (first?.kind !== "groupEvolution") throw new Error("expected disband");
+    engine.publishFailed(first.pending);
+    engine.state = active.pending.newState;
+    await expect(engine.requestDisband()).resolves.toMatchObject({
+      kind: "groupEvolution",
+    });
+
+    const memberStore = new InMemoryKeyValueStore<Uint8Array>();
+    const memberFixture = await engineFixture(memberStore);
+    const removed = memberFixture.makeEngine();
+    const pendingRemoval = await removed.requestDisband();
+    if (pendingRemoval?.kind !== "groupEvolution")
+      throw new Error("expected disband");
+    removed.publishFailed(pendingRemoval.pending);
+    removed.state = {
+      ...removed.state,
+      groupActiveState: { kind: "removedFromGroup" },
+    };
+    expect(await removed.requestDisband()).toBeUndefined();
+    expect(await removed.disbandRequest()).toMatchObject({
+      status: "failed",
+      reason: "NoLongerMember",
+    });
+
+    const adminStore = new InMemoryKeyValueStore<Uint8Array>();
+    const adminFixture = await engineFixture(adminStore);
+    const demoted = adminFixture.makeEngine();
+    const pendingAdmin = await demoted.requestDisband();
+    if (pendingAdmin?.kind !== "groupEvolution")
+      throw new Error("expected disband");
+    demoted.publishFailed(pendingAdmin.pending);
+    const state = deserializeClientState(serializeClientState(demoted.state));
+    const dictionary = getAppDataDictionary(state.groupContext.extensions)!;
+    dictionary.find(
+      (entry) => entry.componentId === GROUP_ADMIN_POLICY_COMPONENT_ID,
+    )!.data = encodeAdminPolicyV1(["e".repeat(64)]);
+    state.groupContext.extensions = state.groupContext.extensions.map(
+      (extension) =>
+        getAppDataDictionary([extension])
+          ? makeAppDataDictionaryExtension(dictionary)
+          : extension,
+    );
+    demoted.state = state;
+    expect(await demoted.requestDisband()).toBeUndefined();
+    expect(await demoted.disbandRequest()).toMatchObject({
+      status: "failed",
+      reason: "NoLongerAdmin",
     });
   });
 });
