@@ -9,7 +9,7 @@ import {
   processMessage,
   unsafeTestingAuthenticationService,
 } from "ts-mls";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1.js";
@@ -25,6 +25,7 @@ import { createSimpleGroup } from "../../../core/group.js";
 import { generateKeyPackage } from "../../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../../extra";
 import type { NostrNetworkInterface } from "../../nostr-interface.js";
+import { MockNetwork } from "../../../__tests__/helpers/mock-network.js";
 import {
   createAdminCommitPolicyCallback,
   MarmotGroup,
@@ -46,6 +47,80 @@ async function createTestGroupState(
 }
 
 describe("MarmotGroup lifecycle (group-state.md)", () => {
+  it("publishes disband intent once and keeps the durable request pending", async () => {
+    const adminPubkey = "a".repeat(64);
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const { clientState } = await createTestGroupState(adminPubkey, impl);
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const network = new MockNetwork(["wss://relay.test"]);
+    const group = new MarmotGroup(clientState, {
+      store: new InMemoryKeyValueStore(),
+      lifecycleStore,
+      signer: { getPublicKey: async () => adminPubkey } as EventSigner,
+      ciphersuite: impl,
+      network,
+    });
+
+    const result = await group.disband();
+    expect(result.kind).toBe("acknowledged");
+    expect(network.events).toHaveLength(1);
+    expect(await lifecycleStore.getItem(`${group.idStr}/disband/request`)).not.toBeNull();
+
+    const repeated = await group.disband();
+    expect(repeated.kind).toBe("pending");
+    expect(network.events).toHaveLength(1);
+  });
+
+  it("retains disband intent and rolls staged state back on publish failure", async () => {
+    const adminPubkey = "a".repeat(64);
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const { clientState } = await createTestGroupState(adminPubkey, impl);
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const network = new MockNetwork(["wss://relay.test"]);
+    vi.spyOn(network, "publish").mockResolvedValue({
+      "wss://relay.test": { from: "wss://relay.test", ok: false },
+    });
+    const group = new MarmotGroup(clientState, {
+      store: new InMemoryKeyValueStore(),
+      lifecycleStore,
+      signer: { getPublicKey: async () => adminPubkey } as EventSigner,
+      ciphersuite: impl,
+      network,
+    });
+
+    const result = await group.disband();
+
+    expect(result.kind).toBe("publishFailed");
+    expect(group.lifecycle).toBe("Stable");
+    expect(await lifecycleStore.getItem(`${group.idStr}/disband/request`)).not.toBeNull();
+  });
+
+  it("reports lifecycle enablement idempotently through the public facade", async () => {
+    const adminPubkey = "a".repeat(64);
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const { clientState } = await createTestGroupState(adminPubkey, impl);
+    const group = new MarmotGroup(clientState, {
+      store: new InMemoryKeyValueStore(),
+      lifecycleStore: new InMemoryKeyValueStore(),
+      signer: { getPublicKey: async () => adminPubkey } as EventSigner,
+      ciphersuite: impl,
+      network: new MockNetwork(["wss://relay.test"]),
+    });
+
+    await expect(group.enableDisbanding()).resolves.toEqual({
+      kind: "alreadyEnabled",
+    });
+  });
+
   it("starts Stable, returns to Stable after commit, and resets to Stable on publish failure", async () => {
     const adminPubkey = "a".repeat(64);
     const impl = await getCiphersuiteImpl(
