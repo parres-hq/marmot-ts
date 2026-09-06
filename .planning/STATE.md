@@ -5,15 +5,15 @@ milestone_name: Phase 1)
 current_phase: 04.1
 current_phase_name: Terminal Group Disbanding
 status: executing
-stopped_at: Completed 04.1-04-PLAN.md
-last_updated: "2026-09-06T16:44:30.652Z"
+stopped_at: Completed 04.1-05-PLAN.md
+last_updated: "2026-09-06T16:53:13.890Z"
 last_activity: 2026-09-06
 last_activity_desc: Completed lifecycle component foundation
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 45
-  completed_plans: 43
+  completed_plans: 44
   percent: 71
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-21)
 ## Current Position
 
 Phase: 04.1 — Terminal Group Disbanding
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-09-06 — Completed lifecycle component foundation
 
-Progress: [██████████] 96% (7 phases)
+Progress: [██████████] 98% (7 phases)
 
 **Next recommended run:** `/gsd-execute-phase 04.1`
 
@@ -107,6 +107,7 @@ _Updated after each plan completion_
 | Phase 04.1 P02 | 10min | 2 tasks | 14 files |
 | Phase 04.1 P03 | 6min | 2 tasks | 8 files |
 | Phase 04.1 P04 | 11min | 2 tasks | 11 files |
+| Phase 04.1 P05 | 6min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.1-03]: Relay acknowledgement retains the pending request; canonical selection and regeneration remain scheduler-owned.
 - [Phase ?]: [Phase 04.1-04]: Carry terminal evidence beside BranchCandidate scoring and consult it only after the unchanged comparator selects a winner.
 - [Phase ?]: [Phase 04.1-04]: Interpret removed-receiver parent-shaped ts-mls tombstones from authenticated inline proposal bytes and logical edge depth.
+- [Phase ?]: [Phase 04.1-05]: Terminal and request records share one lifecycle store but use independent versioned group-scoped namespaces.
+- [Phase ?]: [Phase 04.1-05]: The tombstone write is terminal authority; cleanup is idempotent and resumes on hydration.
+- [Phase ?]: [Phase 04.1-05]: Registry listeners attach before lifecycle hydration and public loaded visibility waits for cleanup.
 
 ### Pending Todos
 
@@ -249,7 +253,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T16:44:30.632Z
-Stopped at: Completed 04.1-04-PLAN.md
+Last session: 2026-09-06T16:53:13.870Z
+Stopped at: Completed 04.1-05-PLAN.md
 Resume file:
 None
