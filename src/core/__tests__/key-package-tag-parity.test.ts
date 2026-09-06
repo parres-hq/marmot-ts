@@ -20,6 +20,21 @@ type TagFixture = {
 
 const SLOT_ID = "a1".repeat(32);
 
+async function expectProductionTags(expectedTags: string[][]): Promise<void> {
+  const message = decode(
+    mlsMessageDecoder,
+    hexToBytes(lifetimeFixture.lifetime.key_package_tls_hex),
+  );
+  if (!message || message.wireformat !== wireformats.mls_key_package)
+    throw new Error("Rust fixture did not decode as an MLS KeyPackage");
+
+  const event = await createKeyPackageEvent({
+    keyPackage: message.keyPackage,
+    identifier: SLOT_ID,
+  });
+  expect(event.tags).toEqual(expectedTags);
+}
+
 describe("MDK kind-30443 tag parity", () => {
   const rust = tagFixture as TagFixture;
 
@@ -29,24 +44,13 @@ describe("MDK kind-30443 tag parity", () => {
       bytesToHex(sha256(new TextEncoder().encode(JSON.stringify(rust.tags)))),
     ).toBe(rust.tags_sha256);
 
-    const message = decode(
-      mlsMessageDecoder,
-      hexToBytes(lifetimeFixture.lifetime.key_package_tls_hex),
-    );
-    if (!message || message.wireformat !== wireformats.mls_key_package)
-      throw new Error("Rust fixture did not decode as an MLS KeyPackage");
-
-    const event = await createKeyPackageEvent({
-      keyPackage: message.keyPackage,
-      identifier: SLOT_ID,
-    });
-    expect(event.tags).toEqual(rust.tags);
+    await expectProductionTags(rust.tags);
   });
 
-  it("negative control detects a canonical tag mutation", () => {
+  it("negative control rejects a mutated Rust oracle through production parity", async () => {
     const mutated = rust.tags.map((tag) => [...tag]);
     mutated[0][1] = "ff".repeat(32);
-    expect(mutated).not.toEqual(rust.tags);
+    await expect(expectProductionTags(mutated)).rejects.toThrow();
   });
 });
 
