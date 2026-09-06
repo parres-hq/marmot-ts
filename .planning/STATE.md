@@ -5,16 +5,16 @@ milestone_name: Phase 1)
 current_phase: 04.1
 current_phase_name: Terminal Group Disbanding
 status: executing
-stopped_at: Completed 04.1-05-PLAN.md
-last_updated: "2026-09-06T16:53:13.890Z"
+stopped_at: Completed 04.1-06-PLAN.md
+last_updated: "2026-09-06T17:02:55.144Z"
 last_activity: 2026-09-06
 last_activity_desc: Completed lifecycle component foundation
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 45
-  completed_plans: 44
-  percent: 71
+  completed_plans: 45
+  percent: 86
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-21)
 ## Current Position
 
 Phase: 04.1 — Terminal Group Disbanding
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-09-06 — Completed lifecycle component foundation
 
-Progress: [██████████] 98% (7 phases)
+Progress: [██████████] 100% (7 phases)
 
 **Next recommended run:** `/gsd-execute-phase 04.1`
 
@@ -108,6 +108,7 @@ _Updated after each plan completion_
 | Phase 04.1 P03 | 6min | 2 tasks | 8 files |
 | Phase 04.1 P04 | 11min | 2 tasks | 11 files |
 | Phase 04.1 P05 | 6min | 2 tasks | 8 files |
+| Phase 04.1 P06 | 8min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -219,6 +220,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.1-05]: Terminal and request records share one lifecycle store but use independent versioned group-scoped namespaces.
 - [Phase ?]: [Phase 04.1-05]: The tombstone write is terminal authority; cleanup is idempotent and resumes on hydration.
 - [Phase ?]: [Phase 04.1-05]: Registry listeners attach before lifecycle hydration and public loaded visibility waits for cleanup.
+- [Phase ?]: [Phase 04.1-06]: Record terminal notification delivery before isolated actor/digest callbacks.
+- [Phase ?]: [Phase 04.1-06]: Repeat disband gates at routing, session, and engine boundaries while keeping Unrecoverable repairable.
 
 ### Pending Todos
 
@@ -253,7 +256,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T16:53:13.870Z
-Stopped at: Completed 04.1-05-PLAN.md
+Last session: 2026-09-06T17:02:55.125Z
+Stopped at: Completed 04.1-06-PLAN.md
 Resume file:
 None

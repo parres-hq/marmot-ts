@@ -264,7 +264,7 @@ spec scope surfaced by the 2026-08-06 reference sweep, not urgent remediation.
 2. A valid Commit that changes the component to `disbanded` forces `Stable → Recovering` on admission **even when it is a linear edge and no divergent edge exists**, so terminalization can only occur after branch selection.
 3. That forced transition does **not** restart either convergence timer, resnapshot `pass_base_epoch`, or give the disband candidate special branch-scoring priority — it is a terminalization boundary, not a scoring rule.
 4. Once `disbanded` is canonical, the group is terminal: no further outbound, and subsequent input is classified consistently with the existing removed-inactive handling.
-   **Plans**: 5/6 plans executed
+   **Plans**: 6/6 plans executed
 
 Plans:
 
@@ -290,7 +290,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 04.1-06-PLAN.md — Public terminal status/events, typed I/O refusal, and inactive routing
+- [x] 04.1-06-PLAN.md — Public terminal status/events, typed I/O refusal, and inactive routing
 
 ### Phase 5: Quality Gate
 
@@ -318,7 +318,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Inbound Trust & Wire Boundary         | 4/4            | Complete    | 2026-07-22 |
 | 3. Commit Integrity & Convergence Parity | 11/11 | Complete    | 2026-09-01 |
 | 4. Feature Parity & Conformance Vectors  | 7/7 | Complete    | 2026-09-05 |
-| 4.1. Terminal Group Disbanding           | 5/6 | In Progress|  |
+| 4.1. Terminal Group Disbanding           | 6/6 | In Progress|  |
 | 5. Quality Gate                          | 0/TBD          | Not started | -          |
 
 ## Backlog
