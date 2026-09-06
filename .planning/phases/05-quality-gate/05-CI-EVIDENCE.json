@@ -41,6 +41,8 @@
       "status": "completed",
       "conclusion": "success",
       "pnpm_version": "10.34.5",
+      "vitest_version": "3.2.6",
+      "log_sha256": "4b826a56b7a50602a4a09cecae6b378bffbe1c8acb204cdcef4f64cd5798eaae",
       "install": { "command": "pnpm install --frozen-lockfile", "conclusion": "success" },
       "normal": { "command": "pnpm vitest run", "conclusion": "success", "test_files": 96, "tests": 964 },
       "extended": { "command": "pnpm conformance:extended", "conclusion": "success", "test_files": 1, "tests": 1 }
@@ -56,6 +58,8 @@
       "status": "completed",
       "conclusion": "success",
       "pnpm_version": "10.34.5",
+      "vitest_version": "3.2.6",
+      "log_sha256": "4fc8261c3ca6973ff0b349f55ffdd8fc190335275ea38b6ec8b425a01bc1a22a",
       "install": { "command": "pnpm install --frozen-lockfile", "conclusion": "success" },
       "normal": { "command": "pnpm vitest run", "conclusion": "success", "test_files": 96, "tests": 964 },
       "extended": { "command": "pnpm conformance:extended", "conclusion": "success", "test_files": 1, "tests": 1 }
@@ -71,6 +75,8 @@
       "status": "completed",
       "conclusion": "success",
       "pnpm_version": "10.34.5",
+      "vitest_version": "3.2.6",
+      "log_sha256": "4de1a5cfd010ad65196f12cd97d430c92801a601fcf7fd8fde3a5767b758b96a",
       "install": { "command": "pnpm install --frozen-lockfile", "conclusion": "success" },
       "normal": { "command": "pnpm vitest run", "conclusion": "success", "test_files": 96, "tests": 964 },
       "extended": { "command": "pnpm conformance:extended", "conclusion": "success", "test_files": 1, "tests": 1 }
@@ -87,6 +93,8 @@
       "status": "completed",
       "conclusion": "success",
       "pnpm_version": "10.34.5",
+      "vitest_version": "3.2.7",
+      "log_sha256": "a81b512832b60938d11e15ef29a47687bff940b71543060c93efd87ae41d4391",
       "install": { "command": "pnpm install --frozen-lockfile", "conclusion": "success" },
       "normal": { "command": "deno run -A --node-modules-dir=auto npm:vitest run", "conclusion": "success", "test_files": 96, "tests": 964 },
       "extended": { "command": "deno run -A --node-modules-dir=auto npm:vitest run --config vitest.extended.config.ts", "conclusion": "success", "test_files": 1, "tests": 1 }
@@ -103,6 +111,8 @@
       "status": "completed",
       "conclusion": "success",
       "pnpm_version": "10.34.5",
+      "vitest_version": "3.2.6",
+      "log_sha256": "d3ae3006b35024eb330b3751359cd9801561a12c0e2c47bde2d857cd30778234",
       "install": { "command": "pnpm install --frozen-lockfile", "conclusion": "success" },
       "normal": { "command": "bun run vitest run", "conclusion": "success", "test_files": 96, "tests": 964 },
       "extended": { "command": "bun run vitest run --config vitest.extended.config.ts", "conclusion": "success", "test_files": 1, "tests": 1 }
@@ -119,6 +129,8 @@
       "status": "completed",
       "conclusion": "success",
       "pnpm_version": "10.34.5",
+      "vitest_version": "3.2.6",
+      "log_sha256": "cf930d32895def45327c6aba18f28895aa1505817437f3f8924ff43f95e6adac",
       "install": { "command": "pnpm install --frozen-lockfile", "conclusion": "success" },
       "normal": { "command": "bun run vitest run", "conclusion": "success", "test_files": 96, "tests": 964 },
       "extended": { "command": "bun run vitest run --config vitest.extended.config.ts", "conclusion": "success", "test_files": 1, "tests": 1 }
