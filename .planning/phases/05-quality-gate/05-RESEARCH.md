@@ -33,7 +33,7 @@ The MDK submodule was safely fast-forwarded from `6479419e` to `dbf45c83` and co
 
 | ID | Description | Research Support |
 |---|---|---|
-| QA-01 | Full test suite green across all supported runtimes (Node 20/22/24, Deno 2, Bun latest/1.1) at milestone end. [VERIFIED: `.planning/REQUIREMENTS.md`] | Preserve the existing six-job runtime matrix, add/confirm explicit extended-suite execution, and record per-job versions and immutable CI links. [VERIFIED: `.github/workflows/tests.yml`, Vitest configs] |
+| QA-01 | Full test suite green across all supported runtimes (Node 20/22/24, Deno 2, Bun latest/1.1) at milestone end. [VERIFIED: `.planning/REQUIREMENTS.md`] | Preserve the existing six-job runtime matrix, execute both the normal and isolated extended suite in every job, and record per-job versions and immutable CI links. [VERIFIED: `.github/workflows/tests.yml`, Vitest configs; RESOLVED Phase 5 research decision] |
 | QA-02 | Every catch-up change with a byte-exact MDK counterpart is cross-checked against the Rust reference output and the result recorded. [VERIFIED: `.planning/REQUIREMENTS.md`] | Produce four dossiers: proof v2, KeyPackage lifetime boundary, tag-cardinality event shapes/rejections, and SafeAAD/LeafNode dictionary bytes. [VERIFIED: roadmap success criterion and Phase 1/2/4 artifacts] |
 
 ## Project Constraints (from AGENTS.md)
@@ -154,13 +154,13 @@ The exact counts must come from the actual run rather than this research documen
 
 **What:** Run available local versions first for rapid diagnosis, then require the hosted matrix for versions missing locally. [VERIFIED: local environment and CI audit]
 
-**When to use:** QA-01, because no local Node 20/24 or Bun 1.1 executable is installed. [VERIFIED: local probe]
+**When to use:** QA-01, because no local Node 20/24 or Bun 1.1 executable is installed; the authoritative CI gate executes both the normal and isolated extended suite on all six required runtime jobs. [VERIFIED: local probe; RESOLVED Phase 5 research decision]
 
 ### Anti-Patterns to Avoid
 
 - **Claiming matrix coverage from one local binary:** a Node 22 pass is not evidence for Node 20 or 24. [VERIFIED: QA-01 wording and local probe]
 - **Calling `pnpm test`:** it starts Vitest watch mode and is unsuitable for a terminating gate. [VERIFIED: `AGENTS.md`, `package.json`]
-- **Running only the root config:** `extended.spec.ts` is excluded from `src/**/*.test.ts`. [VERIFIED: Vitest configs]
+- **Running only the root config:** `extended.spec.ts` is excluded from `src/**/*.test.ts`; every one of the six runtime jobs must invoke the isolated extended suite separately. [VERIFIED: Vitest configs; RESOLVED Phase 5 research decision]
 - **Regenerating expected bytes inside the assertion:** this can turn the reference into a shared implementation rather than an independent oracle. [VERIFIED: existing immutable fixture pattern]
 - **Treating historical verification prose as current evidence:** Phase 5 must bind results to the final candidate commit and current submodule SHAs. [VERIFIED: QA-01 says “at milestone end”]
 - **Silently skipping unsupported or failing conformance entries:** the current harness requires explicit representation and typed unsupported outcomes. [VERIFIED: Phase 4 verification]
@@ -214,7 +214,7 @@ The recommended `05-QUALITY-GATE.md` should contain: [VERIFIED: QA-01/QA-02 and 
 
 1. A provenance header with superproject, Marmot spec, and MDK SHAs plus UTC timestamp. [VERIFIED: submodule-based reference model]
 2. A runtime table with exact resolved runtime and pnpm versions, install command, test command, exit code, test-file/test counts, duration, and CI job URL. [VERIFIED: CI matrix and prior verification records]
-3. Separate compile, `pnpm build`, normal suite, extended suite, and formatting results; none should be implied by another row. [VERIFIED: distinct package scripts/configs]
+3. Separate compile, `pnpm build`, normal suite, extended suite, and formatting results; none should be implied by another row, and every runtime row must contain results for both Vitest configs. [VERIFIED: distinct package scripts/configs; RESOLVED Phase 5 research decision]
 4. A QA-02 table with counterpart, TS artifact/test, Rust source/test, reproduction command, expected and actual bytes/outcomes, result, and negative control. [VERIFIED: existing proof/vector evidence pattern]
 5. A failure/repair ledger naming the failing runtime/vector, root cause, commit, focused rerun, and complete rerun. [VERIFIED: quality-gate diagnostic workflow]
 6. A final requirement map that marks QA-01/QA-02 complete only when every required row has primary evidence. [VERIFIED: GSD verification format]
@@ -232,7 +232,7 @@ The recommended `05-QUALITY-GATE.md` should contain: [VERIFIED: QA-01/QA-02 and 
 
 **What goes wrong:** The normal suite passes while `extended.spec.ts` never executes. [VERIFIED: config include patterns]  
 **Why it happens:** Root discovery matches `.test.ts`, not `.spec.ts`. [VERIFIED: `vitest.config.ts`]  
-**How to avoid:** Run `pnpm conformance:extended` as a separate gate, ideally at least on Node 22/24 and after any conformance repair. [VERIFIED: package script and Phase 4 verification precedent]  
+**How to avoid:** Run the isolated extended config as a separate gate on Node 20/22/24, Deno 2, and Bun latest/1.1, using the runtime-appropriate executable form. [VERIFIED: package script and Vitest config; RESOLVED Phase 5 research decision]
 **Warning signs:** Output has no `extended.spec.ts` row. [VERIFIED: test inventory]
 
 ### Pitfall 3: Local pnpm Drift Is Hidden
@@ -274,11 +274,13 @@ pnpm vitest run
 
 # Deno 2
 deno run -A --node-modules-dir=auto npm:vitest run
+deno run -A --node-modules-dir=auto npm:vitest run --config vitest.extended.config.ts
 
 # Bun latest and 1.1
 bun run vitest run
+bun run vitest run --config vitest.extended.config.ts
 
-# Isolated pressure suite
+# Node 20/22/24 isolated pressure suite
 pnpm conformance:extended
 
 # Library gates
@@ -313,25 +315,21 @@ This pattern mirrors the existing immutable Rust fixture and mutation-control ap
 
 | # | Claim | Section | Risk if Wrong |
 |---|---|---|---|
-| A1 | The isolated extended suite need not run on every runtime if the normal suite covers runtime portability and extended runs on at least one supported Node version. [ASSUMED] | Architecture / Pitfalls | QA-01 may be interpreted as requiring extended coverage on all six jobs; planner should choose the stricter all-runtime interpretation unless runtime cost is prohibitive. |
 | A2 | No production changes will be required once the current matrix and MDK probes execute. [ASSUMED] | Scope | Any demonstrated failure must become a focused defect-fix task with full reruns. |
 
-## Open Questions
+## Resolved Decisions
 
-1. **Must the extended pressure suite run on all six runtime jobs?**
+1. **(RESOLVED) The extended pressure suite runs on all six runtime jobs.**
    - What we know: it is separate from the normal suite and Phase 4 verified it on Node in three fresh processes. [VERIFIED: configs and Phase 4 verification]
-   - What's unclear: QA-01 says “full test suite” across every runtime and does not explicitly exempt the extended config. [VERIFIED: requirement wording]
-   - Recommendation: plan the strict interpretation—run both configs everywhere—unless measured duration or a runtime-specific Node-only test dependency requires an explicitly documented narrower matrix. [ASSUMED]
+   - Decision: execute both the normal suite and isolated extended suite under Node 20, Node 22, Node 24, Deno 2, Bun latest, and Bun 1.1; no runtime receives an extended-suite exemption. [VERIFIED: RESOLVED Phase 5 research decision]
 
-2. **What is the authoritative Rust runtime oracle for all tag-cardinality rejection cases?**
+2. **(RESOLVED) The tag-cardinality dossier separates Rust-produced bytes from specification-derived rejection parity.**
    - What we know: MDK emits canonical 30443 tag arrays, while the spec defines exact rejection semantics and TS implements the full table. [VERIFIED: MDK adapter, spec, TS source]
-   - What's unclear: the inspected MDK transport adapter does not expose a general inbound parser covering every 445/1059/444/30443 cardinality row. [VERIFIED: codebase grep]
-   - Recommendation: report canonical producer byte parity separately from spec-derived rejection parity; add a test-only Rust probe only if an existing parser seam supports it without production changes. [VERIFIED: provenance discipline]
+   - Decision: record Rust-produced canonical kind-30443 tag/event byte parity, then record the complete rejection matrix as specification-derived TS behavior; do not create or claim a Rust rejection oracle that MDK does not expose. [VERIFIED: RESOLVED Phase 5 research decision]
 
-3. **Should the quality record include the MDK `b4649c01` implicit-capability delta as a fifth dossier?**
+3. **(RESOLVED) Include the MDK `b4649c01` implicit-capability delta inside the SafeAAD/KeyPackage dossier.**
    - What we know: the delta can change signed Leaf/KeyPackage capability bytes and arrived at Phase 5 start. [VERIFIED: MDK diff]
-   - What's unclear: QA-02 names catch-up changes from earlier phases, while this is newly surfaced reference drift. [VERIFIED: roadmap and git history]
-   - Recommendation: include it within the SafeAAD/KeyPackage dossier so the final byte comparison is against the current reference rather than the old pin. [VERIFIED: interop goal]
+   - Decision: compare against the current reference and document implicit-default capability omission in that existing dossier rather than creating a separate fifth dossier. [VERIFIED: RESOLVED Phase 5 research decision]
 
 ## Environment Availability
 
@@ -394,14 +392,14 @@ Security enforcement is enabled because `.planning/config.json` does not set `se
 
 ### Tertiary (LOW confidence)
 
-- The recommendation about which runtime subset may host the extended suite is an implementation-cost assumption, not an established requirement interpretation. [ASSUMED]
+- No source-dependent LOW-confidence claim remains; the only assumption is whether execution will reveal production defects. [ASSUMED]
 
 ## Metadata
 
 **Confidence breakdown:**
 - Standard stack: HIGH — directly inspected package metadata, lockfile, CI, and local binaries. [VERIFIED: codebase/local probes]
 - Architecture: HIGH — the test/reference seams already exist and have passed Phase 4 verification. [VERIFIED: Phase 4 verification]
-- Pitfalls: HIGH — most are direct consequences of config boundaries, environment drift, or current MDK diffs; the extended-suite matrix breadth remains an explicit assumption. [VERIFIED: codebase/local probes] [ASSUMED]
+- Pitfalls: HIGH — they are direct consequences of config boundaries, environment drift, current MDK diffs, and the resolved all-runtime suite requirement. [VERIFIED: codebase/local probes; RESOLVED Phase 5 research decision]
 
 **Research date:** 2026-09-06  
 **Valid until:** 2026-09-13 — the reference submodules move independently and the matrix contains a moving `latest` target. [VERIFIED: `AGENTS.md`, CI config]
