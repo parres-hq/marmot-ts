@@ -22,6 +22,7 @@ describe("legal transitions", () => {
     [S.stable, S.recovering],
     [S.recovering, S.stable],
     [S.recovering, S.unrecoverable],
+    [S.recovering, S.disbanded],
     [S.unrecoverable, S.stable],
     [S.recovering, S.recovering], // implicit re-entry
   ];
@@ -39,6 +40,7 @@ describe("legal transitions", () => {
     expect(canTransitionLifecycle(S.stable, S.merging)).toBe(false);
     expect(canTransitionLifecycle(S.stable, S.unrecoverable)).toBe(false);
     expect(canTransitionLifecycle(S.unrecoverable, S.recovering)).toBe(false);
+    expect(canTransitionLifecycle(S.disbanded, S.stable)).toBe(false);
   });
 
   it("transitionLifecycle throws on an illegal edge", () => {
@@ -60,6 +62,7 @@ describe("lifecycle gates", () => {
       S.merging,
       S.recovering,
       S.unrecoverable,
+      S.disbanded,
     ]) {
       expect(mayPrepareLocalCommit(s)).toBe(false);
       expect(mayRunForkDetection(s)).toBe(false);
@@ -72,5 +75,6 @@ describe("lifecycle gates", () => {
     expect(mayApplyRetainedInbound(S.pendingPublish)).toBe(false);
     expect(mayApplyRetainedInbound(S.merging)).toBe(false);
     expect(mayApplyRetainedInbound(S.unrecoverable)).toBe(false);
+    expect(mayApplyRetainedInbound(S.disbanded)).toBe(false);
   });
 });
