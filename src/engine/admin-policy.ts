@@ -158,7 +158,10 @@ export function createAdminCommitPolicyCallback(args: {
  */
 export function withCapturedProposals(inner: IncomingMessageCallback): {
   callback: IncomingMessageCallback;
-  take(): { proposals: ProposalWithSender[]; committerLeafIndex: number | undefined };
+  take(): {
+    proposals: ProposalWithSender[];
+    committerLeafIndex: number | undefined;
+  };
 } {
   let buffered: ProposalWithSender[] = [];
   let committerLeafIndex: number | undefined;

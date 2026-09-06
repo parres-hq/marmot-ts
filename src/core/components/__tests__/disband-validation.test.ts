@@ -68,16 +68,12 @@ function update(componentId: number, bytes: Uint8Array): ProposalWithSender {
 describe("classifyDisbandCommit", () => {
   it("accepts the exact active-to-disbanded shape and reports its actor", () => {
     const result = classifyDisbandCommit({
-      parentState: state(
-        [ADMIN, MEMBER],
-        "active",
-        [GROUP_LIFECYCLE_COMPONENT_ID],
-      ),
-      resultingState: state(
-        [ADMIN],
-        "disbanded",
-        [GROUP_LIFECYCLE_COMPONENT_ID],
-      ),
+      parentState: state([ADMIN, MEMBER], "active", [
+        GROUP_LIFECYCLE_COMPONENT_ID,
+      ]),
+      resultingState: state([ADMIN], "disbanded", [
+        GROUP_LIFECYCLE_COMPONENT_ID,
+      ]),
       committerLeafIndex: 0,
       proposals: [
         {
@@ -99,16 +95,12 @@ describe("classifyDisbandCommit", () => {
 
   it("rejects unrelated proposals and sibling leaves left behind", () => {
     const result = classifyDisbandCommit({
-      parentState: state(
-        [ADMIN, ADMIN, MEMBER],
-        "active",
-        [GROUP_LIFECYCLE_COMPONENT_ID],
-      ),
-      resultingState: state(
-        [ADMIN, ADMIN],
-        "disbanded",
-        [GROUP_LIFECYCLE_COMPONENT_ID],
-      ),
+      parentState: state([ADMIN, ADMIN, MEMBER], "active", [
+        GROUP_LIFECYCLE_COMPONENT_ID,
+      ]),
+      resultingState: state([ADMIN, ADMIN], "disbanded", [
+        GROUP_LIFECYCLE_COMPONENT_ID,
+      ]),
       committerLeafIndex: 0,
       proposals: [
         {
@@ -141,10 +133,7 @@ describe("classifyDisbandCommit", () => {
         APP_COMPONENTS_COMPONENT_ID,
         encodeComponentsList([GROUP_LIFECYCLE_COMPONENT_ID]),
       ),
-      update(
-        GROUP_LIFECYCLE_COMPONENT_ID,
-        encodeGroupLifecycleV1("active"),
-      ),
+      update(GROUP_LIFECYCLE_COMPONENT_ID, encodeGroupLifecycleV1("active")),
     ];
     expect(
       classifyDisbandCommit({

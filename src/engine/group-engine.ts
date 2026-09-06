@@ -33,11 +33,21 @@ import { marmotAuthService } from "../core/auth-service.js";
 import { getMarmotGroupView } from "../core/client-state.js";
 import { decideCommitAuthorization } from "../core/commit-authorization.js";
 import { encodeAdminPolicyV1 } from "../core/components/admin-policy.js";
+import { encodeComponentsList } from "../core/components/app-components-list.js";
+import { encodeGroupLifecycleV1 } from "../core/components/group-lifecycle.js";
+import {
+  getAppComponents,
+  getGroupLifecycle,
+} from "../core/components/dictionary.js";
 import {
   type CommitIntegrityViolation,
   validateCommitLegality,
 } from "../core/components/integrity.js";
-import { GROUP_ADMIN_POLICY_COMPONENT_ID } from "../core/components/ids.js";
+import {
+  APP_COMPONENTS_COMPONENT_ID,
+  GROUP_ADMIN_POLICY_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT_ID,
+} from "../core/components/ids.js";
 import { getCredentialPubkey } from "../core/credential.js";
 import {
   getGroupMemberPubkeys,
@@ -82,6 +92,7 @@ import {
 } from "../audit/index.js";
 import { framedContentType } from "./wire-format.js";
 import { logger } from "../utils/debug.js";
+import type { GenericKeyValueStore } from "../utils/key-value.js";
 import { createAdminCommitPolicyCallback } from "./admin-policy.js";
 import { DeliveredPayloadLedger } from "./delivered-payloads.js";
 import {
@@ -125,6 +136,12 @@ import type {
   SendResult,
 } from "./types.js";
 import { openConvergencePass, refreshConvergencePass } from "./types.js";
+import {
+  decodeDisbandRequest,
+  disbandRequestKey,
+  encodeDisbandRequest,
+  type DisbandRequest,
+} from "./disband-request.js";
 
 /**
  * Thrown by {@link MarmotGroupEngine.send} (`case "commit"`) when a removal
@@ -154,6 +171,18 @@ export class CommitLegalityError extends Error {
   constructor(readonly violation: CommitIntegrityViolation) {
     super(violation.detail);
     this.name = "CommitLegalityError";
+  }
+}
+
+/** Typed ordinary-outbound refusal while irreversible terminal intent is pending. */
+export class DisbandingError extends Error {
+  readonly reason = "disbanding" as const;
+
+  constructor() {
+    super(
+      "Cannot send ordinary outbound work while group disbanding is pending.",
+    );
+    this.name = "DisbandingError";
   }
 }
 
@@ -228,6 +257,8 @@ export type MarmotGroupEngineOptions<TEnvelope> = {
   audit?: AuditSink;
   /** Required when `audit` is set; contains stable engine/account/session metadata. */
   auditContext?: AuditContextOptions;
+  /** Durable lifecycle records shared with terminal settlement. */
+  lifecycleStore?: GenericKeyValueStore<Uint8Array>;
 };
 
 /**
@@ -321,6 +352,10 @@ export class MarmotGroupEngine<TEnvelope> {
   /** Handle of the pending settle-check timer, if any (cleared/reset per pass). */
   #settleTimer: TimerHandle | undefined;
   readonly #audit?: AuditEmitter;
+  readonly #lifecycleStore?: GenericKeyValueStore<Uint8Array>;
+  readonly #disbandRequestKey: string;
+  #disbandRequest: DisbandRequest | undefined;
+  readonly #disbandHydrated: Promise<void>;
 
   constructor(options: MarmotGroupEngineOptions<TEnvelope>) {
     this.#state = options.state;
@@ -333,6 +368,11 @@ export class MarmotGroupEngine<TEnvelope> {
       DEFAULT_CONVERGENCE_POLICY.settlementQuiescenceMs;
     this.#scheduler = options.scheduler ?? DEFAULT_SCHEDULER;
     this.#onSettleCheck = options.onSettleCheck;
+    this.#lifecycleStore = options.lifecycleStore;
+    this.#disbandRequestKey = disbandRequestKey(
+      bytesToHex(options.state.groupContext.groupId),
+    );
+    this.#disbandHydrated = this.#hydrateDisbandRequest();
 
     this.#policy = normalizeConvergencePolicy(
       options.convergencePolicy ?? DEFAULT_CONVERGENCE_POLICY,
@@ -547,8 +587,146 @@ export class MarmotGroupEngine<TEnvelope> {
     return { ...this.#convergencePass };
   }
 
+  /** Current durable irreversible request, hydrated before this promise resolves. */
+  async disbandRequest(): Promise<DisbandRequest | undefined> {
+    await this.#disbandHydrated;
+    return this.#disbandRequest && { ...this.#disbandRequest };
+  }
+
+  /** Persist irreversible intent, then prepare its exact candidate against this epoch. */
+  async requestDisband(): Promise<SendResult<TEnvelope> | undefined> {
+    await this.#disbandHydrated;
+    if (!this.#lifecycleStore)
+      throw new Error(
+        "A durable lifecycleStore is required to request disbanding",
+      );
+    if (this.#state.groupActiveState.kind === "removedFromGroup") {
+      await this.#failDisbandRequest("NoLongerMember");
+      return undefined;
+    }
+    const groupData = getMarmotGroupView(this.#state);
+    const actorLeafIndex = Number(this.#state.privatePath.leafIndex);
+    const actorPubkey = getCredentialPubkey(
+      getCredentialFromLeafIndex(
+        this.#state.ratchetTree,
+        this.#state.privatePath.leafIndex as LeafIndex,
+      ),
+    );
+    if (!groupData?.adminPubkeys.includes(actorPubkey)) {
+      await this.#failDisbandRequest("NoLongerAdmin");
+      return undefined;
+    }
+    if (
+      getGroupLifecycle(this.#state.groupContext.extensions) !== "active" ||
+      !(getAppComponents(this.#state.groupContext.extensions) ?? []).includes(
+        GROUP_LIFECYCLE_COMPONENT_ID,
+      )
+    )
+      throw new Error("Group disbanding is not enabled");
+
+    const epoch = Number(this.#state.groupContext.epoch);
+    if (!this.#disbandRequest) {
+      this.#disbandRequest = {
+        status: "pending",
+        requestedAtMs: Date.now(),
+        lastPreparedEpoch: null,
+      };
+      await this.#persistDisbandRequest();
+    }
+    if (this.#disbandRequest.status === "failed") return undefined;
+    if (
+      this.#disbandRequest.lastPreparedEpoch === epoch &&
+      this.#lifecycle !== groupLifecycleStates.stable
+    )
+      return undefined;
+    this.#disbandRequest = {
+      ...this.#disbandRequest,
+      lastPreparedEpoch: epoch,
+    };
+    await this.#persistDisbandRequest();
+
+    const proposals: Proposal[] = this.#occupiedLeafIndices()
+      .filter((index) => index !== actorLeafIndex)
+      .map((removed) => ({
+        proposalType: defaultProposalTypes.remove,
+        remove: { removed },
+      }));
+    proposals.push(
+      {
+        proposalType: appDataUpdateProposalType,
+        appDataUpdate: {
+          componentId: GROUP_LIFECYCLE_COMPONENT_ID,
+          operation: "update",
+          update: encodeGroupLifecycleV1("disbanded"),
+        },
+      },
+      {
+        proposalType: appDataUpdateProposalType,
+        appDataUpdate: {
+          componentId: GROUP_ADMIN_POLICY_COMPONENT_ID,
+          operation: "update",
+          update: encodeAdminPolicyV1([actorPubkey]),
+        },
+      },
+    );
+    return this.#sendInner({
+      kind: "commit",
+      actorPubkey,
+      extraProposals: proposals,
+    });
+  }
+
+  /** Atomically enables lifecycle-v1 for a legacy group when every leaf supports it. */
+  async enableGroupDisbanding(): Promise<SendResult<TEnvelope> | undefined> {
+    await this.#disbandHydrated;
+    const required =
+      getAppComponents(this.#state.groupContext.extensions) ?? [];
+    const lifecycle = getGroupLifecycle(this.#state.groupContext.extensions);
+    if (required.includes(GROUP_LIFECYCLE_COMPONENT_ID)) {
+      if (lifecycle === "active") return undefined;
+      throw new Error("Lifecycle component is required but not active");
+    }
+    const actorPubkey = getCredentialPubkey(
+      getCredentialFromLeafIndex(
+        this.#state.ratchetTree,
+        this.#state.privatePath.leafIndex as LeafIndex,
+      ),
+    );
+    const groupData = getMarmotGroupView(this.#state);
+    if (!groupData?.adminPubkeys.includes(actorPubkey))
+      throw new Error("Only an active group admin may enable disbanding");
+    const proposals: Proposal[] = [
+      {
+        proposalType: appDataUpdateProposalType,
+        appDataUpdate: {
+          componentId: APP_COMPONENTS_COMPONENT_ID,
+          operation: "update",
+          update: encodeComponentsList([
+            ...required,
+            GROUP_LIFECYCLE_COMPONENT_ID,
+          ]),
+        },
+      },
+      {
+        proposalType: appDataUpdateProposalType,
+        appDataUpdate: {
+          componentId: GROUP_LIFECYCLE_COMPONENT_ID,
+          operation: "update",
+          update: encodeGroupLifecycleV1("active"),
+        },
+      },
+    ];
+    return this.#sendInner({
+      kind: "commit",
+      actorPubkey,
+      extraProposals: proposals,
+    });
+  }
+
   /** Executes a local send intent and returns the wrapped transport envelope. */
   async send(intent: SendIntent): Promise<SendResult<TEnvelope>> {
+    await this.#disbandHydrated;
+    if (this.#disbandRequest?.status === "pending") throw new DisbandingError();
     // D-14: once canonical state is the removedFromGroup tombstone, no
     // outbound intent may proceed — checked before the audit `send_entry`
     // emit and before #sendInner, mirroring the `mayPrepareLocalCommit` throw
@@ -1162,6 +1340,7 @@ export class MarmotGroupEngine<TEnvelope> {
     envelopes: TEnvelope[],
     options?: { maxRetries?: number },
   ): AsyncGenerator<DispositionedIngestResult<TEnvelope>> {
+    await this.#disbandHydrated;
     if (!mayApplyRetainedInbound(this.#lifecycle)) {
       this.#retainedPassInput.push(...envelopes);
       return;
@@ -1735,8 +1914,48 @@ export class MarmotGroupEngine<TEnvelope> {
   }
 
   #setState(newState: ClientState): void {
+    const epochChanged =
+      newState.groupContext.epoch !== this.#state.groupContext.epoch;
     this.#state = newState;
+    if (
+      epochChanged &&
+      this.#disbandRequest?.status === "pending" &&
+      getGroupLifecycle(newState.groupContext.extensions) === "active"
+    ) {
+      this.#disbandRequest = {
+        ...this.#disbandRequest,
+        lastPreparedEpoch: null,
+      };
+      void this.#persistDisbandRequest();
+    }
     this.#onStateChanged?.(newState);
+  }
+
+  async #hydrateDisbandRequest(): Promise<void> {
+    if (!this.#lifecycleStore) return;
+    const encoded = await this.#lifecycleStore.getItem(this.#disbandRequestKey);
+    if (encoded) this.#disbandRequest = decodeDisbandRequest(encoded);
+  }
+
+  async #persistDisbandRequest(): Promise<void> {
+    if (!this.#lifecycleStore || !this.#disbandRequest) return;
+    await this.#lifecycleStore.setItem(
+      this.#disbandRequestKey,
+      encodeDisbandRequest(this.#disbandRequest),
+    );
+  }
+
+  async #failDisbandRequest(
+    reason: "NoLongerMember" | "NoLongerAdmin",
+  ): Promise<void> {
+    if (!this.#disbandRequest) return;
+    this.#disbandRequest = {
+      status: "failed",
+      reason,
+      requestedAtMs: this.#disbandRequest.requestedAtMs,
+      lastPreparedEpoch: null,
+    };
+    await this.#persistDisbandRequest();
   }
 
   #emitAudit(kind: AuditEventKind): void {
@@ -1991,13 +2210,9 @@ export class MarmotGroupEngine<TEnvelope> {
 
     if (resolution.outcome !== "recovered") {
       const decision =
-        resolution.outcome === "superseded"
-          ? resolution.decision
-          : undefined;
+        resolution.outcome === "superseded" ? resolution.decision : undefined;
       const winnerTip =
-        resolution.outcome === "superseded"
-          ? resolution.winnerTip
-          : undefined;
+        resolution.outcome === "superseded" ? resolution.winnerTip : undefined;
       this.#emitAudit({
         type: "convergence_decision",
         current_tip_epoch: Number(this.state.groupContext.epoch),

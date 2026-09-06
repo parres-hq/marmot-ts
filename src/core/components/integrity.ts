@@ -12,7 +12,10 @@ import { getAdminPolicy, getAppComponents } from "./dictionary.js";
 import { getGroupMemberPubkeys } from "../group-members.js";
 import { APP_COMPONENTS_COMPONENT_ID, AppComponentId } from "./ids.js";
 import { bytesEqual } from "./bytes.js";
-import { classifyDisbandCommit, type DisbandClassification } from "./disband-validation.js";
+import {
+  classifyDisbandCommit,
+  type DisbandClassification,
+} from "./disband-validation.js";
 
 /**
  * Ported commit-legality validators for the Marmot app-component layer.
@@ -29,9 +32,7 @@ import { classifyDisbandCommit, type DisbandClassification } from "./disband-val
 
 /** The reason a commit was found to violate a ported MDK commit-legality rule. */
 export type CommitIntegrityViolationReason =
-  | "component-integrity"
-  | "admin-leaf-coupling"
-  | "disband-legality";
+  "component-integrity" | "admin-leaf-coupling" | "disband-legality";
 
 /**
  * A typed, non-throwing violation returned by {@link validateAppComponentIntegrity},
@@ -277,8 +278,11 @@ export function validateCommitLegality(args: {
   proposals: readonly (Proposal | ProposalWithSender)[];
   committerLeafIndex?: number;
 }): CommitIntegrityViolation | undefined {
-  const proposalsWithSenders: ProposalWithSender[] = args.proposals.map((item) =>
-    "proposal" in item ? item : { proposal: item, senderLeafIndex: undefined },
+  const proposalsWithSenders: ProposalWithSender[] = args.proposals.map(
+    (item) =>
+      "proposal" in item
+        ? item
+        : { proposal: item, senderLeafIndex: undefined },
   );
   const proposals = proposalsWithSenders.map(({ proposal }) => proposal);
   const appDataUpdateOps = collectAppDataUpdateOps(proposals);

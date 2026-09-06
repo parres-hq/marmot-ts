@@ -12,7 +12,11 @@ import {
 
 import { getCredentialPubkey } from "../credential.js";
 import { bytesEqual } from "./bytes.js";
-import { getAdminPolicy, getAppComponents, getGroupLifecycle } from "./dictionary.js";
+import {
+  getAdminPolicy,
+  getAppComponents,
+  getGroupLifecycle,
+} from "./dictionary.js";
 import {
   APP_COMPONENTS_COMPONENT_ID,
   GROUP_ADMIN_POLICY_COMPONENT_ID,
@@ -34,7 +38,11 @@ function violation(detail: string): DisbandClassification {
 
 function leafIndexes(state: ClientState): number[] {
   const indexes: number[] = [];
-  for (let nodeIndex = 0; nodeIndex < state.ratchetTree.length; nodeIndex += 2) {
+  for (
+    let nodeIndex = 0;
+    nodeIndex < state.ratchetTree.length;
+    nodeIndex += 2
+  ) {
     const node = state.ratchetTree[nodeIndex];
     if (node?.nodeType === nodeTypes.leaf) indexes.push(nodeIndex / 2);
   }
@@ -77,7 +85,9 @@ export function classifyDisbandCommit(args: {
   let parentRequired: number[];
   let resultingRequired: number[];
   try {
-    parentLifecycle = getGroupLifecycle(args.parentState.groupContext.extensions);
+    parentLifecycle = getGroupLifecycle(
+      args.parentState.groupContext.extensions,
+    );
     resultingLifecycle = getGroupLifecycle(
       args.resultingState.groupContext.extensions,
     );
@@ -109,12 +119,16 @@ export function classifyDisbandCommit(args: {
     return { kind: "notDisband" };
 
   if (args.committerLeafIndex === undefined)
-    return violation("lifecycle transition has no authenticated member committer");
+    return violation(
+      "lifecycle transition has no authenticated member committer",
+    );
   const actorPubkey = actorOf(args.parentState, args.committerLeafIndex);
-  if (!actorPubkey) return violation("lifecycle committer credential is invalid");
+  if (!actorPubkey)
+    return violation("lifecycle committer credential is invalid");
   let parentAdmins: string[];
   try {
-    parentAdmins = getAdminPolicy(args.parentState.groupContext.extensions) ?? [];
+    parentAdmins =
+      getAdminPolicy(args.parentState.groupContext.extensions) ?? [];
   } catch {
     return violation("parent admin-policy component did not decode");
   }
@@ -125,14 +139,20 @@ export function classifyDisbandCommit(args: {
     if (parentLifecycle !== undefined)
       return violation("legacy lifecycle state exists without being required");
     if (resultingLifecycle !== "active" || !resultRequires)
-      return violation("legacy lifecycle enablement must atomically add active and required state");
+      return violation(
+        "legacy lifecycle enablement must atomically add active and required state",
+      );
     if (args.proposals.length !== 2)
-      return violation("legacy lifecycle enablement contains an unrelated proposal");
+      return violation(
+        "legacy lifecycle enablement contains an unrelated proposal",
+      );
     const requiredUpdate = args.proposals.find(
-      (proposal) => updateBytes(proposal, APP_COMPONENTS_COMPONENT_ID) !== undefined,
+      (proposal) =>
+        updateBytes(proposal, APP_COMPONENTS_COMPONENT_ID) !== undefined,
     );
     const lifecycleUpdate = args.proposals.find(
-      (proposal) => updateBytes(proposal, GROUP_LIFECYCLE_COMPONENT_ID) !== undefined,
+      (proposal) =>
+        updateBytes(proposal, GROUP_LIFECYCLE_COMPONENT_ID) !== undefined,
     );
     if (
       !requiredUpdate ||
@@ -148,7 +168,9 @@ export function classifyDisbandCommit(args: {
         encodeGroupLifecycleV1("active"),
       )
     )
-      return violation("legacy lifecycle enablement must use exact inline replacements");
+      return violation(
+        "legacy lifecycle enablement must use exact inline replacements",
+      );
     for (const index of leafIndexes(args.resultingState)) {
       const node = args.resultingState.ratchetTree[index * 2];
       try {
@@ -158,11 +180,11 @@ export function classifyDisbandCommit(args: {
             getAppComponents(
               node.leaf.extensions as unknown as GroupContextExtension[],
             ) ?? []
-          ).includes(
-            GROUP_LIFECYCLE_COMPONENT_ID,
-          )
+          ).includes(GROUP_LIFECYCLE_COMPONENT_ID)
         )
-          return violation("resulting member does not advertise lifecycle support");
+          return violation(
+            "resulting member does not advertise lifecycle support",
+          );
       } catch {
         return violation("resulting member capability state did not decode");
       }
@@ -171,7 +193,9 @@ export function classifyDisbandCommit(args: {
   }
 
   if (!resultRequires || resultingLifecycle !== "disbanded")
-    return violation("required lifecycle state is absorbing and may only become disbanded");
+    return violation(
+      "required lifecycle state is absorbing and may only become disbanded",
+    );
   if (parentLifecycle !== "active")
     return violation("disband requires an active lifecycle parent");
 
@@ -195,7 +219,9 @@ export function classifyDisbandCommit(args: {
         proposal.senderLeafIndex !== args.committerLeafIndex ||
         !bytesEqual(lifecycle, encodeGroupLifecycleV1("disbanded"))
       )
-        return violation("disband lifecycle replacement is not exact and inline");
+        return violation(
+          "disband lifecycle replacement is not exact and inline",
+        );
       lifecycleUpdates++;
       continue;
     }
@@ -205,20 +231,26 @@ export function classifyDisbandCommit(args: {
         proposal.senderLeafIndex !== args.committerLeafIndex ||
         !bytesEqual(admins, encodeAdminPolicyV1([actorPubkey]))
       )
-        return violation("disband admin-policy replacement is not exact and inline");
+        return violation(
+          "disband admin-policy replacement is not exact and inline",
+        );
       adminUpdates++;
       continue;
     }
     return violation("disband commit contains a forbidden proposal");
   }
   if (lifecycleUpdates !== 1 || adminUpdates !== 1)
-    return violation("disband requires exactly one lifecycle and admin-policy replacement");
+    return violation(
+      "disband requires exactly one lifecycle and admin-policy replacement",
+    );
   if (
     removals.length !== expectedRemovals.length ||
     expectedRemovals.some((index) => !removals.includes(index)) ||
     new Set(removals).size !== removals.length
   )
-    return violation("disband must remove every parent leaf except the exact committer leaf");
+    return violation(
+      "disband must remove every parent leaf except the exact committer leaf",
+    );
   try {
     const resultingAdmins =
       getAdminPolicy(args.resultingState.groupContext.extensions) ?? [];
@@ -228,7 +260,9 @@ export function classifyDisbandCommit(args: {
       leafIndexes(args.resultingState).length !== 1 ||
       actorOf(args.resultingState, args.committerLeafIndex) !== actorPubkey
     )
-      return violation("disband resulting roster or admin policy is not committer-only");
+      return violation(
+        "disband resulting roster or admin policy is not committer-only",
+      );
   } catch {
     return violation("resulting disband admin-policy component did not decode");
   }

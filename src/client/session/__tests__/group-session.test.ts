@@ -130,6 +130,28 @@ function makeSession(
 }
 
 describe("GroupSession send intent effects", () => {
+  it("persists a disband request before exposing its candidate and gates later sends", async () => {
+    const impl = await getImpl();
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const session = makeSession(await createAdminState(impl), impl, {
+      lifecycleStore,
+    });
+
+    const effects = await session.requestDisband();
+    expect(effects.publish).toHaveLength(1);
+    expect(
+      (await lifecycleStore.keys()).some((key) =>
+        key.endsWith("/disband/request"),
+      ),
+    ).toBe(true);
+    await expect(
+      session.send({
+        kind: "applicationMessage",
+        payload: new Uint8Array([1]),
+      }),
+    ).rejects.toMatchObject({ reason: "disbanding" });
+  });
+
   it("produces an application-message publish effect", async () => {
     const impl = await getImpl();
     const session = makeSession(await createAdminState(impl), impl);

@@ -10,3 +10,4 @@ export * from "./ingestion-pool.js";
 export * from "./fork-recovery.js";
 export * from "./ingest.js";
 export * from "./group-engine.js";
+export * from "./disband-request.js";

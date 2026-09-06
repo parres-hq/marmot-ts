@@ -1,6 +1,12 @@
 /** @module @category Client - Session */
 import type { NostrEvent } from "applesauce-core/helpers/event";
-import type { CiphersuiteImpl, ClientState, Proposal } from "ts-mls";
+import {
+  getCredentialFromLeafIndex,
+  type CiphersuiteImpl,
+  type ClientState,
+  type LeafIndex,
+  type Proposal,
+} from "ts-mls";
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 
@@ -12,6 +18,7 @@ import {
 } from "../../core/client-state.js";
 import type { ConvergencePolicy } from "../../core/convergence.js";
 import type { Disposition } from "../../core/inbound.js";
+import { getCredentialPubkey } from "../../core/credential.js";
 import type { AuditContextOptions, AuditSink } from "../../audit/index.js";
 import type { IngestionPoolOptions } from "../../engine/ingestion-pool.js";
 import { MarmotGroupEngine } from "../../engine/group-engine.js";
@@ -105,6 +112,8 @@ export type GroupSessionOptions<
   ciphersuite: CiphersuiteImpl;
   store: GenericKeyValueStore<SerializedClientState>;
   ingestStateStore?: GenericKeyValueStore<Uint8Array>;
+  /** Durable lifecycle request/terminal store (defaults to ingestStateStore). */
+  lifecycleStore?: GenericKeyValueStore<Uint8Array>;
   /**
    * Dedicated store for the full-fork history tree (per-node keys under a hex
    * group-id prefix). When set, the tree is flushed on {@link GroupSession.save}
@@ -254,6 +263,7 @@ export class GroupSession<
       onSettleCheck: options.onSettleCheck,
       audit: options.audit,
       auditContext: options.auditContext,
+      lifecycleStore: options.lifecycleStore ?? options.ingestStateStore,
       onStateChanged: (newState) => {
         this.#dirty = true;
         this.#groupData = null;
@@ -483,6 +493,55 @@ export class GroupSession<
         };
       }
     }
+  }
+
+  /** Persists irreversible terminal intent before returning publish work. */
+  async requestDisband(): Promise<GroupEffects> {
+    const sendResult = await this.#engine.requestDisband();
+    if (!sendResult) return { publish: [] };
+    if (sendResult.kind !== "groupEvolution")
+      throw new Error("Expected groupEvolution result from disband request");
+    return {
+      publish: [
+        {
+          kind: "groupEvolution",
+          envelope: sendResult.envelope,
+          pending: sendResult.pending,
+          welcome: sendResult.welcome,
+          actorPubkey: this.#ownPubkey(),
+        },
+      ],
+    };
+  }
+
+  /** Builds the atomic active+required lifecycle enablement commit. */
+  async enableGroupDisbanding(): Promise<GroupEffects> {
+    const sendResult = await this.#engine.enableGroupDisbanding();
+    if (!sendResult) return { publish: [] };
+    if (sendResult.kind !== "groupEvolution")
+      throw new Error(
+        "Expected groupEvolution result from lifecycle enablement",
+      );
+    return {
+      publish: [
+        {
+          kind: "groupEvolution",
+          envelope: sendResult.envelope,
+          pending: sendResult.pending,
+          welcome: sendResult.welcome,
+          actorPubkey: this.#ownPubkey(),
+        },
+      ],
+    };
+  }
+
+  #ownPubkey(): string {
+    return getCredentialPubkey(
+      getCredentialFromLeafIndex(
+        this.state.ratchetTree,
+        this.state.privatePath.leafIndex as LeafIndex,
+      ),
+    );
   }
 
   /**
