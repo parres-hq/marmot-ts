@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { EventSigner } from "applesauce-core/factories";
+import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
+import { describe, expect, it, vi } from "vitest";
 
+import { createCredential } from "../../../core/credential.js";
+import { createSimpleGroup } from "../../../core/group.js";
+import { generateKeyPackage } from "../../../core/key-package.js";
+import { InMemoryKeyValueStore } from "../../../extra/in-memory-key-value-store.js";
+import { GroupTerminalError, MarmotGroup } from "../marmot-group.js";
+import { MockNetwork } from "../../../__tests__/helpers/mock-network.js";
 import {
   decodeDisbandTombstone,
   disbandTombstoneKey,
@@ -60,5 +68,66 @@ describe("disband tombstone", () => {
         ),
       ),
     ).toThrow();
+  });
+});
+
+async function fixture() {
+  const pubkey = "a".repeat(64);
+  const impl = await getCiphersuiteImpl(
+    "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+    defaultCryptoProvider,
+  );
+  const kp = await generateKeyPackage({
+    credential: createCredential(pubkey),
+    ciphersuiteImpl: impl,
+  });
+  const { clientState } = await createSimpleGroup(kp, impl, "terminal", {
+    adminPubkeys: [pubkey],
+    relays: ["wss://relay.test"],
+  });
+  const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+  const group = new MarmotGroup(clientState, {
+    store: new InMemoryKeyValueStore(),
+    lifecycleStore,
+    signer: { getPublicKey: async () => pubkey } as EventSigner,
+    ciphersuite: impl,
+    network: new MockNetwork(["wss://relay.test"]),
+  });
+  return { group, lifecycleStore, pubkey };
+}
+
+describe("public disband terminal contract", () => {
+  it("records delivery before emitting once and rejects every outbound intent", async () => {
+    const { group, pubkey } = await fixture();
+    const digest = new Uint8Array(32).fill(7);
+    const seen = vi.fn(() => {
+      expect(group.status).toBe("disbanded");
+      throw new Error("application callback failure");
+    });
+    group.on("disbanded", seen);
+
+    await group.session.persistSelectedDisband({
+      actorPubkey: pubkey,
+      commitDigest: digest,
+      parentTag: "parent",
+      sourceEpoch: 0,
+      terminalOutcome: "disbanded",
+    });
+    await group.realizeDisbandIfNeeded();
+    await group.realizeDisbandIfNeeded();
+
+    expect(seen).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveBeenCalledWith(group, {
+      actorPubkey: pubkey,
+      commitDigest: digest,
+    });
+    await expect(
+      group.submitIntent({ kind: "applicationMessage", payload: new Uint8Array() }),
+    ).rejects.toMatchObject({ reason: "group_disbanded" });
+    await expect(group.selfUpdate()).rejects.toBeInstanceOf(GroupTerminalError);
+    await expect(group.enableDisbanding()).rejects.toMatchObject({
+      reason: "group_disbanded",
+    });
+    await expect(group.disband()).rejects.toMatchObject({ reason: "group_disbanded" });
   });
 });
