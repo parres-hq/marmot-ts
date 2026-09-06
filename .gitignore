@@ -10,4 +10,5 @@ mcp.json
 plans
 .vitepress/cache
 graphify-out/
+target/
 .cursor/rules/graphify.mdc
