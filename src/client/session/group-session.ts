@@ -497,6 +497,11 @@ export class GroupSession<
     if (bytesToHex(tombstone.groupId) !== idHex)
       throw new Error("Invalid disband tombstone group id");
     this.#terminalTombstone = tombstone;
+    if (!(await this.lifecycleStore.getItem(disbandRegistryStateKey(idHex))))
+      await this.lifecycleStore.setItem(
+        disbandRegistryStateKey(idHex),
+        serializeClientState(scrubTerminalRegistryState(this.state)),
+      );
     await this.#cleanupAfterDisband(idHex);
   }
 
