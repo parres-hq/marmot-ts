@@ -21,6 +21,8 @@ import { InMemoryKeyValueStore } from "../../../extra";
 import { GroupSession } from "../group-session.js";
 import type { UnreadableIngestResult } from "../group-session.js";
 import type { IngestResult as EngineIngestResult } from "../../../engine/types.js";
+import { disbandTombstoneKey } from "../../../engine/disband-tombstone.js";
+import { encodeDisbandRequest } from "../../../engine/disband-request.js";
 
 const ADMIN = "a".repeat(64);
 const MEMBER = "d".repeat(64);
@@ -130,6 +132,78 @@ function makeSession(
 }
 
 describe("GroupSession send intent effects", () => {
+  it("writes selected terminal evidence before clearing live and work state", async () => {
+    const impl = await getImpl();
+    const state = await createAdminState(impl);
+    const id = bytesToHex(state.groupContext.groupId);
+    const operations: string[] = [];
+    const stateStore = new InMemoryKeyValueStore<SerializedClientState>();
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const ingestStateStore = new InMemoryKeyValueStore<Uint8Array>();
+    await stateStore.setItem(id, new Uint8Array([1]));
+    await lifecycleStore.setItem(
+      `${id}/disband/request`,
+      encodeDisbandRequest({
+        status: "pending",
+        requestedAtMs: 1,
+        lastPreparedEpoch: null,
+      }),
+    );
+    await ingestStateStore.setItem(`${id}/effect/work`, new Uint8Array([1]));
+    vi.spyOn(lifecycleStore, "setItem").mockImplementation(async (key, value) => {
+      operations.push(`set:${key}`);
+      return value;
+    });
+    vi.spyOn(stateStore, "removeItem").mockImplementation(async (key) => {
+      operations.push(`remove-state:${key}`);
+    });
+
+    const session = makeSession(state, impl, {
+      store: stateStore,
+      lifecycleStore,
+      ingestStateStore,
+    });
+    await session.persistSelectedDisband({
+      commitDigest: new Uint8Array(32).fill(9),
+      actorPubkey: ADMIN,
+      sourceEpoch: Number(state.groupContext.epoch),
+      parentTag: bytesToHex(state.confirmationTag),
+      terminalOutcome: "disbanded",
+    });
+
+    expect(operations[0]).toBe(`set:${disbandTombstoneKey(id)}`);
+    expect(await lifecycleStore.getItem(`${id}/disband/request`)).toBeNull();
+    expect(await ingestStateStore.getItem(`${id}/effect/work`)).toBeNull();
+    expect(operations).toContain(`remove-state:${id}`);
+  });
+
+  it("hydrates terminal authority over stale live state and rejects corrupt evidence", async () => {
+    const impl = await getImpl();
+    const state = await createAdminState(impl);
+    const id = bytesToHex(state.groupContext.groupId);
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const session = makeSession(state, impl, { lifecycleStore });
+    await session.persistSelectedDisband({
+      commitDigest: new Uint8Array(32).fill(8),
+      actorPubkey: ADMIN,
+      sourceEpoch: Number(state.groupContext.epoch),
+      parentTag: bytesToHex(state.confirmationTag),
+      terminalOutcome: "disbanded",
+    });
+
+    const restarted = makeSession(state, impl, { lifecycleStore });
+    expect((await restarted.disbandTombstone())?.actorPubkey).toBe(ADMIN);
+
+    await lifecycleStore.setItem(
+      disbandTombstoneKey(id),
+      new TextEncoder().encode('{"version":99}'),
+    );
+    const corrupt = makeSession(state, impl, { lifecycleStore });
+    await expect(corrupt.disbandTombstone()).rejects.toThrow(
+      "Invalid disband tombstone",
+    );
+  });
+
   it("persists a disband request before exposing its candidate and gates later sends", async () => {
     const impl = await getImpl();
     const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
