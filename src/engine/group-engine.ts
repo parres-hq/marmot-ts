@@ -362,6 +362,7 @@ export class MarmotGroupEngine<TEnvelope> {
       evidence: DisbandCandidateEvidence;
     }
   >();
+  #selectedDisbandEvidence: DisbandCandidateEvidence | undefined;
   /** Capacity-refused input retained independently so a full pool cannot deadlock it. */
   readonly #capacityRefusedInput = new Map<string, TEnvelope>();
 
@@ -590,6 +591,11 @@ export class MarmotGroupEngine<TEnvelope> {
   /** Snapshot of the active immutable pass, exposed for scheduler diagnostics. */
   get convergencePass(): ConvergencePassState | undefined {
     return this.#convergencePass && { ...this.#convergencePass };
+  }
+
+  /** Canonical terminal evidence retained until the client persists its tombstone. */
+  get selectedDisbandEvidence(): DisbandCandidateEvidence | undefined {
+    return this.#selectedDisbandEvidence;
   }
 
   /** Number of envelopes retained but not yet admitted to a convergence pass. */
@@ -2586,6 +2592,8 @@ export class MarmotGroupEngine<TEnvelope> {
         : groupLifecycleStates.stable,
       resolution.selectedTerminal ? "disband_selected" : "branch_applied",
     );
+    if (resolution.selectedTerminal)
+      this.#selectedDisbandEvidence = resolution.selectedTerminal;
     // The canonical path moved; let held fork messages re-decrypt on it.
     this.#pool.resetTried();
 

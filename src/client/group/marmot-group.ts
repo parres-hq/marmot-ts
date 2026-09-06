@@ -1061,6 +1061,7 @@ export class MarmotGroup<
       await this.#applyRemovalWithdrawal(result);
       if (result.kind === "removed") await this.#realizeRemovalIfNeeded();
     }
+    await this.realizeDisbandIfNeeded();
     if (
       this.lifecycle === groupLifecycleStates.stable &&
       (await this.session.disbandRequest())?.status === "pending"

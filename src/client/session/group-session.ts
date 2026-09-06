@@ -403,6 +403,8 @@ export class GroupSession<
     const results: DispositionedIngestResult[] = [];
     for (const result of await this.#engine.driveConvergence())
       results.push(...(await this.#reconcile(mapEngineIngestResult(result))));
+    if (this.#engine.selectedDisbandEvidence)
+      await this.persistSelectedDisband(this.#engine.selectedDisbandEvidence);
     await this.save();
     return results;
   }

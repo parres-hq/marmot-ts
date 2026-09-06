@@ -148,6 +148,13 @@ describe("MarmotGroup lifecycle (group-state.md)", () => {
     await vi.waitFor(() => expect(targetNetwork.events).toHaveLength(2));
     expect(target.lifecycle).toBe("Recovering");
     expect((await target.session.disbandRequest())?.lastPreparedEpoch).toBe(2);
+
+    nowMs = 10_100;
+    const terminalCutoff = scheduled;
+    if (!terminalCutoff) throw new Error("expected regenerated cutoff");
+    terminalCutoff();
+    await vi.waitFor(() => expect(target.status).toBe("disbanded"));
+    expect(targetNetwork.events).toHaveLength(2);
   });
 
   it("rejects public legacy enablement when any resulting leaf lacks lifecycle support", async () => {
