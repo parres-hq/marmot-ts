@@ -947,13 +947,14 @@ export class MarmotGroup<
       effects = await this.session.enableGroupDisbanding();
     } catch (error) {
       const message = errorMessage(error);
-      const reason = /not all members support|required capabilities/i.test(
-        message,
-      )
-        ? "unsupportedMembers"
-        : /only an active group admin/i.test(message)
-          ? "notAdmin"
-          : "legality";
+      const reason =
+        /not all members support|required capabilities|does not advertise lifecycle support/i.test(
+          message,
+        )
+          ? "unsupportedMembers"
+          : /only an active group admin/i.test(message)
+            ? "notAdmin"
+            : "legality";
       return { kind: "rejected", reason, error: message };
     }
     if (effects.publish.length === 0) return { kind: "alreadyEnabled" };

@@ -5,7 +5,9 @@ import {
   defaultCryptoProvider,
   defaultProposalTypes,
   getCiphersuiteImpl,
+  getAppDataDictionary,
   joinGroup,
+  makeAppDataDictionaryExtension,
   processMessage,
   unsafeTestingAuthenticationService,
 } from "ts-mls";
@@ -22,6 +24,14 @@ import {
 } from "../../../core/account-identity-proof.js";
 import { createCredential } from "../../../core/credential.js";
 import { createSimpleGroup } from "../../../core/group.js";
+import {
+  decodeComponentsList,
+  encodeComponentsList,
+} from "../../../core/components/app-components-list.js";
+import {
+  APP_COMPONENTS_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT_ID,
+} from "../../../core/components/ids.js";
 import { generateKeyPackage } from "../../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../../extra";
 import type { NostrNetworkInterface } from "../../nostr-interface.js";
@@ -47,6 +57,88 @@ async function createTestGroupState(
 }
 
 describe("MarmotGroup lifecycle (group-state.md)", () => {
+  it("rejects public legacy enablement when any resulting leaf lacks lifecycle support", async () => {
+    const admin = "a".repeat(64);
+    const member = "e".repeat(64);
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const adminPackage = await generateKeyPackage({
+      credential: createCredential(admin),
+      ciphersuiteImpl: impl,
+    });
+    const memberPackage = await generateKeyPackage({
+      credential: createCredential(member),
+      ciphersuiteImpl: impl,
+    });
+    const { clientState } = await createSimpleGroup(
+      adminPackage,
+      impl,
+      "Legacy",
+      { adminPubkeys: [admin], relays: ["wss://relay.test"] },
+    );
+    const added = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      state: clientState,
+      wireAsPublicMessage: true,
+      ratchetTreeExtension: true,
+      extraProposals: [
+        {
+          proposalType: defaultProposalTypes.add,
+          add: { keyPackage: memberPackage.publicPackage },
+        },
+      ],
+    });
+    const legacy = added.newState;
+    const withoutLifecycle = (
+      extensions: typeof legacy.groupContext.extensions,
+    ) =>
+      extensions.map((extension) => {
+        const dictionary = getAppDataDictionary([extension]);
+        if (!dictionary) return extension;
+        const entries = dictionary
+          .filter((entry) => entry.componentId !== GROUP_LIFECYCLE_COMPONENT_ID)
+          .map((entry) =>
+            entry.componentId === APP_COMPONENTS_COMPONENT_ID
+              ? {
+                  ...entry,
+                  data: encodeComponentsList(
+                    decodeComponentsList(entry.data).filter(
+                      (id) => id !== GROUP_LIFECYCLE_COMPONENT_ID,
+                    ),
+                  ),
+                }
+              : entry,
+          );
+        return makeAppDataDictionaryExtension(entries);
+      });
+    legacy.groupContext.extensions = withoutLifecycle(
+      legacy.groupContext.extensions,
+    );
+    const memberLeaf = legacy.ratchetTree[2];
+    if (!memberLeaf || !("leaf" in memberLeaf))
+      throw new Error("member leaf missing");
+    memberLeaf.leaf.extensions = withoutLifecycle(memberLeaf.leaf.extensions);
+
+    const network = new MockNetwork(["wss://relay.test"]);
+    const group = new MarmotGroup(legacy, {
+      store: new InMemoryKeyValueStore(),
+      lifecycleStore: new InMemoryKeyValueStore(),
+      signer: { getPublicKey: async () => admin } as EventSigner,
+      ciphersuite: impl,
+      network,
+    });
+    await expect(group.enableDisbanding()).resolves.toMatchObject({
+      kind: "rejected",
+      reason: "unsupportedMembers",
+    });
+    expect(network.events).toEqual([]);
+  });
+
   it("publishes disband intent once and keeps the durable request pending", async () => {
     const adminPubkey = "a".repeat(64);
     const impl = await getCiphersuiteImpl(
