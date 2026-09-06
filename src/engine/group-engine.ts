@@ -8,6 +8,7 @@ import {
   contentTypes,
   createApplicationMessage,
   createCommit,
+  decode,
   CreateCommitOptions,
   createProposal,
   defaultProposalTypes,
@@ -20,6 +21,7 @@ import {
   type MlsFramedMessage,
   type MlsMessage,
   mlsMessageEncoder,
+  mlsMessageDecoder,
   nodeTypes,
   processMessage,
   type ProcessMessageResult,
@@ -31,6 +33,10 @@ import {
 
 import { marmotAuthService } from "../core/auth-service.js";
 import { getMarmotGroupView } from "../core/client-state.js";
+import {
+  deserializeClientState,
+  serializeClientState,
+} from "../core/client-state.js";
 import { decideCommitAuthorization } from "../core/commit-authorization.js";
 import { encodeAdminPolicyV1 } from "../core/components/admin-policy.js";
 import { encodeComponentsList } from "../core/components/app-components-list.js";
@@ -634,12 +640,14 @@ export class MarmotGroupEngine<TEnvelope> {
         lastRelevantInputWallMs:
           wallNow + (this.#convergencePass.lastRelevantInputMs - monoNow),
         candidates: [...this.#disbandCandidates.values()].map(
-          ({ evidence, resultingState }) => ({
+          ({ evidence, resultingState, message }) => ({
             commitDigest: bytesToHex(evidence.commitDigest),
             actorPubkey: evidence.actorPubkey,
             sourceEpoch: evidence.sourceEpoch,
             parentTag: evidence.parentTag,
             childTag: bytesToHex(resultingState.confirmationTag),
+            commitMessage: bytesToHex(encode(mlsMessageEncoder, message)),
+            resultingState: bytesToHex(serializeClientState(resultingState)),
           }),
         ),
       }),
@@ -2037,9 +2045,17 @@ export class MarmotGroupEngine<TEnvelope> {
     const monoNow = this.#now();
     const wallNow = this.#wallNow();
     for (const candidate of stored.candidates) {
-      const parentState = await this.#tree.stateAt(candidate.parentTag);
-      const resultingState = await this.#tree.stateAt(candidate.childTag);
-      const message = await this.#tree.commitMessageOf(candidate.childTag);
+      const parentState =
+        (await this.#tree.stateAt(candidate.parentTag)) ??
+        (bytesToHex(this.#state.confirmationTag) === candidate.parentTag
+          ? this.#state
+          : undefined);
+      const resultingState =
+        (await this.#tree.stateAt(candidate.childTag)) ??
+        deserializeClientState(hexToBytes(candidate.resultingState));
+      const message =
+        (await this.#tree.commitMessageOf(candidate.childTag)) ??
+        decode(mlsMessageDecoder, hexToBytes(candidate.commitMessage));
       if (!parentState || !resultingState || !message)
         throw new Error(
           "Persisted disband candidate is missing history material",
@@ -2056,6 +2072,11 @@ export class MarmotGroupEngine<TEnvelope> {
           terminalOutcome: "disbanded",
         },
       });
+      if (!this.#tree.hasNode(candidate.childTag)) {
+        if (!this.#tree.hasNode(candidate.parentTag))
+          this.#tree.setRoot(parentState);
+        this.#tree.recordCommit(candidate.parentTag, message, resultingState);
+      }
     }
     this.#convergencePass = {
       generation: stored.generation,

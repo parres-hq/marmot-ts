@@ -16,6 +16,9 @@ import { generateKeyPackage } from "../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../extra/in-memory-key-value-store.js";
 import { MarmotGroupEngine } from "../group-engine.js";
 import { GroupHistoryTree } from "../history-tree.js";
+import { MarmotGroup } from "../../client/group/marmot-group.js";
+import { MockNetwork } from "../../__tests__/helpers/mock-network.js";
+import type { EventSigner } from "applesauce-core/factories";
 import type { GroupPeeler } from "../types.js";
 
 describe("bounded disband convergence", () => {
@@ -146,6 +149,66 @@ describe("bounded disband convergence", () => {
     nowMs += 1_000;
     await restored.driveConvergence();
     expect(restored.lifecycle).toBe("Disbanded");
+  });
+
+  it("recovers when history persistence crashes after write-ahead terminal evidence", async () => {
+    const admin = "a".repeat(64);
+    const ciphersuite = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const adminPackage = await generateKeyPackage({
+      credential: createCredential(admin),
+      ciphersuiteImpl: ciphersuite,
+    });
+    const { clientState } = await createSimpleGroup(
+      adminPackage,
+      ciphersuite,
+      "Write ahead",
+      { adminPubkeys: [admin], relays: ["wss://relay.test"] },
+    );
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const backing = new InMemoryKeyValueStore<Uint8Array>();
+    let failHistory = true;
+    const rewindStore = {
+      getItem: (key: string) => backing.getItem(key),
+      setItem: async (key: string, value: Uint8Array) => {
+        if (failHistory) {
+          failHistory = false;
+          throw new Error("injected history crash");
+        }
+        return backing.setItem(key, value);
+      },
+      removeItem: (key: string) => backing.removeItem(key),
+      clear: () => backing.clear(),
+      keys: () => backing.keys(),
+    };
+    const options = {
+      store: new InMemoryKeyValueStore<Uint8Array>(),
+      lifecycleStore,
+      rewindStore,
+      signer: { getPublicKey: async () => admin } as EventSigner,
+      ciphersuite,
+      network: new MockNetwork(["wss://relay.test"]),
+    };
+    const first = new MarmotGroup(clientState, options);
+    const effects = await first.session.requestDisband();
+    const work = effects.publish[0];
+    if (!work || work.kind !== "groupEvolution")
+      throw new Error("expected commit");
+    first.session.confirmPublished(work.pending);
+    await expect(first.save(true)).rejects.toThrow("injected history crash");
+
+    const restored = new MarmotGroup(clientState, options);
+    await restored.session.hydrateLifecycleEvidence();
+    expect(restored.lifecycle).toBe("Recovering");
+    expect(Number(restored.state.groupContext.epoch)).toBe(
+      Number(clientState.groupContext.epoch),
+    );
+    await restored.save(true);
+    expect((await backing.keys()).some((key) => key.includes("/commit/"))).toBe(
+      true,
+    );
   });
   it("holds a valid linear disband until cutoff and terminalizes only its selected branch", async () => {
     const admin = "a".repeat(64);

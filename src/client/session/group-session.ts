@@ -370,8 +370,8 @@ export class GroupSession<
     // Persist the full-fork history tree — the single source for fork recovery
     // across restarts. Append-only flush of any new nodes (O(new nodes)). The
     // bounded convergence window is rebuilt from the tree on load.
-    if (this.rewindStore) await this.#engine.history.flush();
     await this.#engine.persistDisbandConvergence();
+    if (this.rewindStore) await this.#engine.history.flush();
     const stateBytes = serializeClientState(this.state);
     await this.store.setItem(idHex, stateBytes);
     this.#dirty = false;

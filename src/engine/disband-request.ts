@@ -33,6 +33,8 @@ export interface StoredDisbandConvergence {
     readonly sourceEpoch: number;
     readonly parentTag: string;
     readonly childTag: string;
+    readonly commitMessage: string;
+    readonly resultingState: string;
   }[];
 }
 
@@ -75,7 +77,11 @@ export function decodeDisbandConvergence(
       !/^[0-9a-f]{64}$/i.test(candidate.actorPubkey) ||
       !Number.isSafeInteger(candidate.sourceEpoch) ||
       typeof candidate.parentTag !== "string" ||
-      typeof candidate.childTag !== "string"
+      typeof candidate.childTag !== "string" ||
+      typeof candidate.commitMessage !== "string" ||
+      typeof candidate.resultingState !== "string" ||
+      !/^[0-9a-f]*$/i.test(candidate.commitMessage) ||
+      !/^[0-9a-f]*$/i.test(candidate.resultingState)
     )
       throw new Error("Invalid disband convergence record");
   }
