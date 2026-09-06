@@ -15,6 +15,10 @@ import type { SerializedClientState } from "../core/client-state.js";
 import { InMemoryKeyValueStore } from "../extra/in-memory-key-value-store.js";
 import type { GenericKeyValueStore } from "../utils/key-value.js";
 import { MockNetwork } from "./helpers/mock-network.js";
+import {
+  disbandTombstoneKey,
+  encodeDisbandTombstone,
+} from "../engine/disband-tombstone.js";
 
 const ADMIN = "a".repeat(64);
 
@@ -65,6 +69,55 @@ describe("GroupsManager", () => {
 });
 
 describe("GroupsManager session/runtime helpers", () => {
+  it("hydrates terminal evidence before a stale persisted group becomes visible", async () => {
+    const network = new MockNetwork(["wss://relay.test"]);
+    const stateStore = new InMemoryKeyValueStore<SerializedClientState>();
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const manager = new GroupsManager({
+      store: stateStore,
+      lifecycleStore,
+      signer: { getPublicKey: async () => ADMIN } as EventSigner,
+      network,
+    });
+    const group = await manager.create("Terminal", {
+      relays: ["wss://relay.test"],
+    });
+    const stale = await stateStore.getItem(group.idStr);
+    manager.unload(group.id);
+    await lifecycleStore.setItem(
+      disbandTombstoneKey(group.idStr),
+      encodeDisbandTombstone({
+        groupId: group.id,
+        selectedEpoch: Number(group.state.groupContext.epoch),
+        commitDigest: new Uint8Array(32).fill(7),
+        actorPubkey: ADMIN,
+        notificationState: "pending",
+      }),
+    );
+    await stateStore.setItem(group.idStr, stale!);
+
+    const getItem = lifecycleStore.getItem.bind(lifecycleStore);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.spyOn(lifecycleStore, "getItem").mockImplementation(async (key) => {
+      await gate;
+      return getItem(key);
+    });
+    let loaded = false;
+    manager.on("loaded", () => {
+      loaded = true;
+    });
+    const loading = manager.get(group.id);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(loaded).toBe(false);
+    release();
+    const restarted = await loading;
+    expect(await restarted.session.disbandTombstone()).toBeDefined();
+    expect(await stateStore.getItem(group.idStr)).toBeNull();
+  });
+
   it("destroys only the namespaced removal marker on a shared backend", async () => {
     const network = new MockNetwork(["wss://relay.test"]);
     const shared = new InMemoryKeyValueStore<SerializedClientState | boolean>();
