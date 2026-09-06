@@ -5,15 +5,15 @@ milestone_name: Phase 1)
 current_phase: 5
 current_phase_name: Quality Gate
 status: executing
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-09-06T18:49:24.437Z"
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-09-06T19:00:43.740Z"
 last_activity: 2026-09-06
 last_activity_desc: Completed Plan 05-01 runtime matrix and smoke evidence
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 53
-  completed_plans: 50
+  completed_plans: 51
   percent: 86
 ---
 
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-07-21)
 ## Current Position
 
 Phase: 5 — Quality Gate
-Plan: 6 of 8
+Plan: 7 of 8
 Status: Ready to execute
 Last activity: 2026-09-06 — Completed Plan 05-01 runtime matrix and smoke evidence
 
-Progress: [█████████░] 94% (7 phases)
+Progress: [██████████] 96% (7 phases)
 
 **Next recommended run:** `/gsd-execute-phase 05`
 
@@ -115,6 +115,7 @@ _Updated after each plan completion_
 | Phase 05 P03 | 9min | 2 tasks | 6 files |
 | Phase 05 P04 | 7min | 2 tasks | 7 files |
 | Phase 05 P05 | 9min | 2 tasks | 6 files |
+| Phase 05 P06 | 12min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -238,6 +239,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 05-04]: Match MDK's complete required-tag order by placing the i tag before ciphersuite and list advertisements.
 - [Phase ?]: [Phase 05-05]: Extract SafeAAD only from genuine current-profile MDK Engine::fresh_key_package wire output.
 - [Phase ?]: [Phase 05-05]: Use an exact SafeAAD-entry projection because current account-proof timestamp/signature bytes are nondeterministic.
+- [Phase ?]: Bind all QA-02 dossiers to tested source b937e3f while recording attestation 172eb0a separately.
+- [Phase ?]: Verify Marmot and MDK provenance with git ls-tree at tested_source_sha.
 
 ### Pending Todos
 
@@ -272,7 +275,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T18:49:24.416Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-09-06T19:00:43.719Z
+Stopped at: Completed 05-06-PLAN.md
 Resume file:
 None
