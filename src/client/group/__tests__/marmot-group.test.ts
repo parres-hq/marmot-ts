@@ -1,6 +1,7 @@
 import { EventSigner } from "applesauce-core/factories";
 import {
   CiphersuiteImpl,
+  appDataUpdateProposalType,
   createCommit,
   defaultCryptoProvider,
   defaultProposalTypes,
@@ -15,7 +16,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { schnorr } from "@noble/curves/secp256k1.js";
-import { SerializedClientState } from "../../../core/client-state.js";
+import {
+  deserializeClientState,
+  serializeClientState,
+  SerializedClientState,
+} from "../../../core/client-state.js";
 import {
   type AccountIdentityProofRequest,
   makeAccountIdentityProofExtension,
@@ -31,7 +36,9 @@ import {
 import {
   APP_COMPONENTS_COMPONENT_ID,
   GROUP_LIFECYCLE_COMPONENT_ID,
+  GROUP_PROFILE_COMPONENT_ID,
 } from "../../../core/components/ids.js";
+import { encodeGroupProfileV1 } from "../../../core/components/group-profile.js";
 import { generateKeyPackage } from "../../../core/key-package.js";
 import { InMemoryKeyValueStore } from "../../../extra";
 import type { NostrNetworkInterface } from "../../nostr-interface.js";
@@ -57,6 +64,92 @@ async function createTestGroupState(
 }
 
 describe("MarmotGroup lifecycle (group-state.md)", () => {
+  it("automatically regenerates disband after real convergence selects a deeper active branch", async () => {
+    const admin = "a".repeat(64);
+    const impl = await getCiphersuiteImpl(
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
+      defaultCryptoProvider,
+    );
+    const { clientState } = await createTestGroupState(admin, impl);
+    const cloneState = () =>
+      deserializeClientState(serializeClientState(clientState));
+    let nowMs = 100;
+    let scheduled: (() => void) | undefined;
+    const scheduler = {
+      setTimer(_ms: number, callback: () => void) {
+        scheduled = callback;
+        return callback;
+      },
+      clearTimer(handle: unknown) {
+        if (scheduled === handle) scheduled = undefined;
+      },
+    };
+    const targetNetwork = new MockNetwork(["wss://relay.test"]);
+    const target = new MarmotGroup(cloneState(), {
+      store: new InMemoryKeyValueStore(),
+      lifecycleStore: new InMemoryKeyValueStore(),
+      signer: { getPublicKey: async () => admin } as EventSigner,
+      ciphersuite: impl,
+      network: targetNetwork,
+      now: () => nowMs,
+      settlementQuiescenceMs: 1_000,
+      scheduler,
+    });
+    await expect(target.disband()).resolves.toMatchObject({
+      kind: "acknowledged",
+    });
+    expect(target.lifecycle).toBe("Recovering");
+    expect(targetNetwork.events).toHaveLength(1);
+
+    const competitor = new MarmotGroup(cloneState(), {
+      store: new InMemoryKeyValueStore(),
+      signer: { getPublicKey: async () => admin } as EventSigner,
+      ciphersuite: impl,
+      network: new MockNetwork(["wss://relay.test"]),
+    });
+    const activeCommit = (name: string) =>
+      competitor.session.send({
+        kind: "commit" as const,
+        actorPubkey: admin,
+        extraProposals: [
+          {
+            proposalType: appDataUpdateProposalType,
+            appDataUpdate: {
+              componentId: GROUP_PROFILE_COMPONENT_ID,
+              operation: "update" as const,
+              update: encodeGroupProfileV1({ name, description: "" }),
+            },
+          },
+        ],
+      });
+    const first = await activeCommit("Active one");
+    const firstWork = first.publish[0];
+    if (!firstWork || firstWork.kind !== "groupEvolution")
+      throw new Error("expected first active commit");
+    competitor.session.confirmPublished(firstWork.pending);
+    const second = await activeCommit("Active two");
+    const secondWork = second.publish[0];
+    if (!secondWork || secondWork.kind !== "groupEvolution")
+      throw new Error("expected second active commit");
+
+    for await (const _ of target.ingest([
+      firstWork.envelope,
+      secondWork.envelope,
+    ])) {
+      // Drain the real competing-branch ingest path.
+    }
+    expect(Number(target.state.groupContext.epoch)).toBe(2);
+    expect(target.lifecycle).toBe("Recovering");
+
+    nowMs = 5_100;
+    const cutoff = scheduled;
+    if (!cutoff) throw new Error("expected convergence cutoff");
+    cutoff();
+    await vi.waitFor(() => expect(targetNetwork.events).toHaveLength(2));
+    expect(target.lifecycle).toBe("Recovering");
+    expect((await target.session.disbandRequest())?.lastPreparedEpoch).toBe(2);
+  });
+
   it("rejects public legacy enablement when any resulting leaf lacks lifecycle support", async () => {
     const admin = "a".repeat(64);
     const member = "e".repeat(64);
