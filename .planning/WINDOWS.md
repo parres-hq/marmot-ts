@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 7
+open_count: 9
 waived_count: 0
 fixed_count: 0
-total_count: 7
-last_updated: 2026-09-06T16:32:30.529Z
+total_count: 9
+last_updated: 2026-09-06T18:11:57.391Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,8 @@ last_updated: 2026-09-06T16:32:30.529Z
 | 5 | 04.1 | deviation | src/core/__tests__/group.test.ts |  | Updated stale group-construction lifecycle expectation | open |  | 2026-09-06T16:13:16.377Z |  |
 | 6 | 04.1 | deviation | src/client/session/group-session.ts |  | Added read-only hydrated disband request projection required by the public facade | open |  | 2026-09-06T16:32:30.422Z |  |
 | 7 | 04.1 | deviation | src/client/group/__tests__/marmot-group.test.ts |  | Updated stale expected component list after lifecycle-v1 became required | open |  | 2026-09-06T16:32:30.529Z |  |
+| 8 | 05 | deviation | deno.lock |  | Generated Deno lockfile removed after runtime smoke execution | open |  | 2026-09-06T18:11:18.234Z |  |
+| 9 | 05 | deviation | .planning/STATE.md |  | Repaired Phase 5 position after state.advance-plan could not parse the initial Not started state | open |  | 2026-09-06T18:11:57.391Z |  |
 
 ````json
 [
@@ -107,6 +109,30 @@ last_updated: 2026-09-06T16:32:30.529Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-06T16:32:30.529Z",
+    "resolved_at": null
+  },
+  {
+    "id": 8,
+    "kind": "deviation",
+    "phase": "05",
+    "file": "deno.lock",
+    "line": null,
+    "description": "Generated Deno lockfile removed after runtime smoke execution",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T18:11:18.234Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "deviation",
+    "phase": "05",
+    "file": ".planning/STATE.md",
+    "line": null,
+    "description": "Repaired Phase 5 position after state.advance-plan could not parse the initial Not started state",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-06T18:11:57.391Z",
     "resolved_at": null
   }
 ]

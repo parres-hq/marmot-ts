@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: Phase 1)
 current_phase: 5
 current_phase_name: Quality Gate
-status: planning
-stopped_at: Completed 04.1-06-PLAN.md
-last_updated: "2026-09-06T17:39:44.630Z"
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-09-06T18:11:27.150Z"
 last_activity: 2026-09-06
-last_activity_desc: Phase 04.1 complete, transitioned to Phase 5
+last_activity_desc: Completed Phase 5 Plan 01 runtime matrix and smoke evidence
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 45
-  completed_plans: 45
+  total_plans: 53
+  completed_plans: 46
   percent: 86
 ---
 
@@ -24,18 +24,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-21)
 
 **Core value:** A downstream client can join a Marmot group and exchange messages that interoperate, byte-for-byte, with any spec-conformant peer (incl. the Rust MDK reference), across every supported runtime.
-**Current focus:** Phase 04.1 — Terminal Group Disbanding
+**Current focus:** Phase 5 — Quality Gate
 
 ## Current Position
 
 Phase: 5 — Quality Gate
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-09-06 — Phase 04.1 complete, transitioned to Phase 5
+Plan: 2 of 8
+Status: In progress
+Last activity: 2026-09-06 — Completed Plan 05-01 runtime matrix and smoke evidence
 
-Progress: [██████████] 100% (7 phases)
+Progress: [█████████░] 87% (7 phases)
 
-**Next recommended run:** `/gsd-execute-phase 04.1`
+**Next recommended run:** `/gsd-execute-phase 05`
 
 ## Performance Metrics
 
@@ -110,6 +110,7 @@ _Updated after each plan completion_
 | Phase 04.1 P04 | 11min | 2 tasks | 11 files |
 | Phase 04.1 P05 | 6min | 2 tasks | 8 files |
 | Phase 04.1 P06 | 8min | 2 tasks | 11 files |
+| Phase 05 P01 | 9min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -223,6 +224,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 04.1-05]: Registry listeners attach before lifecycle hydration and public loaded visibility waits for cleanup.
 - [Phase ?]: [Phase 04.1-06]: Record terminal notification delivery before isolated actor/digest callbacks.
 - [Phase ?]: [Phase 04.1-06]: Repeat disband gates at routing, session, and engine boundaries while keeping Unrecoverable repairable.
+- [Phase ?]: [Phase 05-01]: Treat local Node 22, Deno 2, and Bun latest executions as smoke evidence only; the complete six-row CI matrix remains release authority.
+- [Phase ?]: [Phase 05-01]: Record local pnpm 12.3.4 honestly while retaining pnpm 10 plus frozen-lockfile installation as the CI contract.
 
 ### Pending Todos
 
@@ -257,7 +260,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-06T17:02:55.125Z
-Stopped at: Completed 04.1-06-PLAN.md
+Last session: 2026-09-06T18:11:27.129Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file:
 None
