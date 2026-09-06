@@ -53,6 +53,7 @@ export function ingestResultDisposition<TEnvelope>(
         case "missing-retained-anchor":
           return disposition.stale(inputCategories.missingHistory);
         case "self-evicted":
+        case "group-disbanded":
           return disposition.stale(inputCategories.staleEpoch);
         default: {
           const exhaustive: never = reason;

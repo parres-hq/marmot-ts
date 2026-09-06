@@ -86,6 +86,7 @@ describe("exports", () => {
         "GroupRumorHistory",
         "GroupRuntime",
         "GroupSession",
+        "GroupTerminalError",
         "GroupsManager",
         "INBOX_RELAY_LIST_KIND",
         "INBOX_RELAY_TAG",

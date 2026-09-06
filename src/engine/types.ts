@@ -185,8 +185,8 @@ export type SkippedIngestResult<TEnvelope> = {
   kind: "skipped";
   envelope: TEnvelope;
   /**
-   * Absent for exactly one reason — `"self-evicted"` — because input for a
-   * group this client has been removed from is classified by its group
+   * Absent for inactive reasons because input for a client removed from, or a
+   * group canonically disbanded is classified by its group
    * before any peel or decrypt (`member-departure.md`: such input "need not
    * be decrypted or authenticated"). Every other skip reason still populates
    * this (D-13).
@@ -200,7 +200,8 @@ export type SkippedIngestResult<TEnvelope> = {
     | "beyond-anchor"
     | "missing-retained-anchor"
     | "invalid-app-payload"
-    | "self-evicted";
+    | "self-evicted"
+    | "group-disbanded";
 };
 
 /** An envelope that could not be decrypted or processed after all retry attempts. */

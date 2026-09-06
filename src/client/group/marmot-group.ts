@@ -553,12 +553,25 @@ export class MarmotGroup<
   }
 
   get groupData() {
-    return this.session.groupData;
+    return this.status === "disbanded" ? null : this.session.groupData;
   }
 
   /** Complete group info/debug model for chat panels and diagnostics. */
   get info(): MarmotGroupInfo {
-    return getMarmotGroupInfo(this.state);
+    const info = getMarmotGroupInfo(this.state);
+    if (this.status !== "disbanded") return info;
+    return {
+      ...info,
+      mls: { ...info.mls, memberCount: 0, proposalCount: 0 },
+      app: {
+        view: null,
+        components: [],
+        componentCount: 0,
+        requiredComponentIds: [],
+      },
+      nostr: { relays: [], relayCount: 0, hasRouting: false },
+      members: { pubkeys: [], count: 0 },
+    };
   }
 
   /**
@@ -606,6 +619,7 @@ export class MarmotGroup<
    * added; an `eligible: true` result is safe to invite. Never throws.
    */
   evaluateKeyPackage(keyPackageEvent: NostrEvent): KeyPackageEligibility {
+    if (this.status === "disbanded") throw new GroupTerminalError();
     return evaluateKeyPackageForGroup(this.state, keyPackageEvent);
   }
 
@@ -769,8 +783,8 @@ export class MarmotGroup<
     }
   }
 
-  async #assertNotDisbanded(): Promise<void> {
-    if (await this.session.disbandTombstone()) throw new GroupTerminalError();
+  #assertNotDisbanded(): void {
+    if (this.session.terminalTombstone) throw new GroupTerminalError();
   }
 
   /**
@@ -802,7 +816,7 @@ export class MarmotGroup<
    * removal.
    */
   async reconverge(): Promise<void> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     const results = await this.session.reconverge();
     for (const result of results) await this.#applyRemovalWithdrawal(result);
     // A tree-fed switch can also land us ON a branch that removes us. The
@@ -823,7 +837,7 @@ export class MarmotGroup<
    * allowed for non-admin members.
    */
   async selfUpdate(): Promise<Record<string, PublishResponse>> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     this.log("self-update commit");
     const groupData = this.groupData;
     if (!groupData) throw new NoMarmotGroupDataError();
@@ -846,7 +860,7 @@ export class MarmotGroup<
   async propose<Args extends unknown[], T extends Proposal | Proposal[]>(
     ...args: Args
   ): Promise<Record<string, PublishResponse>> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     const groupData = this.groupData;
     if (!groupData) throw new NoMarmotGroupDataError();
 
@@ -878,7 +892,7 @@ export class MarmotGroup<
   async sendProposal(
     proposal: Proposal,
   ): Promise<Record<string, PublishResponse>> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     const [result] = await this.submitIntent({ kind: "proposal", proposal });
     return result.response;
   }
@@ -896,7 +910,7 @@ export class MarmotGroup<
   async submitIntent(
     intent: GroupSessionSendIntent,
   ): Promise<GroupPublishResult[]> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     if (mayReleaseOutbound(this.session.convergenceStatus, this.lifecycle)) {
       return this.#sendNow(intent);
     }
@@ -913,7 +927,7 @@ export class MarmotGroup<
 
   /** Atomically enables lifecycle-v1 for a legacy group and publishes it once. */
   async enableDisbanding(): Promise<EnableDisbandingResult> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     let effects;
     try {
       effects = await this.session.enableGroupDisbanding();
@@ -945,7 +959,7 @@ export class MarmotGroup<
 
   /** Persists irreversible intent, publishes one candidate, and retains it until selection. */
   async disband(): Promise<DisbandResult> {
-    await this.#assertNotDisbanded();
+    this.#assertNotDisbanded();
     const existing = await this.session.disbandRequest();
     if (existing?.status === "pending")
       return { kind: "pending", request: existing };

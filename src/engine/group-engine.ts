@@ -2130,6 +2130,7 @@ export class MarmotGroupEngine<TEnvelope> {
       maxRewindCommits: this.#policy.maxRewindCommits,
       log: this.#log(),
       getState: () => this.#state,
+      isDisbanded: () => this.#lifecycle === groupLifecycleStates.disbanded,
       setState: (state) => this.#setState(state),
       recordCommit: (parentState, message, newState) =>
         this.#recordCommitNode(parentState, message, newState),

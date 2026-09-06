@@ -36,6 +36,7 @@ import {
   GroupHistoryFactory,
   GroupMediaFactory,
   MarmotGroup,
+  GroupTerminalError,
   type GroupDisbandedEvent,
 } from "./group/marmot-group.js";
 import { createInviteIntent } from "./group/invite.js";
@@ -526,6 +527,10 @@ export class GroupsManager<
     options?: ConnectOptions,
   ): Promise<Unsubscribable> {
     const noop: Unsubscribable = { unsubscribe: () => {} };
+    if (group.status === "removed" || group.status === "disbanded") {
+      log("connect: group %s is %s — skipping", group.idStr, group.status);
+      return noop;
+    }
     const relays =
       (group.relays?.length ? group.relays : options?.fallbackRelays) ?? [];
     if (!relays.length) {
@@ -591,11 +596,22 @@ export class GroupsManager<
     // ingests as one batch so out-of-order commits resolve together.
     await drain(await this.network.request(relays, filter));
 
+    // Backfill may itself have selected terminal state. Never seed a live route
+    // after the durable tombstone has won.
+    if (group.session.terminalTombstone) return noop;
+
     const sub = this.network
       .subscription(relays, filter)
       .subscribe({ next: (event) => void drain([event]) });
+    const disbanded = () => sub.unsubscribe();
+    group.once("disbanded", disbanded);
 
-    return { unsubscribe: () => sub.unsubscribe() };
+    return {
+      unsubscribe: () => {
+        group.off("disbanded", disbanded, undefined, true);
+        sub.unsubscribe();
+      },
+    };
   }
 
   /**
@@ -752,6 +768,7 @@ export class GroupsManager<
     log("leaving group %s", id);
 
     const group = this.#registry.peek(id) ?? (await this.#registry.load(id));
+    if (group.status === "disbanded") throw new GroupTerminalError();
     const groupIdBytes =
       typeof groupId === "string" ? hexToBytes(groupId) : groupId;
 

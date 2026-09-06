@@ -127,6 +127,8 @@ export interface IngestContext<TEnvelope> {
   maxRewindCommits: number;
   log: Debugger;
   getState(): ClientState;
+  /** True only for canonical protocol disband; Unrecoverable is not terminal. */
+  isDisbanded?: () => boolean;
   setState(state: ClientState): void;
   /**
    * Records an applied commit on the canonical branch: updates retained history
@@ -342,6 +344,15 @@ export async function* ingestEnvelopes<TEnvelope>(
   },
 ): AsyncGenerator<IngestResult<TEnvelope>> {
   const log = ctx.log.extend(`ingest:${Date.now().toString(36).slice(-5)}`);
+
+  // D-04: canonical disband is an absorbing input gate. Keep this before even
+  // reading ClientState so direct engine callers cannot reopen crypto,
+  // convergence passes, timers, dedup, or application delivery.
+  if (ctx.isDisbanded?.()) {
+    for (const envelope of envelopes)
+      yield { kind: "skipped", envelope, reason: "group-disbanded" };
+    return;
+  }
 
   // D-13: once canonical state is the removedFromGroup tombstone, later input
   // for this group is classified `self-evicted` before any per-message work —

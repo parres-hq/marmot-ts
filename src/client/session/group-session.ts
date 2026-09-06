@@ -698,6 +698,18 @@ export class GroupSession<
     events: NostrEvent[],
     options?: { maxRetries?: number },
   ): AsyncGenerator<DispositionedIngestResult> {
+    await this.#terminalHydrated;
+    if (this.#terminalTombstone) {
+      for (const event of events) {
+        const skipped: SkippedIngestResult = {
+          kind: "skipped",
+          event,
+          reason: "group-disbanded",
+        };
+        yield { ...skipped, disposition: ingestResultDisposition(skipped) };
+      }
+      return;
+    }
     for (const pending of (await this.#effectLedger?.pending()) ?? [])
       yield { ...pending, disposition: ingestResultDisposition(pending) };
     const selfEcho: NostrEvent[] = [];
