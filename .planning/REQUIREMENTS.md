@@ -30,7 +30,7 @@ Requirements for catching marmot-ts up to feature parity + byte-for-byte interop
 - [x] **CONV-02**: SelfEvicted / Realizing removal is handled — on being removed, marmot-ts emits a self-removed notification, marks the group removed-inactive, and classifies later input as SelfEvicted/stale (additive; new; `member-departure.md` #171)
 - [x] **CONV-03**: Group-state-change notifications are attributed to their `commit_digest` and withdrawn when that commit is superseded on rewind, including clearing removal markers (additive; `src/engine/` convergence, cf. `delivered-payloads.ts`; `convergence.md` #171, mdk #724)
 - [x] **CONV-04**: Own-confirmed-commit convergence protection is verified against MDK scenario vectors — a device's own published+confirmed commit is never rolled back for a same-epoch sibling; fixes are added only if marmot-ts diverges (verify-first; `src/engine/fork-recovery.ts`, `tree-convergence.ts`; mdk #706/#723/#702, #724)
-- [ ] **CONV-05**: Every valid Commit that changes `marmot.group.lifecycle.v1` to `disbanded` enters the existing bounded convergence pass even on a linear edge, without changing pass identity, deadline, base epoch, or branch scoring; terminalization occurs only when that branch is selected canonically
+- [x] **CONV-05**: Every valid Commit that changes `marmot.group.lifecycle.v1` to `disbanded` enters the existing bounded convergence pass even on a linear edge, without changing pass identity, deadline, base epoch, or branch scoring; terminalization occurs only when that branch is selected canonically
 
 ### Group lifecycle / disbanding
 
@@ -85,7 +85,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | CONV-02     | Phase 3 — Commit Integrity & Convergence Parity | Gaps Found |
 | CONV-03     | Phase 3 — Commit Integrity & Convergence Parity | Gaps Found |
 | CONV-04     | Phase 3 — Commit Integrity & Convergence Parity | Complete |
-| CONV-05     | Phase 4.1 — Terminal Group Disbanding           | Pending  |
+| CONV-05     | Phase 4.1 — Terminal Group Disbanding           | Complete |
 | WIRE-04     | Phase 4 — Feature Parity & Conformance Vectors  | Complete |
 | CONF-01     | Phase 4 — Feature Parity & Conformance Vectors  | Complete |
 | LIFE-01     | Phase 4.1 — Terminal Group Disbanding           | Complete |
