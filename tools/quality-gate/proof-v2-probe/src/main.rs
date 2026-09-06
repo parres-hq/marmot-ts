@@ -1,8 +1,8 @@
 use std::process::Command;
 
 use cgka_engine::account_identity_proof::{
-    ACCOUNT_IDENTITY_PROOF_EXTENSION_TYPE, AccountIdentityProofRequest,
-    AccountIdentityProofSigner, account_identity_proof_extension,
+    ACCOUNT_IDENTITY_PROOF_EXTENSION_TYPE, AccountIdentityProofRequest, AccountIdentityProofSigner,
+    account_identity_proof_extension,
 };
 use k256::schnorr::{SigningKey, signature::hazmat::PrehashSigner};
 use nostr::secp256k1::schnorr::Signature;

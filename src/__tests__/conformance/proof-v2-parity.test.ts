@@ -57,9 +57,7 @@ function fixtureLeaf(proof: Uint8Array): LeafNode {
 
 describe("MDK proof-v2 parity", () => {
   it("verifies the Rust-produced legacy version-byte-2 proof through production code", () => {
-    expect(fixture.mdk_sha).toBe(
-      "dbf45c83a8e157302edd13010944ad2c6a9cf9a5",
-    );
+    expect(fixture.mdk_sha).toBe("dbf45c83a8e157302edd13010944ad2c6a9cf9a5");
     expect(fixture.profile).toBe("legacy-version-byte-2");
 
     const request = fixtureRequest();
