@@ -54,10 +54,12 @@ describe("group construction", () => {
     expect(view?.adminPubkeys).toEqual([adminPubkey]);
     expect(view?.relays).toEqual(["wss://relay.example.com"]);
 
-    // The app_components (0x0001) advertising entry lists the provided ids.
+    // The app_components entry lists provided ids plus lifecycle-v1, which is
+    // mandatory and active for every newly created group.
     expect(getAppComponents(clientState.groupContext.extensions)).toEqual([
-      0x8001, 0x8003, 0x8004,
+      0x8001, 0x8003, 0x8004, 0x800c,
     ]);
+    expect(view?.protocolLifecycle).toBe("active");
 
     // MLS group_id must be distinct from the public nostr_group_id.
     expect(clientState.groupContext.groupId).not.toEqual(nostrGroupId);
