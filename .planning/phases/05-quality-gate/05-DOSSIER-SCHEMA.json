@@ -18,8 +18,11 @@
     "environment.detached_worktree",
     "environment.node_version",
     "environment.pnpm_version",
+    "environment.cargo_version",
+    "environment.rustc_version",
     "environment.install_command",
     "environment.install_result",
+    "environment.install_result_sha256",
     "environment.post_install_lockfile_sha256",
     "verification.compile_command",
     "verification.compile_result",
@@ -29,7 +32,9 @@
     "verification.rust_output_or_digest",
     "verification.fixture_diff_result",
     "verification.typescript_command",
+    "verification.vitest_version",
     "verification.typescript_output",
+    "verification.typescript_output_sha256",
     "oracle.generator_language",
     "oracle.generator_path",
     "oracle.subject_language",
@@ -37,6 +42,7 @@
     "oracle.independence",
     "negative_control.command",
     "negative_control.result"
+    ,"negative_control.output_sha256"
   ],
   "conditional_required_paths": {
     "tag-cardinality": ["oracle.source_classification"],
