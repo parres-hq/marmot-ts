@@ -1,1 +1,81 @@
-{}
+{
+  "boundaries": {
+    "accepted_cap": {
+      "accepted": true,
+      "current": true,
+      "not_after": 1795976400,
+      "not_before": 1788715200,
+      "range_acceptable": true
+    },
+    "expired": {
+      "accepted": false,
+      "current": false,
+      "not_after": 1788711599,
+      "not_before": 1788708800,
+      "range_acceptable": true
+    },
+    "not_yet_current": {
+      "accepted": false,
+      "current": false,
+      "not_after": 1788728800,
+      "not_before": 1788726001,
+      "range_acceptable": true
+    },
+    "one_over": {
+      "accepted": false,
+      "current": true,
+      "not_after": 1795976401,
+      "not_before": 1788715200,
+      "range_acceptable": false
+    }
+  },
+  "capabilities": {
+    "advertised_app_components": [
+      1,
+      32769,
+      32771,
+      32777,
+      32780
+    ],
+    "advertised_extensions": [
+      6
+    ],
+    "advertised_proposals": [
+      8
+    ],
+    "effective_extensions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "effective_proposals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "not_after": 1795976400,
+    "not_before": 1788715200,
+    "serialized_hex": "000000006a9da0c0000000006b0c6cd0"
+  },
+  "lifetime": {
+    "key_package_tls_hex": "000100050001000120b036ebf3914c293772f73595db0ab14fed01c51e33190e069fbd0ece881a821720f8555d8c8dd62cb8cc46c76a30aa3921ea961d5d6046bb4bf846a0366db4450c20e1ec91ca993f0b1f5b25a131bff8d52ad523094a780d0b7dbc042fb9a2b5304a00012010ca9c41ce77fa315b90d238cefec6da0a1fd4084d55e4c56370b7b596e1ac1502000102000102000602000802000101000000006a9da0c0000000006b0c6cd040800006407c407a00010b0a0001800180038009800c8009406810ca9c41ce77fa315b90d238cefec6da0a1fd4084d55e4c56370b7b596e1ac15000000006a9daed0f21c6af0c40707bd32fc101b0099fbe4931dabf9a74bbbb4c65b0463f0e5dcccd6d431a66f7a2bf5a7e59d75f9f10ea24dab638fe7223466887f8e1cb10c1a92404026af5ef00dea2247b40224d69dd67b23f160645cec6490f7bd8db310c93b9c4a387e3d5835f96e21fdcf5e957a142bdf85add5b61051ecc33fab157381670202070006040300040040408ab6537bebdf9d2a15798392c42802c8eab7a3a4b4f1aae98a547635dc0bdada45effdf40224b90d10497295b81815214c91957262c59a4598fa70728425d80c",
+    "key_package_tls_sha256": "d01f7fb2af47fa845c4137992994c5170cf695bf13517199f1dcdabdd29b6615",
+    "not_after": 1795976400,
+    "not_before": 1788715200,
+    "projection_sha256": "dc43f12e19dfa38135b944c61d9dfc12543188e14adf611cff0439e0aa2c2452",
+    "serialized_hex": "000000006a9da0c0000000006b0c6cd0"
+  },
+  "mdk_sha": "dbf45c83a8e157302edd13010944ad2c6a9cf9a5",
+  "openmls_rev": "59e7d3b27a7e95237879dd5478de1fd90eff7ada",
+  "projection_version": 1,
+  "source": "refs/mdk cgka-engine key_package.rs + capabilities.rs at pinned OpenMLS",
+  "validation_time": 1788718800
+}

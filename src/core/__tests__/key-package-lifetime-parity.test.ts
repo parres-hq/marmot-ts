@@ -1,4 +1,6 @@
-import { bytesToHex } from "@noble/hashes/utils.js";
+import { sha256 } from "@noble/hashes/sha2.js";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import { decode, mlsMessageDecoder, wireformats } from "ts-mls";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import fixture from "../../__tests__/fixtures/key-package-lifetime-rust.json";
@@ -23,6 +25,8 @@ type LifetimeFixture = {
     not_after: number;
     serialized_hex: string;
     projection_sha256: string;
+    key_package_tls_sha256: string;
+    key_package_tls_hex: string;
   };
   capabilities: {
     advertised_extensions: number[];
@@ -31,7 +35,10 @@ type LifetimeFixture = {
     effective_proposals: number[];
     advertised_app_components: number[];
   };
-  boundaries: Record<"accepted_cap" | "one_over" | "expired" | "not_yet_current", Boundary>;
+  boundaries: Record<
+    "accepted_cap" | "one_over" | "expired" | "not_yet_current",
+    Boundary
+  >;
 };
 
 function encodeUint64(value: bigint): Uint8Array {
@@ -64,6 +71,18 @@ describe("MDK KeyPackage lifetime parity", () => {
         ),
       ),
     ).toBe(rust.lifetime.serialized_hex);
+    const keyPackageBytes = hexToBytes(rust.lifetime.key_package_tls_hex);
+    expect(bytesToHex(sha256(keyPackageBytes))).toBe(
+      rust.lifetime.key_package_tls_sha256,
+    );
+    const decoded = decode(mlsMessageDecoder, keyPackageBytes);
+    expect(decoded?.wireformat).toBe(wireformats.mls_key_package);
+    if (!decoded || decoded.wireformat !== wireformats.mls_key_package)
+      throw new Error("Rust fixture did not decode as an MLS KeyPackage");
+    expect(decoded.keyPackage.leafNode.lifetime).toEqual({
+      notBefore: BigInt(rust.lifetime.not_before),
+      notAfter: BigInt(rust.lifetime.not_after),
+    });
 
     expect(
       isLifetimeWithinCap({
@@ -109,7 +128,7 @@ describe("MDK KeyPackage lifetime parity", () => {
       expect.arrayContaining([1, 2, 3, 4, 5, 6, 7]),
     );
     expect(rust.capabilities.advertised_app_components).toEqual(
-      expect.arrayContaining([0x0001, 0x0002, 0x000b, 0x8009]),
+      expect.arrayContaining([0x0001, 0x8001, 0x8003, 0x8009, 0x800c]),
     );
   });
 
