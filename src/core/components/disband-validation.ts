@@ -107,10 +107,6 @@ export function classifyDisbandCommit(args: {
   // on that receiver; MLS acceptance has already authenticated those bytes.
   const receiverRemoved =
     args.resultingState.groupActiveState?.kind === "removedFromGroup";
-  if (receiverRemoved) {
-    resultRequires = parentRequires;
-    resultingLifecycle = "disbanded";
-  }
   const touchesLifecycle = args.proposals.some(
     (proposal) =>
       updateBytes(proposal, GROUP_LIFECYCLE_COMPONENT_ID) !== undefined ||
@@ -119,6 +115,10 @@ export function classifyDisbandCommit(args: {
         proposal.proposal.appDataUpdate.componentId ===
           GROUP_LIFECYCLE_COMPONENT_ID),
   );
+  if (receiverRemoved && touchesLifecycle) {
+    resultRequires = parentRequires;
+    resultingLifecycle = "disbanded";
+  }
   if (
     !touchesLifecycle &&
     parentLifecycle === resultingLifecycle &&
