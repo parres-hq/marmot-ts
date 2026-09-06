@@ -4,9 +4,32 @@
 **Domain:** Cross-runtime release qualification and Rust/TypeScript wire-conformance evidence  
 **Confidence:** HIGH — the plan is derived primarily from repository CI, executable tests, pinned specification/reference submodules, and completed verification artifacts. [VERIFIED: codebase grep]
 
-## User Constraints
+<user_constraints>
+## User Constraints (from CONTEXT.md)
 
-No `05-CONTEXT.md` exists, so Phase 5 has no additional locked decisions, discretion notes, or deferred ideas beyond the roadmap, requirements, and project instructions. [VERIFIED: codebase grep]
+### Locked Decisions
+
+#### Runtime evidence
+
+- **D-01:** Run both the normal and isolated extended conformance suites in every required runtime job.
+- **D-02:** Local Node 22, Deno 2, and Bun latest runs are smoke evidence; authoritative missing-version evidence comes from CI jobs, never inferred from local substitutes.
+- **D-03:** CI must pin pnpm 10 and preserve the frozen lockfile contract.
+
+#### Cross-reference dossiers
+
+- **D-04:** Record separate reproducible dossiers for proof v2, KeyPackage lifetime, tag cardinality, and SafeAAD with exact repository SHAs, commands, outputs/digests, and negative controls.
+- **D-05:** For tag cardinality, distinguish Rust-produced kind-30443 byte parity from specification-derived inbound rejection parity; do not claim a Rust oracle where MDK exposes none.
+- **D-06:** MDK `b4649c01` changes signed MLS capability advertisements, so KeyPackage and SafeAAD evidence must be regenerated against the updated pinned reference.
+
+### the agent's Discretion
+
+- CI job factoring, artifact naming, and report layout, provided every required runtime/version and both suite classes are unambiguous.
+- Whether runtime defects are fixed in one or several plans, with atomic regression commits.
+
+### Deferred Ideas (OUT OF SCOPE)
+
+None — this phase is strictly the milestone release gate.
+</user_constraints>
 
 ## Summary
 
