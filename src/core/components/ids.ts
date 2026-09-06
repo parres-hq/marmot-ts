@@ -37,6 +37,7 @@ export const GROUP_MESSAGE_RETENTION_COMPONENT_ID: AppComponentId = 0x8005;
 export const AGENT_TEXT_STREAM_QUIC_COMPONENT_ID: AppComponentId = 0x8006;
 export const GROUP_AVATAR_URL_COMPONENT_ID: AppComponentId = 0x8007;
 export const GROUP_ENCRYPTED_MEDIA_COMPONENT_ID: AppComponentId = 0x8008;
+export const GROUP_LIFECYCLE_COMPONENT_ID: AppComponentId = 0x800c;
 
 /** Human-readable component names (the `v1` suffix is part of the name). */
 export const GROUP_PROFILE_COMPONENT = "marmot.group.profile.v1";
@@ -50,6 +51,7 @@ export const AGENT_TEXT_STREAM_QUIC_COMPONENT =
 export const GROUP_AVATAR_URL_COMPONENT = "marmot.group.avatar-url.v1";
 export const GROUP_ENCRYPTED_MEDIA_COMPONENT =
   "marmot.group.encrypted-media.v1";
+export const GROUP_LIFECYCLE_COMPONENT = "marmot.group.lifecycle.v1";
 
 /**
  * Default group component ids provisioned for a new Marmot group, matching the
@@ -59,6 +61,7 @@ export const GROUP_ENCRYPTED_MEDIA_COMPONENT =
 export const DEFAULT_GROUP_COMPONENT_IDS: readonly AppComponentId[] = [
   GROUP_PROFILE_COMPONENT_ID,
   GROUP_ADMIN_POLICY_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT_ID,
 ];
 
 /**
@@ -80,4 +83,5 @@ export const SUPPORTED_APP_COMPONENT_IDS: readonly AppComponentId[] = [
   AGENT_TEXT_STREAM_QUIC_COMPONENT_ID,
   GROUP_AVATAR_URL_COMPONENT_ID,
   GROUP_ENCRYPTED_MEDIA_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT_ID,
 ];

@@ -13,6 +13,10 @@ import {
   adminPolicyEntry,
   AppComponentId,
   appComponentsEntry,
+  DEFAULT_GROUP_COMPONENT_IDS,
+  GROUP_LIFECYCLE_COMPONENT_ID,
+  groupLifecycleEntry,
+  groupProtocolLifecycleValues,
   groupProfileEntry,
   makeAppComponentsExtension,
   nostrRoutingEntry,
@@ -62,11 +66,20 @@ export async function createGroup(
 
   // Advertise the required component ids (defaults to whatever was provided),
   // then seed each component's state into the app_data_dictionary extension.
-  const requiredIds =
-    requiredComponentIds ?? components.map((c) => c.componentId);
+  const requiredIds = [
+    ...new Set([
+      ...DEFAULT_GROUP_COMPONENT_IDS,
+      ...(requiredComponentIds ?? components.map((c) => c.componentId)),
+    ]),
+  ];
+  const initialComponents = components.some(
+    (component) => component.componentId === GROUP_LIFECYCLE_COMPONENT_ID,
+  )
+    ? components
+    : [...components, groupLifecycleEntry(groupProtocolLifecycleValues.active)];
   const appDataExtension = makeAppComponentsExtension([
     appComponentsEntry(requiredIds),
-    ...components,
+    ...initialComponents,
   ]);
 
   // Every Marmot group declares the protocol-mandatory required_capabilities so

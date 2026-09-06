@@ -26,7 +26,6 @@ import {
   getMessageRetention,
   getNostrRouting,
   groupAvatarUrlEntry,
-  groupProtocolLifecycleValues,
   groupProfileEntry,
   makeAppComponentsExtension,
   messageRetentionEntry,
@@ -41,6 +40,7 @@ import {
   SAFE_AAD_COMPONENT_ID,
   SUPPORTED_APP_COMPONENT_IDS,
 } from "../ids.js";
+import { groupProtocolLifecycleValues } from "../group-lifecycle.js";
 import { makeLeafAppComponentsExtension } from "../dictionary.js";
 import { createCredential } from "../../credential.js";
 import { generateKeyPackage } from "../../key-package.js";
@@ -154,8 +154,7 @@ describe("makeLeafAppComponentsExtension", () => {
       ciphersuiteImpl,
     });
     const extension = keyPackage.publicPackage.leafNode.extensions.find(
-      (candidate) =>
-        candidate.extensionType === appDataDictionaryExtensionType,
+      (candidate) => candidate.extensionType === appDataDictionaryExtensionType,
     );
 
     expect(extension).toBeDefined();
@@ -168,9 +167,7 @@ describe("makeLeafAppComponentsExtension", () => {
           ...extension!.extensionData,
         ]),
       ),
-    ).toBe(
-      "00061918000111100001800180038004800580068007800800020100",
-    );
+    ).toBe("00061b1a0001131200018001800380048005800680078008800c00020100");
   });
 
   it("rejects SafeAAD as group-component state", () => {
@@ -206,10 +203,12 @@ describe("group lifecycle defaults", () => {
     expect(getAppComponents(clientState.groupContext.extensions)).toContain(
       GROUP_LIFECYCLE_COMPONENT_ID,
     );
-    expect(getComponentData(
-      clientState.groupContext.extensions,
-      GROUP_LIFECYCLE_COMPONENT_ID,
-    )).toEqual(new Uint8Array([0]));
+    expect(
+      getComponentData(
+        clientState.groupContext.extensions,
+        GROUP_LIFECYCLE_COMPONENT_ID,
+      ),
+    ).toEqual(new Uint8Array([0]));
     expect(getGroupLifecycle(clientState.groupContext.extensions)).toBe(
       groupProtocolLifecycleValues.active,
     );

@@ -16,6 +16,7 @@ import {
   GROUP_AVATAR_URL_COMPONENT_ID,
   GROUP_ENCRYPTED_MEDIA_COMPONENT_ID,
   GROUP_MESSAGE_RETENTION_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT_ID,
   GROUP_PROFILE_COMPONENT_ID,
   AGENT_TEXT_STREAM_QUIC_COMPONENT_ID,
   NOSTR_ROUTING_COMPONENT_ID,
@@ -56,6 +57,11 @@ import {
   decodeAgentTextStreamQuicPolicyV1,
   encodeAgentTextStreamQuicPolicyV1,
 } from "./agent-text-stream.js";
+import {
+  decodeGroupLifecycleV1,
+  encodeGroupLifecycleV1,
+  GroupProtocolLifecycleValue,
+} from "./group-lifecycle.js";
 
 /**
  * Read + build helpers over the Marmot v2 app components carried in the MLS
@@ -208,6 +214,11 @@ const ENCRYPTED_MEDIA_CODEC = defineCodec(
   decodeEncryptedMediaPolicyV1,
   encodeEncryptedMediaPolicyV1,
 );
+const GROUP_LIFECYCLE_CODEC = defineCodec(
+  GROUP_LIFECYCLE_COMPONENT_ID,
+  decodeGroupLifecycleV1,
+  encodeGroupLifecycleV1,
+);
 
 /** Reads + decodes a component from the dictionary, or `undefined` if absent. */
 function getComponent<T>(
@@ -283,6 +294,13 @@ export function getEncryptedMediaPolicy(
   return getComponent(extensions, ENCRYPTED_MEDIA_CODEC);
 }
 
+/** The `group.lifecycle.v1` protocol state (`0x800c`). */
+export function getGroupLifecycle(
+  extensions: GroupContextExtension[],
+): GroupProtocolLifecycleValue | undefined {
+  return getComponent(extensions, GROUP_LIFECYCLE_CODEC);
+}
+
 // ---------------------------------------------------------------------------
 // Typed entry builders (for create-time dictionaries and updates)
 // ---------------------------------------------------------------------------
@@ -329,4 +347,11 @@ export function encryptedMediaEntry(
   policy: EncryptedMediaPolicyV1,
 ): ComponentData {
   return entryFor(ENCRYPTED_MEDIA_CODEC, policy);
+}
+
+/** Builds the `group.lifecycle.v1` entry. */
+export function groupLifecycleEntry(
+  value: GroupProtocolLifecycleValue,
+): ComponentData {
+  return entryFor(GROUP_LIFECYCLE_CODEC, value);
 }

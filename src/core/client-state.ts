@@ -32,6 +32,8 @@ import {
   GROUP_ENCRYPTED_MEDIA_COMPONENT_ID,
   GROUP_MESSAGE_RETENTION_COMPONENT,
   GROUP_MESSAGE_RETENTION_COMPONENT_ID,
+  GROUP_LIFECYCLE_COMPONENT,
+  GROUP_LIFECYCLE_COMPONENT_ID,
   GROUP_PROFILE_COMPONENT,
   GROUP_PROFILE_COMPONENT_ID,
   NOSTR_ROUTING_COMPONENT,
@@ -43,14 +45,17 @@ import {
   decodeGroupAvatarUrlV1,
   decodeGroupProfileV1,
   decodeMessageRetentionV1,
+  decodeGroupLifecycleV1,
   decodeNostrRoutingV1,
   getAdminPolicy,
   getEncryptedMediaPolicy,
   getGroupAvatarUrl,
   getGroupProfile,
   getMessageRetention,
+  getGroupLifecycle,
   getNostrRouting,
 } from "./components/index.js";
+import type { GroupProtocolLifecycleValue } from "./components/index.js";
 import { getGroupMemberPubkeys } from "./group-members.js";
 
 /** Default ClientConfig for Marmot. */
@@ -70,6 +75,8 @@ export const defaultMarmotClientConfig: ClientConfig = {
  * the v2 replacement for the legacy `MarmotGroupData` monolith.
  */
 export interface MarmotGroupView {
+  /** Authenticated group protocol lifecycle, if the component is enabled. */
+  protocolLifecycle?: GroupProtocolLifecycleValue;
   /** Public 32-byte nostr group id (from nostr routing), if routing is set. */
   nostrGroupId?: Uint8Array;
   /** Group display name (from the profile component). */
@@ -166,6 +173,7 @@ const COMPONENT_NAMES = new Map<number, string>([
   [AGENT_TEXT_STREAM_QUIC_COMPONENT_ID, AGENT_TEXT_STREAM_QUIC_COMPONENT],
   [GROUP_AVATAR_URL_COMPONENT_ID, GROUP_AVATAR_URL_COMPONENT],
   [GROUP_ENCRYPTED_MEDIA_COMPONENT_ID, GROUP_ENCRYPTED_MEDIA_COMPONENT],
+  [GROUP_LIFECYCLE_COMPONENT_ID, GROUP_LIFECYCLE_COMPONENT],
 ]);
 
 const CIPHERSUITE_NAMES = new Map<number, string>(
@@ -207,6 +215,8 @@ function decodeGroupComponent(
       return decodeGroupAvatarUrlV1(data);
     case GROUP_ENCRYPTED_MEDIA_COMPONENT_ID:
       return decodeEncryptedMediaPolicyV1(data);
+    case GROUP_LIFECYCLE_COMPONENT_ID:
+      return decodeGroupLifecycleV1(data);
     default:
       return undefined;
   }
@@ -260,6 +270,7 @@ export function getMarmotGroupView(
     const avatar = getGroupAvatarUrl(extensions);
     const encryptedMedia = getEncryptedMediaPolicy(extensions);
     const messageRetention = getMessageRetention(extensions);
+    const protocolLifecycle = getGroupLifecycle(extensions);
 
     if (!profile && !adminPubkeys && !routing) return null;
 
@@ -272,6 +283,7 @@ export function getMarmotGroupView(
       avatarUrl: avatar?.url,
       encryptedMedia,
       messageRetention,
+      protocolLifecycle,
     };
   } catch {
     return null;
