@@ -416,6 +416,12 @@ export class GroupSession<
     return this.#terminalTombstone;
   }
 
+  /** Waits until both durable lifecycle namespaces have been decoded. */
+  async hydrateLifecycleEvidence(): Promise<void> {
+    await this.#terminalHydrated;
+    await this.#engine.disbandRequest();
+  }
+
   /**
    * Commits selected terminal evidence before repeatable cleanup. The first
    * durable write is authoritative even if any later store operation fails.

@@ -287,6 +287,7 @@ export class GroupRegistry<
       // Hydration is deliberately side-effect free. Persisted competing tips can
       // change canonical state (including landing on removal), so activate them
       // only after every public lifecycle forwarder is attached.
+      await group.session.hydrateLifecycleEvidence();
       if (group.forkTree.tips().length > 1) await group.reconverge();
       await group.realizeRemovalIfNeeded();
       this.#activatingGroups.delete(id);
