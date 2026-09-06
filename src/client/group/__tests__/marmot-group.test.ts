@@ -41,7 +41,7 @@ async function createTestGroupState(
     kp,
     ciphersuiteImpl,
     "Test Group",
-    { adminPubkeys: [adminPubkey], relays: [] },
+    { adminPubkeys: [adminPubkey], relays: ["wss://relay.test"] },
   );
   return { clientState, kp };
 }
@@ -65,9 +65,11 @@ describe("MarmotGroup lifecycle (group-state.md)", () => {
     });
 
     const result = await group.disband();
-    expect(result.kind).toBe("acknowledged");
+    expect(result).toMatchObject({ kind: "acknowledged" });
     expect(network.events).toHaveLength(1);
-    expect(await lifecycleStore.getItem(`${group.idStr}/disband/request`)).not.toBeNull();
+    expect(
+      await lifecycleStore.getItem(`${group.idStr}/disband/request`),
+    ).not.toBeNull();
 
     const repeated = await group.disband();
     expect(repeated.kind).toBe("pending");
@@ -98,7 +100,9 @@ describe("MarmotGroup lifecycle (group-state.md)", () => {
 
     expect(result.kind).toBe("publishFailed");
     expect(group.lifecycle).toBe("Stable");
-    expect(await lifecycleStore.getItem(`${group.idStr}/disband/request`)).not.toBeNull();
+    expect(
+      await lifecycleStore.getItem(`${group.idStr}/disband/request`),
+    ).not.toBeNull();
   });
 
   it("reports lifecycle enablement idempotently through the public facade", async () => {
@@ -176,6 +180,7 @@ describe("MarmotGroup lifecycle (group-state.md)", () => {
       "marmot.group.profile.v1",
       "marmot.group.admin-policy.v1",
       "marmot.transport.nostr.routing.v1",
+      "marmot.group.lifecycle.v1",
     ]);
     expect(group.info.nostr.groupIdHex).toHaveLength(64);
     expect(group.info.nostr.relays).toEqual(["wss://relay.test"]);

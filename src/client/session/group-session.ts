@@ -24,6 +24,7 @@ import type { IngestionPoolOptions } from "../../engine/ingestion-pool.js";
 import { MarmotGroupEngine } from "../../engine/group-engine.js";
 import { GroupHistoryTree } from "../../engine/history-tree.js";
 import type { RetainedHistoryStore } from "../../engine/retained-store.js";
+import type { DisbandRequest } from "../../engine/disband-request.js";
 import { ingestResultDisposition as engineIngestResultDisposition } from "../../engine/ingest-disposition.js";
 import type {
   DispositionedIngestResult as EngineDispositionedIngestResult,
@@ -514,6 +515,11 @@ export class GroupSession<
         },
       ],
     };
+  }
+
+  /** Returns the hydrated durable disband request, if one exists. */
+  async disbandRequest(): Promise<DisbandRequest | undefined> {
+    return this.#engine.disbandRequest();
   }
 
   /** Builds the atomic active+required lifecycle enablement commit. */

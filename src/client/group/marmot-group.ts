@@ -23,6 +23,10 @@ import type { ConvergencePolicy } from "../../core/convergence.js";
 import type { GroupHistoryTree } from "../../engine/history-tree.js";
 import type { IngestionPoolOptions } from "../../engine/ingestion-pool.js";
 import type { RetainedHistoryStore } from "../../engine/retained-store.js";
+import type {
+  DisbandFailureReason,
+  DisbandRequest,
+} from "../../engine/disband-request.js";
 import { buildForkTreeView, type ForkTreeView } from "./fork-tree-view.js";
 import { logger } from "../../utils/debug.js";
 import type { GenericKeyValueStore } from "../../utils/key-value.js";
@@ -70,6 +74,38 @@ export class NoMarmotGroupDataError extends Error {
   constructor() {
     super("MarmotGroupData not found in ClientState.");
   }
+}
+
+export type EnableDisbandingResult =
+  | { kind: "enabled"; publication: GroupPublishResult }
+  | { kind: "alreadyEnabled" }
+  | {
+      kind: "rejected";
+      reason: "unsupportedMembers" | "notAdmin" | "legality";
+      error: string;
+    }
+  | { kind: "publishFailed"; error: string };
+
+export type DisbandResult =
+  | {
+      kind: "acknowledged";
+      request: Extract<DisbandRequest, { status: "pending" }>;
+      publication: GroupPublishResult;
+    }
+  | {
+      kind: "pending";
+      request: Extract<DisbandRequest, { status: "pending" }>;
+    }
+  | { kind: "failed"; reason: DisbandFailureReason }
+  | { kind: "rejected"; reason: "notEnabled" | "legality"; error: string }
+  | {
+      kind: "publishFailed";
+      request: Extract<DisbandRequest, { status: "pending" }>;
+      error: string;
+    };
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export type {
@@ -776,6 +812,74 @@ export class MarmotGroup<
     return new Promise<GroupPublishResult[]>((resolve, reject) => {
       this.#outboundQueue.push({ intent, resolve, reject });
     });
+  }
+
+  /** Atomically enables lifecycle-v1 for a legacy group and publishes it once. */
+  async enableDisbanding(): Promise<EnableDisbandingResult> {
+    let effects;
+    try {
+      effects = await this.session.enableGroupDisbanding();
+    } catch (error) {
+      const message = errorMessage(error);
+      const reason = /not all members support|required capabilities/i.test(
+        message,
+      )
+        ? "unsupportedMembers"
+        : /only an active group admin/i.test(message)
+          ? "notAdmin"
+          : "legality";
+      return { kind: "rejected", reason, error: message };
+    }
+    if (effects.publish.length === 0) return { kind: "alreadyEnabled" };
+    try {
+      const [publication] = await this.runtime.publishEffects(effects);
+      if (!publication)
+        return {
+          kind: "rejected",
+          reason: "legality",
+          error: "Lifecycle enablement produced no publication result",
+        };
+      return { kind: "enabled", publication };
+    } catch (error) {
+      return { kind: "publishFailed", error: errorMessage(error) };
+    }
+  }
+
+  /** Persists irreversible intent, publishes one candidate, and retains it until selection. */
+  async disband(): Promise<DisbandResult> {
+    const existing = await this.session.disbandRequest();
+    if (existing?.status === "pending")
+      return { kind: "pending", request: existing };
+    if (existing?.status === "failed")
+      return { kind: "failed", reason: existing.reason };
+    let effects;
+    try {
+      effects = await this.session.requestDisband();
+    } catch (error) {
+      const message = errorMessage(error);
+      return {
+        kind: "rejected",
+        reason: /not enabled/i.test(message) ? "notEnabled" : "legality",
+        error: message,
+      };
+    }
+    const request = await this.session.disbandRequest();
+    if (request?.status === "failed")
+      return { kind: "failed", reason: request.reason };
+    if (!request)
+      return {
+        kind: "rejected",
+        reason: "legality",
+        error: "Disband request was not persisted",
+      };
+    if (effects.publish.length === 0) return { kind: "pending", request };
+    try {
+      const [publication] = await this.runtime.publishEffects(effects);
+      if (!publication) return { kind: "pending", request };
+      return { kind: "acknowledged", request, publication };
+    } catch (error) {
+      return { kind: "publishFailed", request, error: errorMessage(error) };
+    }
   }
 
   /** Builds + publishes an intent's effects immediately (no gating). */
