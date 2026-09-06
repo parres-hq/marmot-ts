@@ -1,0 +1,42 @@
+{
+  "advertised_app_components": [
+    1,
+    32769,
+    32771,
+    32777,
+    32780
+  ],
+  "capabilities": {
+    "advertised_extensions": [
+      6
+    ],
+    "advertised_proposals": [
+      8
+    ],
+    "effective_extensions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "effective_proposals": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
+  },
+  "dictionary_hex": "0400020100",
+  "dictionary_projection": "exact extracted SafeAAD entry only; current account-proof bytes are intentionally excluded as nondeterministic",
+  "dictionary_sha256": "1488eb12e7041072e9446639f22054ed76cfdc3c53680f401ebeddb56924cc74",
+  "extraction": "Engine::fresh_key_package -> KeyPackage::bytes -> MlsMessageIn -> LeafNode",
+  "mdk_sha": "dbf45c83a8e157302edd13010944ad2c6a9cf9a5",
+  "safe_aad_hex": "00",
+  "source": "refs/mdk cgka_engine::Engine implementing cgka_traits::CgkaEngine::fresh_key_package"
+}
