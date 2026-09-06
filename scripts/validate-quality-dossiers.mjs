@@ -3,17 +3,15 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const sharedRepositoryRoot = dirname(
-  execFileSync("git", ["rev-parse", "--git-common-dir"], {
-    cwd: root,
-    encoding: "utf8",
-  }).trim(),
-);
+const gitCommonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
+  cwd: root,
+  encoding: "utf8",
+}).trim();
+const sharedRepositoryRoot = resolve(root, dirname(gitCommonDir));
 const phaseDir = join(root, ".planning/phases/05-quality-gate");
 const schema = JSON.parse(
   readFileSync(join(phaseDir, "05-DOSSIER-SCHEMA.json"), "utf8"),
@@ -81,6 +79,20 @@ function typescriptCommand(definition) {
 
 function controlCommand(definition) {
   return `${typescriptCommand(definition)} -t ${JSON.stringify(definition.control)}`;
+}
+
+function replayPaths(definition) {
+  const worktreePrefix = join(sharedRepositoryRoot, ".quality-dossier-replay-");
+  const cargoTarget = join(
+    sharedRepositoryRoot,
+    dirname(definition.manifest),
+    "target",
+  );
+  if (!isAbsolute(sharedRepositoryRoot) || !isAbsolute(cargoTarget))
+    fail(
+      "replay paths must resolve against an absolute shared repository root",
+    );
+  return { worktreePrefix, cargoTarget };
 }
 
 function validateToolVersions(evidence, actual) {
@@ -331,7 +343,9 @@ function parseVitest(output, label) {
 
 function replay(records) {
   const sourceSha = records[0].evidence.provenance.tested_source_sha;
-  const worktree = mkdtempSync(join(tmpdir(), "marmot-dossier-replay-"));
+  const worktree = mkdtempSync(
+    replayPaths(records[0].definition).worktreePrefix,
+  );
   try {
     runChecked(
       "git",
@@ -399,11 +413,7 @@ function replay(records) {
       "build replay",
     );
     for (const { evidence, definition, fixture } of records) {
-      const targetDir = join(
-        sharedRepositoryRoot,
-        dirname(definition.manifest),
-        "target",
-      );
+      const targetDir = replayPaths(definition).cargoTarget;
       const rust = runChecked(
         "cargo",
         ["run", "--quiet", "--manifest-path", definition.manifest, "--locked"],
@@ -589,6 +599,18 @@ function selfTest(records) {
         fail(`${evidence.dossier}: ${field} mutation was accepted`);
       rejected += 1;
     }
+  for (const { definition } of records) {
+    const { worktreePrefix, cargoTarget } = replayPaths(definition);
+    if (
+      dirname(worktreePrefix) !== sharedRepositoryRoot ||
+      !cargoTarget.startsWith(`${sharedRepositoryRoot}/`) ||
+      cargoTarget.startsWith("/tmp/")
+    )
+      fail("replay path regression: worktree/cache escaped shared workspace");
+  }
+  const relativeCommonRoot = resolve(root, dirname(".git"));
+  if (relativeCommonRoot !== root)
+    fail("relative git common-dir regression: main worktree root misresolved");
   console.log(
     `PASS: rejected ${rejected} plausible provenance and digest mutations`,
   );
