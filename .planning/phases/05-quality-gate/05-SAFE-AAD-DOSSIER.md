@@ -8,7 +8,7 @@ Evidence captured on 2026-09-06 UTC from a detached worktree at the immutable te
   "schema_version": 1,
   "dossier": "safe-aad",
   "provenance": {
-    "tested_source_sha": "c399203cd0de4db45b3b39d3b49ab27da9b8f075",
+    "tested_source_sha": "1aaeafe8c890e2cd01dbb99d0a7e0ba1a5981b78",
     "marmot_sha": "4a2bc65f8db5866cec3b2a127dedb37818eaf207",
     "mdk_sha": "dbf45c83a8e157302edd13010944ad2c6a9cf9a5",
     "lockfile_sha256": "0f516945e45e257735c4c89a5e9e08b4bb2f839b7ce48121a71b4fb0b03a0932"
