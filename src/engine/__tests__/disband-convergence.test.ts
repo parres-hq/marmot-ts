@@ -116,10 +116,18 @@ describe("bounded disband convergence", () => {
       lastRelevantInputMs: 100,
       baseEpoch: beforeEpoch,
     });
+    const openedPass = observer.convergencePass;
+
+    nowMs = 500;
+    for await (const _ of observer.ingest([candidate.envelope])) {
+      // Duplicate terminal evidence has no scheduler effect.
+    }
+    expect(observer.convergencePass).toEqual(openedPass);
 
     nowMs = 1_100;
     await observer.driveConvergence();
     expect(observer.lifecycle).toBe("Disbanded");
     expect(observer.state.groupActiveState.kind).toBe("removedFromGroup");
+    await expect(observer.send({ kind: "selfUpdate" })).rejects.toThrow();
   });
 });
