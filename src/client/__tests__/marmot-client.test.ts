@@ -239,3 +239,62 @@ describe("MarmotClient ingest-state persistence capability", () => {
     );
   });
 });
+
+describe("MarmotClient lifecycle persistence", () => {
+  it("threads one supplied lifecycle store through create, import, and load", async () => {
+    const account = PrivateKeyAccount.generateNew();
+    const groupStateStore = new InMemoryKeyValueStore<SerializedClientState>();
+    const lifecycleStore = new InMemoryKeyValueStore<Uint8Array>();
+    const makeClient = (store: InMemoryKeyValueStore<SerializedClientState>) =>
+      new MarmotClient({
+        groupStateStore: store,
+        lifecycleStore,
+        keyPackageStore: new InMemoryKeyValueStore(),
+        signer: account.signer,
+        network: new MockNetwork(),
+      });
+
+    const writer = makeClient(groupStateStore);
+    const created = await writer.groups.create("Lifecycle create", {
+      relays: ["wss://relay.example.com"],
+    });
+    expect(created.session.lifecycleStore).toBe(lifecycleStore);
+
+    const reader = makeClient(groupStateStore);
+    const [loaded, concurrent] = await Promise.all([
+      reader.groups.get(created.id),
+      reader.groups.get(created.id),
+    ]);
+    expect(loaded).toBe(concurrent);
+    expect(loaded.session.lifecycleStore).toBe(lifecycleStore);
+
+    const imported = await makeClient(
+      new InMemoryKeyValueStore(),
+    ).groups.import(created.state);
+    expect(imported.session.lifecycleStore).toBe(lifecycleStore);
+  });
+
+  it("defaults lifecycle records to the durable group-state backend", async () => {
+    const account = PrivateKeyAccount.generateNew();
+    const groupStateStore = new InMemoryKeyValueStore<SerializedClientState>();
+    const client = new MarmotClient({
+      groupStateStore,
+      keyPackageStore: new InMemoryKeyValueStore(),
+      signer: account.signer,
+      network: new MockNetwork(),
+    });
+    const group = await client.groups.create("Lifecycle fallback", {
+      relays: ["wss://relay.example.com"],
+    });
+    const marker = new Uint8Array([1, 2, 3]);
+
+    await group.session.lifecycleStore.setItem(
+      `${group.idStr}/disband/request`,
+      marker,
+    );
+
+    expect(
+      await groupStateStore.getItem(`${group.idStr}/disband/request`),
+    ).toEqual(marker);
+  });
+});
